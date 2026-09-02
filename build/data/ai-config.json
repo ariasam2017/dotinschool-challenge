@@ -1,0 +1,12 @@
+{
+  "activeId": "cf273cf0-5bf9-441f-99b6-1dda81d45a96",
+  "providers": [
+    {
+      "id": "cf273cf0-5bf9-441f-99b6-1dda81d45a96",
+      "label": "GapGPT",
+      "baseUrl": "https://api.gapgpt.app/v1",
+      "model": "gpt-4o-mini",
+      "apiKey": "sk-ALYQ5TxsMngf2xSNQ2ZhaINLjMPPNTWCDlYCG1Tx20x8voLQ"
+    }
+  ]
+}

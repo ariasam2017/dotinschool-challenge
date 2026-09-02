@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { storeToRefs } from 'pinia'
 import { useParticipantStore } from '@/stores/participant'
@@ -22,13 +22,22 @@ import { toFa } from '@/lib/fa'
 const pStore = useParticipantStore()
 const eStore = useEventStore()
 const { user } = storeToRefs(pStore)
-const { challenge, state: eventState, remainMs, startsInMs, canCompete, loaded } = storeToRefs(eStore)
+const { challenge, state: eventState, remainMs, startsInMs, canCompete } = storeToRefs(eStore)
+
+// Once the event is live the participant is dropped straight into the coding
+// arena — there is no "start" button. This stays true afterwards (a pause or the
+// event ending doesn't yank the editor away), so we can also restore it for a
+// returning participant whose status is already started/submitted.
+const arenaEntered = ref(false)
 
 const booted = ref(false)
-const arenaOpen = ref(false)
 const code = ref(STARTER_CODE)
 const submitState = ref<'idle' | 'submitting' | 'submitted' | 'error'>('idle')
 const submitError = ref('')
+
+// The countdown-to-start is shown to participants only inside the final hour
+// before the scheduled start; before that they just see a "not started" notice.
+const START_COUNTDOWN_WINDOW_MS = 60 * 60 * 1000
 
 const problems = ref<EditorProblem[]>([])
 const cursor = ref({ line: 1, col: 1 })
@@ -62,6 +71,32 @@ const resultMessage = computed(
   () => challenge.value?.submitMessage?.trim() || 'کدت با موفقیت ثبت شد. پس از بررسی مدیر سامانه، نتیجه‌ی چالش به شما اعلام خواهد شد.',
 )
 
+// Show the countdown-to-start only inside the final hour before the scheduled
+// start time. Outside that window a plain "not started" notice is shown.
+const showStartCountdown = computed(
+  () => eventState.value === 'waiting' && startsInMs.value > 0 && startsInMs.value <= START_COUNTDOWN_WINDOW_MS,
+)
+
+// Which screen the signed-in participant sees.
+const userView = computed<'notStarted' | 'countdown' | 'arena'>(() => {
+  if (arenaEntered.value || eventState.value === 'running' || eventState.value === 'ended') return 'arena'
+  if (showStartCountdown.value) return 'countdown'
+  return 'notStarted' // waiting (>1h) or paused-before-start
+})
+
+// Enter the arena automatically the moment the event goes live. No button.
+watch(
+  [eventState, user],
+  ([st, u]) => {
+    if (u && st === 'running' && !arenaEntered.value) {
+      arenaEntered.value = true
+      if (!code.value || code.value === STARTER_CODE) code.value = u.code || STARTER_CODE
+      void pStore.patchQuietly({ status: 'started' })
+    }
+  },
+  { immediate: true },
+)
+
 onMounted(async () => {
   installErrorQueueFlusher()
   eStore.start()
@@ -69,7 +104,7 @@ onMounted(async () => {
   if (resumed) {
     message.success(`خوش آمدید دوباره، ${resumed.firstName}`)
     if (resumed.status !== 'registered') {
-      arenaOpen.value = true
+      arenaEntered.value = true
       code.value = resumed.code || STARTER_CODE
       if (resumed.status === 'submitted') submitState.value = 'submitted'
     }
@@ -80,21 +115,9 @@ onBeforeUnmount(() => eStore.stop())
 
 function onAuthed(status: string) {
   if (status !== 'registered') {
-    arenaOpen.value = true
+    arenaEntered.value = true
     code.value = user.value?.code || STARTER_CODE
   }
-}
-
-async function startChallenge() {
-  if (!user.value) return
-  if (!canCompete.value) {
-    message.error(LOCK_MESSAGES[lockReason.value] || 'شروع چالش ممکن نیست')
-    return
-  }
-  arenaOpen.value = true
-  code.value = user.value.code || STARTER_CODE
-  await pStore.patchQuietly({ status: 'started' })
-  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 async function submit() {
@@ -158,7 +181,7 @@ function friendlyError(err: ApiError): string {
 }
 
 function confirmExit() {
-  const midChallenge = arenaOpen.value && user.value?.status !== 'submitted'
+  const midChallenge = arenaEntered.value && user.value?.status !== 'submitted'
   Modal.confirm({
     title: 'خروج از حساب',
     content: midChallenge
@@ -211,61 +234,51 @@ function confirmExit() {
 
       <!-- signed in -->
       <template v-else>
-        <div v-if="loaded && eventState !== 'running' && !arenaOpen" class="event-banner" :class="eventState">
-          <AppIcon :name="eventState === 'ended' ? 'clock' : eventState === 'paused' ? 'pause' : 'calendar'" :size="16" />
-          <span>
-            {{ eventState === 'waiting' ? 'رویداد زمان‌بندی شده و هنوز شروع نشده است' : eventState === 'paused' ? 'رویداد توسط مدیر موقتاً متوقف شده است' : 'زمان رویداد به پایان رسیده است' }}
-          </span>
-        </div>
-
-        <!-- scheduled: waiting for start -->
-        <section v-if="eventState === 'waiting' && !arenaOpen" class="wait-card card card-pad">
-          <AppIcon name="clock" :size="28" />
-          <h2>چالش هنوز شروع نشده است</h2>
-          <CountdownClock :ms="startsInMs" state="waiting" size="xl" label="زمان باقی‌مانده تا شروع خودکار" />
+        <!-- event not started yet: no challenge is shown at all -->
+        <section v-if="userView === 'notStarted'" class="wait-card card card-pad">
+          <AppIcon :name="eventState === 'paused' ? 'pause' : 'calendar'" :size="30" />
+          <h2>{{ eventState === 'paused' ? 'رویداد موقتاً متوقف است' : 'رویداد هنوز شروع نشده است' }}</h2>
+          <p class="faint wait-lead">
+            {{
+              eventState === 'paused'
+                ? 'مدیر رویداد را موقتاً متوقف کرده — به‌محض ادامه، سوال چالش همین‌جا برای شما نمایش داده می‌شود.'
+                : 'زمان برگزاری را مدیر سامانه تعیین می‌کند. به‌محض شروع رویداد، سوال چالش به‌صورت خودکار همین‌جا نمایش داده می‌شود — نیازی به هیچ کاری نیست.'
+            }}
+          </p>
           <p v-if="eStore.config?.eventStartsAt" class="faint">
-            شروع: <span class="num">{{ fmtJalaliDateTime(eStore.config.eventStartsAt) }}</span>
+            زمان شروع: <span class="num">{{ fmtJalaliDateTime(eStore.config.eventStartsAt) }}</span>
+          </p>
+          <ul class="rules-list wait-rules">
+            <li v-for="(r, i) in RULES" :key="i">
+              <AppIcon name="check-circle" :size="15" />
+              <span>{{ r }}</span>
+            </li>
+          </ul>
+        </section>
+
+        <!-- final hour before the scheduled start: countdown, still no challenge -->
+        <section v-else-if="userView === 'countdown'" class="wait-card card card-pad">
+          <AppIcon name="clock" :size="30" />
+          <h2>رویداد به‌زودی شروع می‌شود</h2>
+          <CountdownClock :ms="startsInMs" state="waiting" size="xl" label="زمان باقی‌مانده تا شروع" />
+          <p v-if="eStore.config?.eventStartsAt" class="faint">
+            شروع خودکار: <span class="num">{{ fmtJalaliDateTime(eStore.config.eventStartsAt) }}</span>
+          </p>
+          <p class="faint wait-lead">
+            وقتی شمارش معکوس به پایان برسد، سوال چالش خودکار همین‌جا نمایش داده می‌شود.
           </p>
         </section>
 
-        <!-- challenge intro -->
-        <section v-else-if="!arenaOpen && challenge" class="intro-grid">
-          <div class="card card-pad">
-            <ChallengeCard :challenge="challenge" />
-          </div>
-          <aside class="intro-side">
-            <div class="card card-pad clock-card">
-              <span class="section-title">زمان باقی‌مانده</span>
-              <CountdownClock :ms="remainMs" :state="clockState" size="lg" />
-              <a-button
-                type="primary"
-                size="large"
-                block
-                :disabled="!canCompete"
-                @click="startChallenge"
-              >
-                <template #icon><AppIcon name="play" :size="16" /></template>
-                شروع حل چالش
-              </a-button>
-              <p v-if="!canCompete" class="faint lock-note">{{ LOCK_MESSAGES[lockReason] }}</p>
-            </div>
-
-            <div class="card card-pad rules-card">
-              <span class="section-title">پیش از شروع</span>
-              <ul class="rules-list">
-                <li v-for="(r, i) in RULES" :key="i">
-                  <AppIcon name="check-circle" :size="15" />
-                  <span>{{ r }}</span>
-                </li>
-              </ul>
-            </div>
-          </aside>
-        </section>
-
-        <!-- arena -->
-        <section v-else-if="arenaOpen && challenge" class="arena">
+        <!-- arena — shown the moment the event goes live, no start button -->
+        <section v-else-if="challenge" class="arena">
           <aside class="arena-brief card card-pad">
             <ChallengeCard :challenge="challenge" compact />
+            <ul class="rules-list arena-rules">
+              <li v-for="(r, i) in RULES" :key="i">
+                <AppIcon name="check-circle" :size="14" />
+                <span>{{ r }}</span>
+              </li>
+            </ul>
           </aside>
 
           <div class="arena-editor">
@@ -502,28 +515,24 @@ function confirmExit() {
   gap: var(--space-4);
   text-align: center;
   color: var(--text-dim);
+  max-width: 640px;
+  margin: var(--space-6) auto 0;
 }
-.intro-grid {
-  display: grid;
-  gap: var(--space-5);
+.wait-card h2 {
+  margin: 0;
 }
-@media (min-width: 960px) {
-  .intro-grid {
-    grid-template-columns: 1fr 320px;
-    align-items: start;
-  }
+.wait-lead {
+  font-size: 0.88rem;
+  line-height: 2;
+  margin: 0;
+  max-width: 52ch;
 }
-.clock-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-  position: sticky;
-  top: calc(var(--header-h) + 16px);
-}
-.lock-note {
-  font-size: 0.75rem;
-  text-align: center;
+.wait-rules {
+  align-self: stretch;
+  margin-top: var(--space-2) !important;
+  text-align: start;
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4) !important;
 }
 .arena {
   display: grid;
@@ -573,8 +582,14 @@ function confirmExit() {
 .editor-host {
   height: min(58vh, 540px);
 }
-.rules-card {
-  margin-top: var(--space-3);
+.arena-rules {
+  margin-top: var(--space-4) !important;
+  padding-top: var(--space-3) !important;
+  border-top: 1px solid var(--border);
+}
+.arena-rules li {
+  font-size: 0.74rem;
+  gap: 6px;
 }
 .rules-list {
   list-style: none;
