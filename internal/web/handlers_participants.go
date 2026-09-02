@@ -35,6 +35,9 @@ func (s *server) handleDeleteParticipant(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+// maxSubmittedCode caps the stored solution size (~5000 lines of Java).
+const maxSubmittedCode = 200_000
+
 type participantPatch struct {
 	SessionToken *string `json:"sessionToken"`
 	FirstName    *string `json:"firstName"`
@@ -137,7 +140,13 @@ func (s *server) handlePatchParticipant(c *gin.Context) {
 		p.Status = *body.Status
 	}
 	if body.Code != nil {
-		p.Code = body.Code
+		// A challenge solution is never this big; clamp so a single row can't
+		// bloat the DB or the admin's code-preview render.
+		code := *body.Code
+		if len(code) > maxSubmittedCode {
+			code = code[:maxSubmittedCode]
+		}
+		p.Code = &code
 	}
 	if body.AIFlag != nil {
 		p.AIFlag = body.AIFlag

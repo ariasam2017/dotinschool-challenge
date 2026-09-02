@@ -11,7 +11,17 @@ import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLi
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { java } from '@codemirror/lang-java'
 import { bracketMatching, indentOnInput, foldGutter, syntaxHighlighting, defaultHighlightStyle, HighlightStyle } from '@codemirror/language'
-import { closeBrackets, closeBracketsKeymap, autocompletion, completionKeymap, type CompletionContext } from '@codemirror/autocomplete'
+import {
+  closeBrackets,
+  closeBracketsKeymap,
+  autocompletion,
+  completionKeymap,
+  acceptCompletion,
+  completionStatus,
+  snippetCompletion,
+  type CompletionContext,
+  type Completion,
+} from '@codemirror/autocomplete'
 import { searchKeymap, highlightSelectionMatches, search } from '@codemirror/search'
 import { linter, lintGutter, type Diagnostic } from '@codemirror/lint'
 import { tags as t } from '@lezer/highlight'
@@ -107,16 +117,62 @@ function lintJava(code: string): Diagnostic[] {
 /* ---- autocomplete: curated Java API + templates + same-file identifiers ---- */
 const JAVA_TYPES = ['String', 'Integer', 'Long', 'Double', 'Boolean', 'Character', 'Object', 'List', 'ArrayList', 'LinkedList', 'Map', 'HashMap', 'TreeMap', 'LinkedHashMap', 'Set', 'HashSet', 'TreeSet', 'Queue', 'Deque', 'ArrayDeque', 'Stack', 'Scanner', 'Arrays', 'Collections', 'Math', 'System', 'StringBuilder', 'Comparator', 'Iterator', 'Optional', 'Exception', 'RuntimeException']
 const JAVA_METHODS: [string, string][] = [['println', 'System.out.println(x)'], ['print', 'System.out.print(x)'], ['printf', 'System.out.printf(fmt, args)'], ['length', 'array.length / string.length()'], ['size', 'collection.size()'], ['add', 'collection.add(e)'], ['get', 'list.get(i) / map.get(k)'], ['put', 'map.put(k, v)'], ['containsKey', 'map.containsKey(k)'], ['keySet', 'map.keySet()'], ['values', 'map.values()'], ['entrySet', 'map.entrySet()'], ['sort', 'Arrays.sort(a)'], ['max', 'Math.max(a, b)'], ['min', 'Math.min(a, b)'], ['abs', 'Math.abs(x)'], ['equals', 'a.equals(b)'], ['compareTo', 'a.compareTo(b)'], ['substring', 's.substring(a, b)'], ['charAt', 's.charAt(i)'], ['indexOf', 's.indexOf(x)'], ['split', 's.split(regex)'], ['trim', 's.trim()'], ['toCharArray', 's.toCharArray()'], ['parseInt', 'Integer.parseInt(s)'], ['append', 'sb.append(x)'], ['nextInt', 'scanner.nextInt()'], ['nextLine', 'scanner.nextLine()']]
-const SNIPPETS: [string, string][] = [['sout', 'System.out.println();'], ['psvm', 'public static void main(String[] args) {\n    \n}'], ['fori', 'for (int i = 0; i < n; i++) {\n    \n}'], ['ifn', 'if () {\n    \n}'], ['trycatch', 'try {\n    \n} catch (Exception e) {\n    e.printStackTrace();\n}']]
+/* IntelliJ IDEA "Live Templates": type the abbreviation, press Tab (or Enter)
+   and it expands with proper indentation and tab-stops. Template syntax is
+   CodeMirror's snippet syntax: `${}` = final cursor / a stop, `${name}` = a
+   placeholder holding literal text, `${1}` `${2}` = numbered stops (repeating a
+   number links the fields — editing one edits all), `\t` becomes one indent
+   unit. Output text matches IntelliJ's Java templates. */
+const LIVE_TEMPLATES: { name: string; template: string; detail: string }[] = [
+  { name: 'psvm', template: 'public static void main(String[] args) {\n\t${}\n}', detail: 'public static void main(String[] args)' },
+  { name: 'main', template: 'public static void main(String[] args) {\n\t${}\n}', detail: 'public static void main(String[] args)' },
+  { name: 'sout', template: 'System.out.println(${});', detail: 'System.out.println(...)' },
+  { name: 'souf', template: 'System.out.printf(${});', detail: 'System.out.printf(...)' },
+  { name: 'serr', template: 'System.err.println(${});', detail: 'System.err.println(...)' },
+  { name: 'soutv', template: 'System.out.println("${1:value} = " + ${1});', detail: 'print a value with its name' },
+  { name: 'fori', template: 'for (int ${1:i} = 0; ${1} < ${2:n}; ${1}++) {\n\t${}\n}', detail: 'index for loop' },
+  { name: 'forr', template: 'for (int ${1:i} = ${2:n} - 1; ${1} >= 0; ${1}--) {\n\t${}\n}', detail: 'reverse for loop' },
+  { name: 'iter', template: 'for (${1:var} ${2:item} : ${3:iterable}) {\n\t${}\n}', detail: 'enhanced for (for-each)' },
+  { name: 'itar', template: 'for (int ${1:i} = 0; ${1} < ${2:array}.length; ${1}++) {\n\t${3:int} ${4:x} = ${2}[${1}];\n\t${}\n}', detail: 'iterate over an array' },
+  { name: 'iff', template: 'if (${}) {\n\t${}\n}', detail: 'if statement' },
+  { name: 'ifn', template: 'if (${1:x} == null) {\n\t${}\n}', detail: 'if (x == null)' },
+  { name: 'inn', template: 'if (${1:x} != null) {\n\t${}\n}', detail: 'if (x != null)' },
+  { name: 'ifelse', template: 'if (${}) {\n\t${}\n} else {\n\t\n}', detail: 'if / else' },
+  { name: 'whilen', template: 'while (${}) {\n\t${}\n}', detail: 'while loop' },
+  { name: 'trycatch', template: 'try {\n\t${}\n} catch (${1:Exception} ${2:e}) {\n\t${3:e.printStackTrace();}\n}', detail: 'try / catch' },
+  { name: 'try', template: 'try {\n\t${}\n} catch (${1:Exception} ${2:e}) {\n\t${3:e.printStackTrace();}\n}', detail: 'try / catch' },
+  { name: 'thr', template: 'throw new ${1:RuntimeException}(${2});', detail: 'throw an exception' },
+  { name: 'psf', template: 'public static final ${}', detail: 'public static final' },
+  { name: 'psfi', template: 'public static final int ${1:NAME} = ${2:0};', detail: 'public static final int' },
+  { name: 'psfs', template: 'public static final String ${1:NAME} = "${2}";', detail: 'public static final String' },
+  { name: 'prsf', template: 'private static final ${}', detail: 'private static final' },
+  { name: 'St', template: 'String', detail: 'String' },
+]
 
 function javaCompletions(ctx: CompletionContext) {
   const word = ctx.matchBefore(/[\w$]+/)
   if (!word || (word.from === word.to && !ctx.explicit)) return null
+  const prefix = ctx.state.sliceDoc(word.from, word.to)
+  const lower = prefix.toLowerCase()
   const doc = ctx.state.doc.toString()
+
   const ids = new Set<string>()
   for (const m of doc.matchAll(/[A-Za-z_$][A-Za-z0-9_$]*/g)) ids.add(m[0])
-  const options = [
-    ...SNIPPETS.map(([label, tmpl]) => ({ label, type: 'keyword', detail: 'قالب کد', apply: tmpl })),
+  ids.delete(prefix)
+
+  const templates: Completion[] = LIVE_TEMPLATES.filter((tpl) =>
+    tpl.name.toLowerCase().startsWith(lower),
+  ).map((tpl) =>
+    snippetCompletion(tpl.template, {
+      label: tpl.name,
+      type: 'keyword',
+      detail: 'Live Template — ' + tpl.detail,
+      boost: 99, // live templates rank first, like IntelliJ
+    }),
+  )
+
+  const options: Completion[] = [
+    ...templates,
     ...JAVA_TYPES.map((label) => ({ label, type: 'class', detail: 'کلاس / نوع' })),
     ...JAVA_METHODS.map(([label, detail]) => ({ label, type: 'function', detail, apply: label + '()' })),
     ...[...ids].map((label) => ({ label, type: 'variable', detail: 'نماد در همین فایل' })),
@@ -168,7 +224,13 @@ onMounted(() => {
       indentOnInput(),
       bracketMatching(),
       closeBrackets(),
-      autocompletion({ override: [javaCompletions] }),
+      autocompletion({
+        override: [javaCompletions],
+        activateOnTyping: true,
+        selectOnOpen: true,
+        defaultKeymap: false, // we bind the completion keys ourselves, below
+        icons: true,
+      }),
       highlightSelectionMatches(),
       search({ top: true }),
       java(),
@@ -193,7 +255,21 @@ onMounted(() => {
         },
         { delay: 350 },
       ),
-      keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...completionKeymap, ...searchKeymap, indentWithTab]),
+      keymap.of([
+        // IntelliJ-style: Tab accepts the highlighted completion / live template
+        // (its snippet then expands with indentation and tab-stops). When no
+        // completion popup is open, Tab indents as usual.
+        {
+          key: 'Tab',
+          run: (view) => (completionStatus(view.state) === 'active' ? acceptCompletion(view) : false),
+        },
+        ...closeBracketsKeymap,
+        ...completionKeymap, // ArrowUp/Down, Enter-to-accept, Esc, Ctrl-Space
+        ...defaultKeymap,
+        ...historyKeymap,
+        ...searchKeymap,
+        indentWithTab,
+      ]),
       themeComp.of(makeThemeExt()),
       editableComp.of(EditorView.editable.of(!props.disabled)),
       EditorView.updateListener.of((u) => {

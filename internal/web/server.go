@@ -18,6 +18,14 @@ type Options struct {
 	Log      *logrus.Logger
 }
 
+// Request body ceilings. The original Node server capped every body at 1 MiB;
+// this is a little more generous but still bounded. Restore is the one route
+// that legitimately needs a large body (a base64 SQLite file).
+const (
+	defaultBodyLimit = 2 << 20   // 2 MiB
+	restoreBodyLimit = 256 << 20 // 256 MiB
+)
+
 type server struct {
 	cfg *config.Config
 	svc *service.Services
@@ -36,6 +44,9 @@ func NewRouter(opts Options) *gin.Engine {
 	r.Use(s.recovery())
 	r.Use(s.requestLogger())
 	r.Use(s.securityHeaders())
+	r.Use(bodyLimit(defaultBodyLimit)) // 2 MiB ceiling on every request body
+
+	r.MaxMultipartMemory = 4 << 20
 
 	s.mountAPI(r)
 	s.mountStatic(r) // must be last: it owns every non-/api path via NoRoute
@@ -72,7 +83,9 @@ func (s *server) mountAPI(r *gin.Engine) {
 
 		admin.POST("/admin/logout", s.handleAdminLogout)
 		admin.GET("/admin/backup", s.handleBackup)
-		admin.POST("/admin/backup/restore", s.handleRestore)
+		// restore uploads a whole base64-encoded SQLite file — needs a much
+		// higher ceiling than the 2 MiB default (still admin-only + magic-checked).
+		admin.POST("/admin/backup/restore", bodyLimit(restoreBodyLimit), s.handleRestore)
 		admin.POST("/admin/update", s.handleUpdate)
 
 		admin.GET("/admin/ai-status", s.handleAIStatus)

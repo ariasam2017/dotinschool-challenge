@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -49,9 +50,14 @@ func (s *server) failWith(c *gin.Context, err error) {
 	})
 }
 
-// bindJSON decodes the request body, returning a friendly 400 on malformed JSON.
+// bindJSON decodes the request body, returning a friendly 400 on malformed JSON
+// or a 413 when the body exceeds the configured size limit.
 func bindJSON(c *gin.Context, dst any) error {
 	if err := c.ShouldBindJSON(dst); err != nil {
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			return apperr.New(http.StatusRequestEntityTooLarge, "BODY_TOO_LARGE", "حجم درخواست بیش از حد مجاز است.")
+		}
 		return apperr.New(400, "INVALID_JSON", "بدنه‌ی درخواست نامعتبر است.")
 	}
 	return nil

@@ -76,6 +76,20 @@ func (s *server) recovery() gin.HandlerFunc {
 	}
 }
 
+// bodyLimit caps the number of bytes a request body may carry. The original
+// server enforced a 1 MiB ceiling on *every* body; this rewrite had lost that,
+// leaving an unauthenticated attacker able to exhaust memory by streaming a
+// huge JSON payload to any POST/PATCH/PUT route. bindJSON turns the resulting
+// error into a clean 413.
+func bodyLimit(max int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Body != nil {
+			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, max)
+		}
+		c.Next()
+	}
+}
+
 // requireAdmin aborts unless a valid, unexpired admin bearer token is present.
 // On expiry the token is dropped so a stale browser tab surfaces a clean 401.
 func (s *server) requireAdmin() gin.HandlerFunc {
