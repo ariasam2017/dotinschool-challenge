@@ -16,9 +16,21 @@ import { searchKeymap, highlightSelectionMatches, search } from '@codemirror/sea
 import { linter, lintGutter, type Diagnostic } from '@codemirror/lint'
 import { tags as t } from '@lezer/highlight'
 import { isDark } from '@/lib/theme'
+import type { EditorProblem, EditorCursor } from './editor-types'
 
 const props = defineProps<{ modelValue: string; disabled?: boolean }>()
-const emit = defineEmits<{ 'update:modelValue': [string] }>()
+
+const emit = defineEmits<{
+  'update:modelValue': [string]
+  problems: [EditorProblem[]]
+  cursor: [EditorCursor]
+}>()
+
+function offsetToLineCol(doc: string, offset: number): { line: number; col: number } {
+  const before = doc.slice(0, Math.max(0, offset))
+  const nl = before.lastIndexOf('\n')
+  return { line: before.split('\n').length, col: offset - (nl + 1) + 1 }
+}
 
 const host = ref<HTMLDivElement>()
 const view = shallowRef<EditorView>()
@@ -161,12 +173,35 @@ onMounted(() => {
       search({ top: true }),
       java(),
       lintGutter(),
-      linter((v) => lintJava(v.state.doc.toString()), { delay: 350 }),
+      linter(
+        (v) => {
+          const doc = v.state.doc.toString()
+          const diags = lintJava(doc)
+          emit(
+            'problems',
+            diags.map((d) => {
+              const lc = offsetToLineCol(doc, d.from)
+              return {
+                severity: d.severity === 'error' ? 'error' : 'warning',
+                message: d.message,
+                line: lc.line,
+                col: lc.col,
+              } as EditorProblem
+            }),
+          )
+          return diags
+        },
+        { delay: 350 },
+      ),
       keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...completionKeymap, ...searchKeymap, indentWithTab]),
       themeComp.of(makeThemeExt()),
       editableComp.of(EditorView.editable.of(!props.disabled)),
       EditorView.updateListener.of((u) => {
         if (u.docChanged) emit('update:modelValue', u.state.doc.toString())
+        if (u.docChanged || u.selectionSet) {
+          const head = u.state.selection.main.head
+          emit('cursor', offsetToLineCol(u.state.doc.toString(), head))
+        }
       }),
     ],
   })

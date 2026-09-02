@@ -72,6 +72,17 @@ async function submit() {
           ورود به پنل مدیریت
         </a-button>
       </form>
+
+      <ul class="login-features">
+        <li><AppIcon name="file-code" :size="14" /> طراحی چالش، سطح دشواری و مثال‌ها</li>
+        <li><AppIcon name="activity" :size="14" /> نظارت زندهٔ وضعیت شرکت‌کنندگان</li>
+        <li><AppIcon name="wand" :size="14" /> بررسی هوشمند احتمال تولید کد با AI</li>
+      </ul>
+
+      <a class="login-back" href="/">
+        <AppIcon name="chevron-right" :size="14" />
+        بازگشت به سامانهٔ چالش
+      </a>
     </div>
   </div>
 </template>
@@ -130,5 +141,35 @@ async function submit() {
   color: var(--text-faint);
   display: grid;
   place-items: center;
+}
+.login-features {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: var(--space-4) 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.login-features li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+.login-features li :deep(.app-icon) {
+  color: var(--primary);
+}
+.login-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--space-4);
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+.login-back:hover {
+  color: var(--text);
 }
 </style>

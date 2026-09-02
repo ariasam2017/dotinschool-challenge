@@ -13,9 +13,11 @@ import AuthPanel from './AuthPanel.vue'
 import ChallengeCard from '@/components/ChallengeCard.vue'
 import CountdownClock from '@/components/CountdownClock.vue'
 import JavaEditor from '@/components/JavaEditor.vue'
+import type { EditorProblem } from '@/components/editor-types'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import Chip from '@/components/Chip.vue'
+import { toFa } from '@/lib/fa'
 
 const pStore = useParticipantStore()
 const eStore = useEventStore()
@@ -27,6 +29,21 @@ const arenaOpen = ref(false)
 const code = ref(STARTER_CODE)
 const submitState = ref<'idle' | 'submitting' | 'submitted' | 'error'>('idle')
 const submitError = ref('')
+
+const problems = ref<EditorProblem[]>([])
+const cursor = ref({ line: 1, col: 1 })
+const errCount = computed(() => problems.value.filter((p) => p.severity === 'error').length)
+const warnCount = computed(() => problems.value.filter((p) => p.severity === 'warning').length)
+
+const RULES = [
+  'پس از شروع، تایمر رویداد از حرکت باز نمی‌ایستد.',
+  'خطاهای نحوی کد شما به‌صورت زنده زیر ادیتور نمایش داده می‌شود.',
+  'می‌توانید تا پایان زمان، کد را ویرایش و چند بار ارسال کنید.',
+]
+
+function resetCode() {
+  code.value = STARTER_CODE
+}
 
 const LOCK_MESSAGES: Record<string, string> = {
   waiting: 'چالش هنوز طبق زمان‌بندی شروع نشده — نوشتن و ارسال کد ممکن نیست',
@@ -232,6 +249,16 @@ function confirmExit() {
               </a-button>
               <p v-if="!canCompete" class="faint lock-note">{{ LOCK_MESSAGES[lockReason] }}</p>
             </div>
+
+            <div class="card card-pad rules-card">
+              <span class="section-title">پیش از شروع</span>
+              <ul class="rules-list">
+                <li v-for="(r, i) in RULES" :key="i">
+                  <AppIcon name="check-circle" :size="15" />
+                  <span>{{ r }}</span>
+                </li>
+              </ul>
+            </div>
           </aside>
         </section>
 
@@ -243,13 +270,48 @@ function confirmExit() {
 
           <div class="arena-editor">
             <div class="editor-toolbar card">
-              <span class="section-title">ادیتور جاوا</span>
+              <span class="file-tab"><AppIcon name="file-code" :size="14" /> Main.java</span>
+              <span class="lang-badge">Java 17</span>
+              <a-button size="small" :disabled="!canCompete" @click="resetCode">
+                <template #icon><AppIcon name="rotate-ccw" :size="13" /></template>
+                بازنشانی کد
+              </a-button>
               <div class="grow" />
               <Chip v-if="!canCompete" tone="danger" dot>{{ LOCK_MESSAGES[lockReason] }}</Chip>
               <CountdownClock :ms="remainMs" :state="clockState" size="md" />
             </div>
 
-            <JavaEditor v-model="code" :disabled="!canCompete" class="editor-host" />
+            <JavaEditor
+              v-model="code"
+              :disabled="!canCompete"
+              class="editor-host"
+              @problems="problems = $event"
+              @cursor="cursor = $event"
+            />
+
+            <div class="problems-panel card">
+              <div class="problems-head">
+                <span>مشکلات</span>
+                <span class="cnt cnt-err">{{ toFa(errCount) }} خطا</span>
+                <span class="cnt cnt-warn">{{ toFa(warnCount) }} هشدار</span>
+                <div class="grow" />
+                <span class="status-bit num">خط {{ toFa(cursor.line) }}:{{ toFa(cursor.col) }}</span>
+                <span class="status-bit">فاصله‌گذاری: {{ toFa(4) }}</span>
+              </div>
+              <div class="problems-list">
+                <div v-if="!problems.length" class="problems-empty">مشکلی یافت نشد ✓</div>
+                <div
+                  v-for="(p, i) in problems"
+                  :key="i"
+                  class="problem-row"
+                  :class="p.severity"
+                >
+                  <AppIcon :name="p.severity === 'error' ? 'alert-circle' : 'alert-triangle'" :size="13" />
+                  <span class="grow">{{ p.message }}</span>
+                  <span class="loc num">{{ toFa(p.line) }}:{{ toFa(p.col) }}</span>
+                </div>
+              </div>
+            </div>
 
             <div class="submit-bar card card-pad">
               <div class="grow">
@@ -488,11 +550,106 @@ function confirmExit() {
 .editor-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 8px 12px;
+  flex-wrap: wrap;
+}
+.file-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.lang-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
 }
 .editor-host {
-  height: min(60vh, 560px);
+  height: min(58vh, 540px);
+}
+.rules-card {
+  margin-top: var(--space-3);
+}
+.rules-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rules-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.8rem;
+  line-height: 1.8;
+  color: var(--text-dim);
+}
+.rules-list li :deep(.app-icon) {
+  color: var(--success);
+  margin-top: 3px;
+}
+.problems-panel {
+  padding: 0;
+  overflow: hidden;
+}
+.problems-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.cnt-err {
+  color: var(--danger);
+}
+.cnt-warn {
+  color: var(--warning);
+}
+.status-bit {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  font-weight: 500;
+}
+.problems-list {
+  max-height: 160px;
+  overflow-y: auto;
+}
+.problems-empty {
+  padding: 14px;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+.problem-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  font-size: 0.78rem;
+  border-bottom: 1px solid var(--border);
+}
+.problem-row:last-child {
+  border-bottom: none;
+}
+.problem-row.error {
+  color: var(--danger);
+}
+.problem-row.warning {
+  color: var(--warning);
+}
+.problem-row .loc {
+  font-size: 0.7rem;
+  color: var(--text-faint);
 }
 .submit-bar {
   display: flex;

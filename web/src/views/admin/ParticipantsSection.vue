@@ -16,6 +16,17 @@ const { participants } = storeToRefs(admin)
 const search = ref('')
 const statusFilter = ref<string | undefined>(undefined)
 const selectedKeys = ref<string[]>([])
+const refreshing = ref(false)
+
+async function manualRefresh() {
+  refreshing.value = true
+  try {
+    await admin.refreshParticipants()
+    message.success('فهرست شرکت‌کنندگان به‌روزرسانی شد')
+  } finally {
+    refreshing.value = false
+  }
+}
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedKeys.value,
@@ -135,6 +146,11 @@ function confirmDelete(ids: string[]) {
           ]"
         />
         <div class="grow" />
+        <span class="faint count-note">{{ toFa(filtered.length) }} از {{ toFa(participants.length) }}</span>
+        <a-button size="small" :loading="refreshing" @click="manualRefresh">
+          <template #icon><AppIcon name="refresh" :size="13" /></template>
+          به‌روزرسانی
+        </a-button>
         <a-button v-if="selectedKeys.length" danger @click="confirmDelete(selectedKeys)">
           <template #icon><AppIcon name="trash" :size="14" /></template>
           حذف {{ toFa(selectedKeys.length) }} مورد انتخاب‌شده
@@ -216,6 +232,9 @@ function confirmDelete(ids: string[]) {
   display: flex;
   gap: 6px;
   white-space: nowrap;
+}
+.count-note {
+  font-size: 0.74rem;
 }
 .empty {
   padding: 24px;
