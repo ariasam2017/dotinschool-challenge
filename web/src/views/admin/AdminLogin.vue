@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { useAdminStore } from '@/stores/admin'
-import { ApiError } from '@/api/client'
+import { ApiError, getConfig } from '@/api/client'
 import AppIcon from '@/components/AppIcon.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 
@@ -10,15 +10,30 @@ const form = reactive({ username: 'administrator', password: '' })
 const showPass = ref(false)
 const loading = ref(false)
 const error = ref('')
+const reachable = ref<boolean | null>(null)
+
+// Proactive connectivity probe: GET /api/config is public. If it fails the
+// problem is the network/proxy/extension, not the password — say so up front so
+// a wrong "ورود ناموفق" doesn't send the admin chasing the credentials.
+onMounted(async () => {
+  try {
+    await getConfig()
+    reachable.value = true
+  } catch {
+    reachable.value = false
+  }
+})
 
 async function submit() {
   error.value = ''
   loading.value = true
   try {
     const ok = await store.login(form.username.trim(), form.password)
-    if (!ok) error.value = 'نام کاربری یا رمز عبور اشتباه است.'
+    if (ok) reachable.value = true
+    else error.value = 'نام کاربری یا رمز عبور اشتباه است.'
   } catch (e) {
     error.value = e instanceof ApiError ? e.message : 'ورود ناموفق بود'
+    if (e instanceof ApiError && e.code === 'NETWORK_ERROR') reachable.value = false
   } finally {
     loading.value = false
   }
@@ -36,6 +51,15 @@ async function submit() {
           <p class="faint">برای ادامه وارد شوید</p>
         </div>
       </div>
+
+      <a-alert
+        v-if="reachable === false"
+        type="error"
+        show-icon
+        style="margin-bottom: 14px"
+        message="سرور در دسترس نیست"
+        description="این صفحه بارگذاری شده ولی درخواست‌های API به سرور نمی‌رسند. معمولاً یکی از این‌هاست: فیلترشکن/پروکسی سیستم (v2rayN و…) که ترافیک localhost را هم رد می‌کند — آن را روی «Bypass» برای آدرس‌های محلی بگذارید یا موقتاً خاموش کنید؛ یا افزونهٔ ad-blocker روی این صفحه؛ یا اینکه پنل را روی پورت اشتباه باز کرده‌اید (باید همان پورتی باشد که کانتینر منتشر کرده). بعد Ctrl+Shift+R."
+      />
 
       <a-alert
         v-if="store.sessionExpiredNote"
