@@ -82,41 +82,58 @@ dotinschool cert
 
 ## نصب با Docker
 
-> **چرا این روش:** باینری روی **هاست** کامپایل می‌شود (Go بومی و سریع، فرانت از قبل در مخزن است)
-> و `docker build` فقط یک کپیِ چندثانیه‌ایِ فایل داخل Alpine است. بنابراین بیلد Docker
-> **هیچ‌وقت** به‌خاطر کمبود حافظهٔ Docker Desktop، بلاک‌بودن `proxy.golang.org`، یا قطع
-> BuildKit (`rpc error: code = Unavailable ... EOF`) شکست نمی‌خورد.
+### یک دستور (از ریشهٔ پروژه)
 
-### روش سریع (اسکریپت — روی سرور لینوکس)
+```bash
+cd proje_1
+docker compose up -d --build
+```
+
+همین. یک ایمیج (فرانت + باینری Go داخل خودش) و یک کانتینر `dotinschool` ساخته می‌شود.
+هیچ ابزار دیگری لازم نیست. `./Dockerfile` و `./docker-compose.yml` در ریشه هستند و
+`docker compose` خودش پیدایشان می‌کند.
+
+- پنل کاربر: <http://localhost:8080/> · پنل ادمین: `http://localhost:8080/<ADMIN_PATH>/`
+- رمز ادمین: اگر `.env` نساخته باشید، یک رمز تصادفی ساخته و در لاگ چاپ می‌شود
+  (`docker compose logs app`). برای رمز ثابت: `cp .env.example .env` و `ADMIN_PASSWORD` را پر کنید.
+- داده‌ها در ولوم `./data` — SQLite تک‌فایل.
+- لاگ: `docker compose logs -f app` · توقف: `docker compose down` · به‌روزرسانی: دوباره `docker compose up -d --build`
+
+**روی ویندوز** Docker Desktop معمولاً پورت ۸۰۸۰ را گرفته — پورت میزبان را عوض کنید:
+
+```powershell
+$env:APP_PORT = "8091"; docker compose up -d --build
+#  یا در فایل .env کنار docker-compose.yml خط  APP_PORT=8091  را اضافه کنید
+```
+
+> مرحلهٔ `go build` داخل ایمیج کمی حافظه می‌خواهد (با `-p 1` و `GOMEMLIMIT` تنظیم شده تا روی
+> Docker Desktop معمولی جا شود). اگر باز هم با `rpc error: code = Unavailable ... EOF` مُرد،
+> یا حافظهٔ Docker Desktop را در Settings → Resources بالا ببرید (۴GB کافی است)، یا از مسیر
+> «کامپایل روی هاست» پایین استفاده کنید که اصلاً `go build` داخل کانتینر ندارد.
+
+### یک دستور — بدون هیچ ریسک بیلد (کامپایل روی هاست)
+
+اگر Go روی سیستم نصب است، این مسیر باینری را روی هاست می‌سازد و `docker build` فقط یک کپیِ
+چندثانیه‌ای می‌شود (خطای حافظه/شبکه/BuildKit **غیرممکن**):
+
+```powershell
+.\docker-up.ps1          # ویندوز
+```
+```bash
+./docker-up.sh           # لینوکس / مک
+```
+
+خودش `.env` (در صورت نبود)، انتخاب پورت آزاد، کامپایل، بیلد و بالا آوردن استک را انجام می‌دهد.
+
+### روی سرور لینوکس (یک خط)
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/YOUR_ORG/dotinschool/main/build/docker-install.sh)
 ```
 
-Docker و Go را (در صورت نبود) نصب می‌کند، `.env` با رمز و مسیر مخفی تصادفی می‌سازد، ایمیج را
-با کامپایل روی هاست می‌سازد، استک را بالا می‌آورد و دستور `dotinschool` را نصب می‌کند
+Docker و Go را نصب می‌کند، `.env` تصادفی می‌سازد، ایمیج را با کامپایل روی هاست می‌سازد،
+استک را بالا می‌آورد و دستور `dotinschool` را نصب می‌کند
 (`up | down | restart | logs | ps | rebuild | update | admin`).
-
-### دستی
-
-```bash
-cp .env.example .env      # ADMIN_PASSWORD و در صورت نیاز ADMIN_PATH را پر کنید
-# روی ویندوز چون پورت ۸۰۸۰ را Docker Desktop می‌گیرد: APP_PORT=8091
-
-make image                                    # = scripts/docker-build.sh
-docker compose -f build/docker-compose.yml up -d
-```
-
-`make image` باینری `dist/dotinschool_linux_amd64` را می‌سازد و ایمیج `dotinschool:local` را
-پکیج می‌کند. برای معماری‌های دیگر: `scripts/docker-build.sh "amd64 arm64"`.
-
-- پنل: <http://localhost:8080/>  (روی ویندوز: پورتی که در `APP_PORT` گذاشتید · ادمین: `/<ADMIN_PATH>/`)
-- داده‌ها در ولوم `./data` — SQLite تک‌فایل.
-
-> بیلدِ کاملاً درون‌کانتینری (بدون نیاز به Go روی هاست) هم هست: `build/Dockerfile.hermetic` —
-> ولی برای مرحلهٔ `go build` به حدود ۲ گیگابایت RAM آزاد برای Docker نیاز دارد، وگرنه همان
-> خطای `rpc ... EOF` را می‌دهد. اگر دیدید، حافظهٔ Docker Desktop را در Settings → Resources
-> بالا ببرید یا از `make image` استفاده کنید.
 
 ### HTTPS خودکار با دامنه (Caddy)
 

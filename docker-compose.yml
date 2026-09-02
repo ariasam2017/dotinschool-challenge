@@ -1,0 +1,37 @@
+# dotinschool — one container, one command, from this folder:
+#
+#   docker compose up -d --build          # build + start
+#   docker compose logs -f app            # follow logs
+#   docker compose down                   # stop
+#   docker compose up -d --build          # re-run after a code change
+#
+# The image builds the frontend + the Go binary inside itself (see ./Dockerfile),
+# so nothing else needs to be installed. On Windows, Docker Desktop often holds
+# port 8080 — set APP_PORT to something else:  (PowerShell)  $env:APP_PORT=8091
+# or add APP_PORT=8091 to a .env file next to this one.
+#
+# For a public domain + automatic HTTPS, add the prod override:
+#   docker compose -f docker-compose.yml -f build/docker-compose.prod.yml up -d
+
+name: dotinschool
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dotinschool:local
+    container_name: dotinschool
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      - PORT=8080
+      - DATA_DIR=/app/data
+      - DOTINSCHOOL_DOCKER=1
+    # optional: SMS / AI / admin creds. Missing file is fine.
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
