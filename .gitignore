@@ -1,5 +1,6 @@
 # runtime state — created on first run, never committed
 /data/
+**/data/
 *.db
 *.db-wal
 *.db-shm
