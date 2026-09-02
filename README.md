@@ -82,23 +82,41 @@ dotinschool cert
 
 ## نصب با Docker
 
-### روش سریع (اسکریپت)
+> **چرا این روش:** باینری روی **هاست** کامپایل می‌شود (Go بومی و سریع، فرانت از قبل در مخزن است)
+> و `docker build` فقط یک کپیِ چندثانیه‌ایِ فایل داخل Alpine است. بنابراین بیلد Docker
+> **هیچ‌وقت** به‌خاطر کمبود حافظهٔ Docker Desktop، بلاک‌بودن `proxy.golang.org`، یا قطع
+> BuildKit (`rpc error: code = Unavailable ... EOF`) شکست نمی‌خورد.
+
+### روش سریع (اسکریپت — روی سرور لینوکس)
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/YOUR_ORG/dotinschool/main/build/docker-install.sh)
 ```
 
-Docker را (در صورت نبود) نصب می‌کند، `.env` با رمز و مسیر مخفی تصادفی می‌سازد، استک را بالا می‌آورد و دستور `dotinschool` (نسخهٔ Docker: `up|down|restart|logs|ps|update|admin`) را نصب می‌کند.
+Docker و Go را (در صورت نبود) نصب می‌کند، `.env` با رمز و مسیر مخفی تصادفی می‌سازد، ایمیج را
+با کامپایل روی هاست می‌سازد، استک را بالا می‌آورد و دستور `dotinschool` را نصب می‌کند
+(`up | down | restart | logs | ps | rebuild | update | admin`).
 
 ### دستی
 
 ```bash
 cp .env.example .env      # ADMIN_PASSWORD و در صورت نیاز ADMIN_PATH را پر کنید
-docker compose -f build/docker-compose.yml up -d --build
+# روی ویندوز چون پورت ۸۰۸۰ را Docker Desktop می‌گیرد: APP_PORT=8091
+
+make image                                    # = scripts/docker-build.sh
+docker compose -f build/docker-compose.yml up -d
 ```
 
-- پنل: <http://localhost:8080/>  (ادمین: `/<ADMIN_PATH>/`)
-- داده‌ها در `./data` (ولوم) — SQLite تک‌فایل.
+`make image` باینری `dist/dotinschool_linux_amd64` را می‌سازد و ایمیج `dotinschool:local` را
+پکیج می‌کند. برای معماری‌های دیگر: `scripts/docker-build.sh "amd64 arm64"`.
+
+- پنل: <http://localhost:8080/>  (روی ویندوز: پورتی که در `APP_PORT` گذاشتید · ادمین: `/<ADMIN_PATH>/`)
+- داده‌ها در ولوم `./data` — SQLite تک‌فایل.
+
+> بیلدِ کاملاً درون‌کانتینری (بدون نیاز به Go روی هاست) هم هست: `build/Dockerfile.hermetic` —
+> ولی برای مرحلهٔ `go build` به حدود ۲ گیگابایت RAM آزاد برای Docker نیاز دارد، وگرنه همان
+> خطای `rpc ... EOF` را می‌دهد. اگر دیدید، حافظهٔ Docker Desktop را در Settings → Resources
+> بالا ببرید یا از `make image` استفاده کنید.
 
 ### HTTPS خودکار با دامنه (Caddy)
 
@@ -109,7 +127,7 @@ docker compose -f build/docker-compose.yml -f build/docker-compose.prod.yml up -
 
 Caddy گواهی Let's Encrypt را خودش می‌گیرد و تمدید می‌کند — بدون certbot، بدون downtime.
 
-داخل Docker، دکمهٔ «به‌روزرسانی» پنل پیام می‌دهد که روی هاست `dotinschool update` (یا `git pull && docker compose ... up -d --build`) را اجرا کنید — داده‌ها در ولوم `data/` دست‌نخورده می‌مانند.
+داخل Docker، دکمهٔ «به‌روزرسانی» پنل پیام می‌دهد که روی هاست `dotinschool update` (یا `dotinschool rebuild`) را اجرا کنید — این دستور `git reset --hard origin/main`، سپس کامپایل مجدد باینری روی هاست و `docker compose up -d` را انجام می‌دهد. داده‌ها در ولوم `data/` دست‌نخورده می‌مانند.
 
 ---
 
@@ -155,8 +173,8 @@ internal/web/          روتر Gin، میدل‌ورها (security headers/CSP�
                        admin-host)، هندلرهای /api، سرو استاتیکِ embed‌شده
 web/                   سورس فرانت (Vue 3 + Vite + Ant Design Vue 4)
 web/assets/            خروجی بیلد فرانت (commit می‌شود؛ go:embed)
-scripts/               install.sh + build.sh
-build/                 Dockerfile، docker-compose*.yml، Caddyfile، docker-install.sh
+scripts/               install.sh (bare-metal) · build.sh (کراس‌کامپایل) · docker-build.sh
+build/                 Dockerfile (پکیجینگ) · Dockerfile.hermetic · docker-compose*.yml · Caddyfile · docker-install.sh
 design-system/         خروجی اسکیل ui-ux-pro-max (MASTER.md + pages/admin.md)
 ```
 

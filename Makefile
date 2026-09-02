@@ -37,9 +37,16 @@ dev: ## Go server (:8080) + Vite dev server (:5173) together
 release: ## cross-compile release artifacts into dist/
 	bash scripts/build.sh
 
+.PHONY: image
+image: ## reliable Docker image: host-compile the binary, then package it
+	bash scripts/docker-build.sh
+
+.PHONY: image-hermetic
+image-hermetic: ## fully in-container build (needs ~2GB free for `go build`)
+	docker build -f build/Dockerfile.hermetic -t dotinschool:local .
+
 .PHONY: docker
-docker: ## build the production Docker image
-	docker build -f build/Dockerfile -t dotinschool:local .
+docker: image ## alias for `make image`
 
 .PHONY: seed
 seed: build ## run the standalone demo-data seeder against ./data

@@ -1,12 +1,18 @@
 # ── dotinschool ── base stack: works everywhere (Windows/macOS/Linux, IP-only).
 #
+# The image is built by the packaging Dockerfile (build/Dockerfile), which just
+# copies a host-compiled Linux binary — so it never fails on memory / proxy /
+# BuildKit. Build it first, then bring the stack up:
+#
+#   make image                                                   # or: scripts/docker-build.sh
 #   docker compose -f build/docker-compose.yml up -d
-#       → http://localhost:8080   (admin at /<ADMIN_PATH>)
-#   docker compose -f build/docker-compose.yml up -d --build   → rebuild
 #   docker compose -f build/docker-compose.yml logs -f app
 #   docker compose -f build/docker-compose.yml down
 #
-# For a public domain + automatic HTTPS on Linux, add the prod override:
+# `up -d --build` also works, but only after `dist/dotinschool_linux_amd64`
+# exists (make image / scripts/docker-build.sh create it).
+#
+# Public domain + automatic HTTPS on Linux: add the prod override —
 #   docker compose -f build/docker-compose.yml -f build/docker-compose.prod.yml up -d
 
 name: dotinschool
