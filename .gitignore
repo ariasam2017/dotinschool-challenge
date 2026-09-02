@@ -34,3 +34,7 @@ Thumbs.db
 /run.pid
 /run.log
 /dotinschool.exe
+
+# scratch dirs for local screenshots / smoke tests
+.demo/
+.qa*/
