@@ -24,16 +24,11 @@ const eStore = useEventStore()
 const { user } = storeToRefs(pStore)
 const { challenge, state: eventState, remainMs, startsInMs, canCompete } = storeToRefs(eStore)
 
-// Once the event is live the participant is dropped straight into the coding
-// arena — there is no "start" button. This stays true afterwards (a pause or the
-// event ending doesn't yank the editor away), so we can also restore it for a
-// returning participant whose status is already started/submitted.
-const arenaEntered = ref(false)
-
 const booted = ref(false)
 const code = ref(STARTER_CODE)
 const submitState = ref<'idle' | 'submitting' | 'submitted' | 'error'>('idle')
 const submitError = ref('')
+let startedSent = false
 
 // The countdown-to-start is shown to participants only inside the final hour
 // before the scheduled start; before that they just see a "not started" notice.
@@ -77,20 +72,31 @@ const showStartCountdown = computed(
   () => eventState.value === 'waiting' && startsInMs.value > 0 && startsInMs.value <= START_COUNTDOWN_WINDOW_MS,
 )
 
-// Which screen the signed-in participant sees.
-const userView = computed<'notStarted' | 'countdown' | 'arena'>(() => {
-  if (arenaEntered.value || eventState.value === 'running' || eventState.value === 'ended') return 'arena'
-  if (showStartCountdown.value) return 'countdown'
-  return 'notStarted' // waiting (>1h) or paused-before-start
+// The participant's screen follows the live event state — it is NOT sticky.
+// The moment the admin pauses or the event ends, the challenge + editor are
+// replaced with the matching notice (within one poll, ~1s). Any code the
+// participant had typed stays in `code` (in memory) and is restored if the
+// event resumes.
+type UserView = 'notStarted' | 'countdown' | 'running' | 'paused' | 'ended'
+const userView = computed<UserView>(() => {
+  switch (eventState.value) {
+    case 'ended':
+      return 'ended'
+    case 'paused':
+      return 'paused'
+    case 'waiting':
+      return showStartCountdown.value ? 'countdown' : 'notStarted'
+    default:
+      return 'running'
+  }
 })
 
-// Enter the arena automatically the moment the event goes live. No button.
+// Record status=started the first time this participant sees the live arena.
 watch(
-  [eventState, user],
-  ([st, u]) => {
-    if (u && st === 'running' && !arenaEntered.value) {
-      arenaEntered.value = true
-      if (!code.value || code.value === STARTER_CODE) code.value = u.code || STARTER_CODE
+  [userView, user],
+  ([view, u]) => {
+    if (view === 'running' && u && !startedSent && u.status === 'registered') {
+      startedSent = true
       void pStore.patchQuietly({ status: 'started' })
     }
   },
@@ -103,21 +109,17 @@ onMounted(async () => {
   const resumed = await pStore.resume()
   if (resumed) {
     message.success(`خوش آمدید دوباره، ${resumed.firstName}`)
-    if (resumed.status !== 'registered') {
-      arenaEntered.value = true
-      code.value = resumed.code || STARTER_CODE
-      if (resumed.status === 'submitted') submitState.value = 'submitted'
-    }
+    if (resumed.code) code.value = resumed.code
+    if (resumed.status === 'submitted') submitState.value = 'submitted'
+    if (resumed.status !== 'registered') startedSent = true
   }
   booted.value = true
 })
 onBeforeUnmount(() => eStore.stop())
 
 function onAuthed(status: string) {
-  if (status !== 'registered') {
-    arenaEntered.value = true
-    code.value = user.value?.code || STARTER_CODE
-  }
+  if (user.value?.code) code.value = user.value.code
+  if (status !== 'registered') startedSent = true
 }
 
 async function submit() {
@@ -181,7 +183,7 @@ function friendlyError(err: ApiError): string {
 }
 
 function confirmExit() {
-  const midChallenge = arenaEntered.value && user.value?.status !== 'submitted'
+  const midChallenge = userView.value === 'running' && user.value?.status !== 'submitted'
   Modal.confirm({
     title: 'خروج از حساب',
     content: midChallenge
@@ -232,18 +234,15 @@ function confirmExit() {
         <AuthPanel @authed="onAuthed" />
       </section>
 
-      <!-- signed in -->
+      <!-- signed in — the screen always follows the live event state -->
       <template v-else>
-        <!-- event not started yet: no challenge is shown at all -->
+        <!-- 1) scheduled, more than an hour away: no challenge, no timer -->
         <section v-if="userView === 'notStarted'" class="wait-card card card-pad">
-          <AppIcon :name="eventState === 'paused' ? 'pause' : 'calendar'" :size="30" />
-          <h2>{{ eventState === 'paused' ? 'رویداد موقتاً متوقف است' : 'رویداد هنوز شروع نشده است' }}</h2>
+          <span class="wait-ico neutral"><AppIcon name="calendar" :size="26" /></span>
+          <h2>رویداد هنوز شروع نشده است</h2>
           <p class="faint wait-lead">
-            {{
-              eventState === 'paused'
-                ? 'مدیر رویداد را موقتاً متوقف کرده — به‌محض ادامه، سوال چالش همین‌جا برای شما نمایش داده می‌شود.'
-                : 'زمان برگزاری را مدیر سامانه تعیین می‌کند. به‌محض شروع رویداد، سوال چالش به‌صورت خودکار همین‌جا نمایش داده می‌شود — نیازی به هیچ کاری نیست.'
-            }}
+            زمان برگزاری را مدیر سامانه تعیین می‌کند. به‌محض شروع رویداد، سوال چالش به‌صورت
+            خودکار همین‌جا نمایش داده می‌شود — نیازی به هیچ کاری نیست.
           </p>
           <p v-if="eStore.config?.eventStartsAt" class="faint">
             زمان شروع: <span class="num">{{ fmtJalaliDateTime(eStore.config.eventStartsAt) }}</span>
@@ -256,9 +255,9 @@ function confirmExit() {
           </ul>
         </section>
 
-        <!-- final hour before the scheduled start: countdown, still no challenge -->
+        <!-- 2) final hour before the scheduled start: countdown, still no challenge -->
         <section v-else-if="userView === 'countdown'" class="wait-card card card-pad">
-          <AppIcon name="clock" :size="30" />
+          <span class="wait-ico info"><AppIcon name="clock" :size="26" /></span>
           <h2>رویداد به‌زودی شروع می‌شود</h2>
           <CountdownClock :ms="startsInMs" state="waiting" size="xl" label="زمان باقی‌مانده تا شروع" />
           <p v-if="eStore.config?.eventStartsAt" class="faint">
@@ -269,7 +268,35 @@ function confirmExit() {
           </p>
         </section>
 
-        <!-- arena — shown the moment the event goes live, no start button -->
+        <!-- 3) admin paused a live event: hide challenge + editor immediately -->
+        <section v-else-if="userView === 'paused'" class="wait-card card card-pad">
+          <span class="wait-ico warning"><AppIcon name="pause" :size="26" /></span>
+          <h2>رویداد متوقف شده است</h2>
+          <p class="faint wait-lead">
+            مدیر رویداد را موقتاً متوقف کرده است. سوال چالش و ادیتور تا زمان ادامه‌ی رویداد
+            نمایش داده نمی‌شوند — کدی که نوشته‌اید محفوظ است و پس از ادامه بازمی‌گردد.
+          </p>
+          <CountdownClock :ms="remainMs" state="paused" size="lg" label="زمان باقی‌ماندهٔ چالش (متوقف)" />
+        </section>
+
+        <!-- 4) event finished: dedicated end screen, no challenge, no editor -->
+        <section v-else-if="userView === 'ended'" class="wait-card card card-pad">
+          <span class="wait-ico danger"><AppIcon name="clock" :size="26" /></span>
+          <h2>زمان رویداد به پایان رسید</h2>
+          <p class="faint wait-lead">مهلت ارسال کد تمام شده است.</p>
+          <p
+            v-if="user.status === 'submitted'"
+            class="ended-note ok"
+          >
+            کد شما ثبت شده — نتیجه پس از بررسی مدیر سامانه به شما اعلام می‌شود.
+          </p>
+          <p v-else-if="user.status === 'started'" class="ended-note bad">
+            متأسفانه کدی از شما پیش از پایان مهلت ثبت نشد.
+          </p>
+          <p v-else class="ended-note bad">شما در این رویداد کدی ارسال نکردید.</p>
+        </section>
+
+        <!-- 5) event live: arena (challenge + editor) — no start button -->
         <section v-else-if="challenge" class="arena">
           <aside class="arena-brief card card-pad">
             <ChallengeCard :challenge="challenge" compact />
@@ -521,11 +548,49 @@ function confirmExit() {
 .wait-card h2 {
   margin: 0;
 }
+.wait-ico {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+.wait-ico.neutral {
+  background: var(--surface-2);
+  color: var(--text-dim);
+}
+.wait-ico.info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.wait-ico.warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.wait-ico.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
 .wait-lead {
   font-size: 0.88rem;
   line-height: 2;
   margin: 0;
   max-width: 52ch;
+}
+.ended-note {
+  font-size: 0.86rem;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  margin: 0;
+}
+.ended-note.ok {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.ended-note.bad {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 .wait-rules {
   align-self: stretch;
