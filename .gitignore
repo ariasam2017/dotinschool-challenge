@@ -1,0 +1,30 @@
+# runtime state — created on first run, never committed
+/data/
+*.db
+*.db-wal
+*.db-shm
+
+# local secrets (SMS key, admin password, AI key) for dev outside install.sh
+.env
+.env.local
+
+# build output binaries
+/dist/
+/dotinschool
+/dotinschool.exe
+/server
+/server.exe
+
+# frontend toolchain
+/web/node_modules/
+/web/.vite/
+# NOTE: /web/assets/ (the built frontend) IS committed on purpose — the Go
+# server embeds it and a bare-metal install must not need Node to rebuild it.
+
+# editor / OS
+.DS_Store
+Thumbs.db
+*.log
+
+# assistant / tooling config — not part of the shipped product
+/.claude/

@@ -1,0 +1,18 @@
+# keep the build context small and free of host-only / secret files
+.git
+.gitattributes
+.gitignore
+.github
+.claude
+data
+*.log
+.env
+.env.*
+!.env.example
+web/node_modules
+web/.vite
+dist
+*.md
+!README.md
+scripts/install.sh
+build/docker-install.sh

@@ -1,0 +1,194 @@
+/* =============================================================================
+   Design tokens — layered primitive -> semantic -> component.
+   Three-state theme: bare :root = light; (prefers-color-scheme: dark) guarded by
+   :root:not([data-theme="light"]); explicit :root[data-theme="dark"] wins both
+   ways. Two panel personalities swap only the primary role:
+   [data-panel="user"] = code green (warm), [data-panel="admin"] = indigo (pro).
+   ============================================================================= */
+
+:root {
+  /* ---- primitive scales ---- */
+  --green-400: #4ade80;
+  --green-500: #22c55e;
+  --green-600: #16a34a;
+  --green-700: #15803d;
+
+  --indigo-400: #818cf8;
+  --indigo-500: #6366f1;
+  --indigo-600: #4f46e5;
+  --indigo-700: #4338ca;
+
+  --amber-400: #fbbf24;
+  --amber-500: #f59e0b;
+  --amber-600: #d97706;
+
+  --red-400: #f87171;
+  --red-500: #ef4444;
+  --red-600: #dc2626;
+
+  --yellow-500: #eab308;
+  --yellow-600: #ca8a04;
+
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --slate-950: #020617;
+
+  /* ---- component scale (density: standard) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  --header-h: 60px;
+  --sidebar-w: 248px;
+
+  --font-ui: 'Vazirmatn', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', 'Menlo', 'Consolas', monospace;
+
+  --dur-fast: 140ms;
+  --dur: 220ms;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ---- semantic: LIGHT ---- */
+  --bg: var(--slate-50);
+  --surface: #ffffff;
+  --surface-2: var(--slate-100);
+  --surface-3: var(--slate-200);
+  --text: var(--slate-900);
+  --text-dim: var(--slate-600);
+  --text-faint: var(--slate-400);
+  --border: var(--slate-200);
+  --border-strong: var(--slate-300);
+
+  --primary: var(--green-600);
+  --primary-hover: var(--green-700);
+  --primary-soft: color-mix(in srgb, var(--primary) 12%, transparent);
+  --on-primary: #ffffff;
+
+  --accent: var(--amber-600);
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --on-accent: #ffffff;
+
+  --danger: var(--red-600);
+  --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
+  --warning: var(--yellow-600);
+  --warning-soft: color-mix(in srgb, var(--warning) 15%, transparent);
+  --success: var(--green-600);
+  --success-soft: color-mix(in srgb, var(--success) 13%, transparent);
+  --info: var(--indigo-600);
+  --info-soft: color-mix(in srgb, var(--info) 12%, transparent);
+
+  --ring: color-mix(in srgb, var(--primary) 45%, transparent);
+
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.05);
+  --shadow-2: 0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.05);
+  --shadow-3: 0 16px 40px rgba(15, 23, 42, 0.16);
+
+  --code-bg: #0d1524;
+  --code-text: #e2e8f0;
+
+  color-scheme: light;
+}
+
+[data-panel='admin'] {
+  --primary: var(--indigo-600);
+  --primary-hover: var(--indigo-700);
+  --success: var(--green-600);
+}
+
+/* ---- semantic: DARK (system) ---- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0b1220;
+    --surface: #111a2e;
+    --surface-2: #16213a;
+    --surface-3: #1f2c47;
+    --text: var(--slate-50);
+    --text-dim: var(--slate-300);
+    --text-faint: var(--slate-400);
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.16);
+
+    --primary: var(--green-500);
+    --primary-hover: var(--green-400);
+    --on-primary: #06210f;
+
+    --accent: var(--amber-500);
+    --on-accent: #241900;
+
+    --danger: var(--red-500);
+    --warning: var(--yellow-500);
+    --success: var(--green-500);
+    --info: var(--indigo-400);
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.45);
+    --shadow-3: 0 24px 60px rgba(0, 0, 0, 0.55);
+
+    --code-bg: #0a1120;
+    --code-text: #e2e8f0;
+
+    color-scheme: dark;
+  }
+  :root:not([data-theme='light'])[data-panel='admin'] {
+    --primary: var(--indigo-500);
+    --primary-hover: var(--indigo-400);
+    --on-primary: #ffffff;
+  }
+}
+
+/* ---- semantic: DARK (explicit) ---- */
+:root[data-theme='dark'] {
+  --bg: #0b1220;
+  --surface: #111a2e;
+  --surface-2: #16213a;
+  --surface-3: #1f2c47;
+  --text: var(--slate-50);
+  --text-dim: var(--slate-300);
+  --text-faint: var(--slate-400);
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --primary: var(--green-500);
+  --primary-hover: var(--green-400);
+  --on-primary: #06210f;
+
+  --accent: var(--amber-500);
+  --on-accent: #241900;
+
+  --danger: var(--red-500);
+  --warning: var(--yellow-500);
+  --success: var(--green-500);
+  --info: var(--indigo-400);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 24px 60px rgba(0, 0, 0, 0.55);
+
+  --code-bg: #0a1120;
+  --code-text: #e2e8f0;
+
+  color-scheme: dark;
+}
+:root[data-theme='dark'][data-panel='admin'] {
+  --primary: var(--indigo-500);
+  --primary-hover: var(--indigo-400);
+  --on-primary: #ffffff;
+}

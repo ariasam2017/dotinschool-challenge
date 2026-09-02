@@ -1,0 +1,31 @@
+# ── dotinschool ── base stack: works everywhere (Windows/macOS/Linux, IP-only).
+#
+#   docker compose -f build/docker-compose.yml up -d
+#       → http://localhost:8080   (admin at /<ADMIN_PATH>)
+#   docker compose -f build/docker-compose.yml up -d --build   → rebuild
+#   docker compose -f build/docker-compose.yml logs -f app
+#   docker compose -f build/docker-compose.yml down
+#
+# For a public domain + automatic HTTPS on Linux, add the prod override:
+#   docker compose -f build/docker-compose.yml -f build/docker-compose.prod.yml up -d
+
+name: dotinschool
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: build/Dockerfile
+    image: dotinschool:local
+    container_name: dotinschool
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      - PORT=8080
+      - DATA_DIR=/app/data
+      - DOTINSCHOOL_DOCKER=1
+    env_file:
+      - ../.env
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
