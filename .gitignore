@@ -28,3 +28,8 @@ Thumbs.db
 
 # assistant / tooling config — not part of the shipped product
 /.claude/
+
+# local run artifacts
+/run.pid
+/run.log
+/dotinschool.exe

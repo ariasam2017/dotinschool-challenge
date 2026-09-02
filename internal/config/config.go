@@ -39,6 +39,8 @@ type Config struct {
 	IppanelLoginPattern       string
 	IppanelAdminNotifyPattern string
 	IppanelAdminPhone         string
+	IppanelBaseURL            string // override the gateway endpoint
+	IppanelAuthScheme         string // "" (raw) | AccessKey | apikey | Bearer
 
 	// AI fallback (lowest priority; panel DB and data/ai-config.json win).
 	AIEnvAPIKey  string
@@ -83,6 +85,8 @@ func Load(root string, log *logrus.Logger) *Config {
 		IppanelLoginPattern:       firstNonEmpty(os.Getenv("IPPANEL_LOGIN_PATTERN_CODE"), defaultIppanelLoginPattern),
 		IppanelAdminNotifyPattern: firstNonEmpty(os.Getenv("IPPANEL_ADMIN_NOTIFY_PATTERN_CODE"), defaultIppanelAdminPattern),
 		IppanelAdminPhone:         strings.TrimPrefix(strings.TrimSpace(os.Getenv("IPPANEL_ADMIN_PHONE")), "0"),
+		IppanelBaseURL:            strings.TrimSpace(os.Getenv("IPPANEL_BASE_URL")),
+		IppanelAuthScheme:         strings.TrimSpace(os.Getenv("IPPANEL_AUTH_SCHEME")),
 
 		AIEnvAPIKey:  strings.TrimSpace(os.Getenv("AI_API_KEY")),
 		AIEnvBaseURL: strings.TrimRight(strings.TrimSpace(os.Getenv("AI_BASE_URL")), "/"),

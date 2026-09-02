@@ -16,7 +16,11 @@ RUN npm run build:fast
 # ---- 2. build the Go binary with the frontend embedded ----
 FROM golang:1.27-alpine AS build
 WORKDIR /src
-ENV CGO_ENABLED=0 GOFLAGS=-trimpath
+# Module proxy + checksum DB. Defaults reach networks where proxy.golang.org /
+# sum.golang.org are blocked; override with --build-arg for a normal network.
+ARG GOPROXY=https://goproxy.cn,direct
+ARG GOSUMDB=sum.golang.google.cn
+ENV CGO_ENABLED=0 GOFLAGS=-trimpath GOPROXY=${GOPROXY} GOSUMDB=${GOSUMDB}
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
@@ -30,6 +34,11 @@ FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata wget && adduser -D -u 10001 app
 WORKDIR /app
 COPY --from=build /out/dotinschool /app/dotinschool
+
+# Create the data dir with app ownership *before* declaring the VOLUME so a
+# freshly-mounted named volume inherits it — otherwise the non-root user cannot
+# open /app/data/arena.db (SQLITE_CANTOPEN).
+RUN mkdir -p /app/data && chown -R app:app /app
 
 ENV PORT=8080 \
     DATA_DIR=/app/data \

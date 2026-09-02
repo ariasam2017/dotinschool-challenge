@@ -4,7 +4,15 @@ import { message } from 'ant-design-vue'
 import { storeToRefs } from 'pinia'
 import { useAdminStore } from '@/stores/admin'
 import { useEventStore } from '@/stores/event'
-import { setConfig, downloadBackup, restoreBackup, checkForUpdate } from '@/api/client'
+import {
+  setConfig,
+  downloadBackup,
+  restoreBackup,
+  checkForUpdate,
+  smsStatus,
+  smsTest,
+} from '@/api/client'
+import type { SmsInfo, SmsTestResult } from '@/api/types'
 import { toFa, fmtPhone, statusLabel } from '@/lib/fa'
 
 import StatCard from '@/components/StatCard.vue'
@@ -144,6 +152,40 @@ async function doRestore(ev: Event) {
     ;(ev.target as HTMLInputElement).value = ''
   }
 }
+/* SMS (ippanel) diagnostics */
+const sms = ref<SmsInfo | null>(null)
+const smsForm = reactive({ phone: '', purpose: 'register' as 'register' | 'login' })
+const smsSending = ref(false)
+const smsResult = ref<SmsTestResult | null>(null)
+const smsRawOpen = ref(false)
+
+onMounted(async () => {
+  try {
+    sms.value = await smsStatus()
+  } catch (e) {
+    admin.handleAuthError(e)
+  }
+})
+
+async function sendTestSms() {
+  const phone = smsForm.phone.replace(/\D/g, '').replace(/^98/, '').replace(/^0/, '')
+  if (!/^9\d{9}$/.test(phone)) {
+    message.error('شمارهٔ موبایل معتبر وارد کنید (مثل ۹۱۲۳۴۵۶۷۸۹)')
+    return
+  }
+  smsSending.value = true
+  smsResult.value = null
+  try {
+    smsResult.value = await smsTest({ phone, purpose: smsForm.purpose })
+    if (smsResult.value.ok) message.success('پیامک آزمایشی با موفقیت ارسال شد')
+    else message.error('ارسال ناموفق بود — جزئیات پایین را ببینید')
+  } catch (e) {
+    admin.toastError(e, 'ارسال پیامک آزمایشی ناموفق بود')
+  } finally {
+    smsSending.value = false
+  }
+}
+
 const updating = ref(false)
 const updateMsg = ref('')
 async function doUpdate() {
@@ -270,6 +312,65 @@ async function doUpdate() {
         <p v-if="updateMsg" class="update-msg">{{ updateMsg }}</p>
       </section>
     </div>
+
+    <section class="card card-pad">
+      <div class="row-wrap" style="gap: 10px; margin-bottom: 8px">
+        <span class="section-title">پیامک (OTP ثبت‌نام و ورود)</span>
+        <Chip :tone="sms?.configured ? 'success' : 'danger'" dot>
+          {{ sms?.configured ? 'کلید ippanel فعال است' : 'کلید ippanel تنظیم نشده' }}
+        </Chip>
+      </div>
+      <p class="faint hint">
+        اگر ثبت‌نام/ورود کاربر کد پیامکی نمی‌فرستد، این‌جا یک پیامک آزمایشی بفرستید تا پاسخِ دقیقِ
+        سرویس ippanel (رد شدن پترن، خط فرستنده، نبودِ اعتبار …) دیده شود.
+      </p>
+
+      <div v-if="sms" class="sms-info num">
+        <span>اندپوینت: <code dir="ltr">{{ sms.endpoint }}</code></span>
+        <span>خط فرستنده: <code dir="ltr">{{ sms.sender || '—' }}</code></span>
+        <span>پترن ثبت‌نام: <code dir="ltr">{{ sms.registerPattern || '—' }}</code></span>
+        <span>پترن ورود: <code dir="ltr">{{ sms.loginPattern || '—' }}</code></span>
+        <span>شمارهٔ ادمین: <code dir="ltr">{{ sms.adminPhone || '—' }}</code></span>
+        <span>نوع Authorization: <code dir="ltr">{{ sms.authScheme }}</code></span>
+      </div>
+
+      <div class="row-wrap" style="margin-top: 12px; align-items: flex-end">
+        <label class="sms-field">
+          <span>شمارهٔ آزمایشی</span>
+          <a-input v-model:value="smsForm.phone" dir="ltr" placeholder="9123456789" style="width: 180px" />
+        </label>
+        <label class="sms-field">
+          <span>پترن</span>
+          <a-select
+            v-model:value="smsForm.purpose"
+            style="width: 150px"
+            :options="[
+              { value: 'register', label: 'ثبت‌نام' },
+              { value: 'login', label: 'ورود' },
+            ]"
+          />
+        </label>
+        <a-button type="primary" :loading="smsSending" @click="sendTestSms">
+          <template #icon><AppIcon name="send" :size="15" /></template>ارسال پیامک آزمایشی
+        </a-button>
+      </div>
+
+      <a-alert
+        v-if="smsResult"
+        :type="smsResult.ok ? 'success' : 'error'"
+        show-icon
+        style="margin-top: 12px"
+        :message="smsResult.ok ? 'ارسال موفق بود' : `ارسال ناموفق (کد HTTP ${toFa(smsResult.status)})`"
+      >
+        <template #description>
+          <div v-if="smsResult.message" style="margin-bottom: 6px">{{ smsResult.message }}</div>
+          <a-button size="small" @click="smsRawOpen = !smsRawOpen">
+            {{ smsRawOpen ? 'پنهان‌کردن پاسخ خام' : 'نمایش پاسخ خام سرویس' }}
+          </a-button>
+          <pre v-if="smsRawOpen" class="sms-raw" dir="ltr">{{ smsResult.rawBody || '(خالی)' }}</pre>
+        </template>
+      </a-alert>
+    </section>
   </div>
 </template>
 
@@ -366,5 +467,38 @@ async function doUpdate() {
   margin-top: 10px;
   font-size: 0.8rem;
   color: var(--text-dim);
+}
+.sms-info {
+  display: grid;
+  gap: 6px;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+.sms-info code {
+  font-size: 0.9em;
+  background: var(--surface-2);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.sms-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+.sms-raw {
+  margin: 8px 0 0;
+  background: var(--code-bg);
+  color: var(--code-text);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 0.74rem;
+  line-height: 1.6;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>

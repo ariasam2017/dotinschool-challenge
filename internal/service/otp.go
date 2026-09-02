@@ -81,7 +81,9 @@ func (s *OTPService) Send(phone, purpose string) error {
 	}
 	if err := s.sms.SendPattern(phone, pattern, map[string]string{"code": code}); err != nil {
 		s.log.Errorf("ارسال کد تأیید به %s شکست خورد: %v", phone, err)
-		return apperr.New(502, "SMS_SEND_FAILED", "ارسال پیامک ناموفق بود، لطفاً دوباره تلاش کنید.")
+		// Surface the real upstream reason — the original hid it, which made a
+		// misconfigured pattern / line / credit impossible to diagnose.
+		return apperr.New(502, "SMS_SEND_FAILED", "ارسال پیامک ناموفق بود — "+err.Error())
 	}
 	now := time.Now()
 	s.mu.Lock()

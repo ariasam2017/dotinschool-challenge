@@ -118,3 +118,23 @@ export interface UpdateResult {
   updated: boolean
   message: string
 }
+
+export interface SmsInfo {
+  configured: boolean
+  provider: string
+  endpoint: string
+  sender: string
+  registerPattern: string
+  loginPattern: string
+  adminPattern: string
+  adminPhone: string
+  authScheme: string
+}
+
+export interface SmsTestResult {
+  ok: boolean
+  status: number
+  endpoint: string
+  message: string
+  rawBody: string
+}

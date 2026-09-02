@@ -12,6 +12,8 @@ import type {
   Participant,
   ReviewResult,
   SessionParticipant,
+  SmsInfo,
+  SmsTestResult,
   UpdateResult,
 } from './types'
 
@@ -168,6 +170,11 @@ export async function restoreBackup(file: File) {
 }
 export const checkForUpdate = () =>
   apiFetch<UpdateResult>('/api/admin/update', { method: 'POST' })
+
+/* ---- SMS (ippanel) diagnostics ---- */
+export const smsStatus = () => apiFetch<SmsInfo>('/api/admin/sms-status')
+export const smsTest = (payload: { phone: string; purpose?: 'register' | 'login'; pattern?: string }) =>
+  apiFetch<SmsTestResult>('/api/admin/sms-test', { method: 'POST', body: payload })
 
 /* ---- AI assistant (admin) ---- */
 export const aiStatus = () => apiFetch<AiStatus>('/api/admin/ai-status')

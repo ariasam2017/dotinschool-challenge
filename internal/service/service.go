@@ -34,7 +34,7 @@ func New(cfg *config.Config, db *gorm.DB, log *logrus.Logger) *Services {
 	if cfg.IppanelAPIKey != "" {
 		sms = newIppanelProvider(cfg, log)
 	} else {
-		sms = nullSMSProvider{}
+		sms = nullSMSProvider{cfg: cfg}
 	}
 
 	return &Services{
