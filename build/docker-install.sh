@@ -5,24 +5,20 @@
 # The dotinschool repo is private, so getting the source needs a GitHub
 # token: a fine-grained personal access token, scoped to just this repository
 # with "Contents: Read-only", is enough. Create one at
-# https://github.com/settings/personal-access-tokens/new, then install with:
+# https://github.com/settings/personal-access-tokens/new, then run this —
+# no token in the command itself, it asks for it interactively:
 #
-#   git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
-#   sudo bash dotinschool/build/docker-install.sh
+#   bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)'
 #
-# The token is only needed for that first "git clone": once cloned, this
-# script reuses the same remote for /opt/dotinschool, so later updates (this
-# script, or `dotinschool update`) keep working without it. The clone above
-# can be deleted afterwards - /opt/dotinschool is its own independent copy.
+# The token is only needed for that first run: it gets embedded in the
+# /opt/dotinschool clone's git remote, so later updates (this script, or
+# `dotinschool update`) keep working without it.
 #
-# If you'd rather skip the local clone entirely, this also works in one line:
-#
-#   bash <(curl -Ls -H "Authorization: token YOUR_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
-#
-# Installs Docker + Go if missing, clones the repo to /opt/dotinschool,
-# generates a .env with a random admin password + secret admin path, builds the
-# image the RELIABLE way (host-compile the binary, then package it — never an
-# in-container `go build`), brings the stack up, and installs a wrapper command:
+# Installs Docker + Go if missing (auto — no prompts), clones the repo to
+# /opt/dotinschool, generates a .env with a random admin password + secret
+# admin path, builds the image the RELIABLE way (host-compile the binary,
+# then package it — never an in-container `go build`), brings the stack up,
+# and installs a wrapper command:
 #
 #   dotinschool up | down | restart | logs | update | admin | ps | rebuild
 # =============================================================================
@@ -57,6 +53,19 @@ repo_url(){
   local t; t=$(gh_token)
   if [[ -n "$t" ]]; then echo "https://${t}@github.com/ariasam2017/dotinschool.git"
   else echo "https://github.com/ariasam2017/dotinschool.git"; fi
+}
+
+# Prompts once, in the real shell (not a $(...) subshell, so the export
+# actually sticks), if nothing else already supplies a token.
+ensure_gh_token(){
+  [[ -n "${DOTINSCHOOL_GH_TOKEN:-}" ]] && return
+  [[ -n "${DOTINSCHOOL_REPO_URL:-}" ]] && return
+  [[ -d "$INSTALL_DIR/.git" ]] && [[ -n "$(gh_token)" ]] && return
+  [[ -t 0 ]] || return
+  echo "This repo is private. Create a fine-grained token (Contents: Read-only) at:"
+  echo "  https://github.com/settings/personal-access-tokens/new"
+  read -rsp "GitHub token: " DOTINSCHOOL_GH_TOKEN; echo
+  export DOTINSCHOOL_GH_TOKEN
 }
 
 install_prereqs(){
@@ -186,6 +195,7 @@ WRAP
 
 main(){
   require_root
+  ensure_gh_token
   install_prereqs
   install_docker
   install_go

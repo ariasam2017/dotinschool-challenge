@@ -3,11 +3,13 @@
 # The dotinschool repo is private, so fetching this file and the git clone it
 # runs both need a GitHub token: a fine-grained personal access token, scoped
 # to just this repository with "Contents: Read-only", is enough. Create one at
-# https://github.com/settings/personal-access-tokens/new, then install with:
+# https://github.com/settings/personal-access-tokens/new, then run this - no
+# token in the command itself, it asks for it interactively (input hidden):
 #
-#   $env:DOTINSCHOOL_GH_TOKEN = '<your token>'
-#   $h = @{ Authorization = "token $env:DOTINSCHOOL_GH_TOKEN" }
-#   irm -Headers $h https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+#   $s = Read-Host "GitHub token" -AsSecureString
+#   $T = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))
+#   $env:DOTINSCHOOL_GH_TOKEN = $T
+#   irm -Headers @{Authorization="token $T"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
 #
 # The token is only needed for this first run: it gets embedded in the local
 # clone's git remote, so a later `.\docker-up.ps1` or re-run of this same
@@ -15,8 +17,8 @@
 #
 # Fetches the latest dotinschool source from GitHub into %USERPROFILE%\dotinschool
 # (or updates it if already there), then hands off to docker-up.ps1, which
-# installs Go and Docker Desktop if missing, compiles the Linux binary on this
-# host, builds the image, and starts the stack.
+# installs Go if missing and builds/starts the stack (Docker Desktop itself
+# is not auto-installed - docker-up.ps1 will tell you if it's missing).
 #
 # ASCII-only on purpose: Windows PowerShell 5.1 mis-reads non-ASCII script files
 # unless they carry a UTF-8 BOM, and `irm | iex` has no file of its own to tag
@@ -29,6 +31,16 @@ function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; exit 1 }
 
 $Branch     = 'main'
 $InstallDir = Join-Path $env:USERPROFILE 'dotinschool'
+
+# Prompts once (hidden input), if nothing else already supplies a token.
+function Ensure-GhToken {
+  if ($env:DOTINSCHOOL_GH_TOKEN) { return }
+  if (Test-Path (Join-Path $InstallDir '.git')) { return }
+  $sec = Read-Host "GitHub token (repo is private - https://github.com/settings/personal-access-tokens/new)" -AsSecureString
+  $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
+  try { $env:DOTINSCHOOL_GH_TOKEN = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr) }
+  finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+}
 
 # Prefer an explicitly-passed token, otherwise reuse the one already embedded
 # in the existing clone's git remote (set on first install). Never print the
@@ -66,6 +78,7 @@ if (-not $git) {
 }
 
 # ---- 2. fetch or update the source from GitHub ----
+Ensure-GhToken
 if (Test-Path (Join-Path $InstallDir '.git')) {
   Say "updating existing checkout at $InstallDir"
   & $git -C $InstallDir fetch --depth 1 origin $Branch

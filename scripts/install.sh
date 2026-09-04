@@ -91,6 +91,20 @@ repo_url(){
   else echo "https://github.com/ariasam2017/dotinschool.git"; fi
 }
 
+# Prompts once, in the real shell (not a $(...) subshell, so the export
+# actually sticks), if nothing else already supplies a token. Call this
+# before any command that talks to GitHub.
+ensure_gh_token(){
+  [[ -n "${DOTINSCHOOL_GH_TOKEN:-}" ]] && return
+  [[ -n "${DOTINSCHOOL_REPO_URL:-}" ]] && return
+  [[ -d "$INSTALL_DIR/.git" ]] && [[ -n "$(gh_token)" ]] && return
+  [[ -t 0 ]] || return
+  echo "This repo is private. Create a fine-grained token (Contents: Read-only) at:"
+  echo "  https://github.com/settings/personal-access-tokens/new"
+  read -rsp "GitHub token: " DOTINSCHOOL_GH_TOKEN; echo
+  export DOTINSCHOOL_GH_TOKEN
+}
+
 detect_pkg_manager(){
   if command -v apt-get >/dev/null 2>&1; then echo apt
   elif command -v dnf >/dev/null 2>&1; then echo dnf
@@ -304,6 +318,7 @@ print_access_info(){
 
 cmd_install(){
   require_root
+  ensure_gh_token
   install_prereqs
   install_go
   fetch_app
@@ -332,6 +347,7 @@ cmd_install(){
 cmd_update(){
   require_root
   [[ -d "$INSTALL_DIR" ]] || die "Not installed yet — run \"dotinschool install\" first."
+  ensure_gh_token
   local before after
   before=$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || echo "")
   fetch_app
@@ -345,6 +361,7 @@ cmd_update(){
 
 cmd_update_menu(){
   require_root
+  ensure_gh_token
   info "Fetching the latest management script..."
   local tmp t; tmp=$(mktemp); t=$(gh_token)
   if [[ -n "${DOTINSCHOOL_CLI_SOURCE_URL:-}" ]]; then
