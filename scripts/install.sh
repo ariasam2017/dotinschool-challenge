@@ -27,7 +27,12 @@
 #   dotinschool update          pull the latest version + rebuild + restart
 #   dotinschool update-menu     update just this CLI script
 #   dotinschool admin           show / change admin address, credentials, subdomain
-#   dotinschool cert            issue / renew a Let's Encrypt certificate
+#   dotinschool cert            issue/renew an SSL certificate over HTTP-01
+#   dotinschool cert-cf         issue/renew an SSL certificate via Cloudflare DNS
+#   dotinschool log             live log / clear logs
+#   dotinschool reset           factory reset (wipe DB, new admin credentials)
+#   dotinschool fail2ban        enable IP banning after repeated failed logins
+#   dotinschool banlog          show fail2ban's dotinschool jail status
 #   dotinschool start|stop|restart|status
 #   dotinschool enable|disable  auto-start on boot
 #   dotinschool uninstall
@@ -311,6 +316,7 @@ cmd_install(){
   if systemctl is-active --quiet "$SERVICE_NAME"; then ok "Install complete and the service is running."
   else err "Service failed to start — log:"; journalctl -u "$SERVICE_NAME" --no-pager -n 30 || true; exit 1; fi
   print_access_info
+  prompt_domain_setup
 }
 
 cmd_update(){
@@ -386,25 +392,10 @@ cmd_admin(){
 
 install_acme(){ [[ -x "$HOME/.acme.sh/acme.sh" ]] || { info "Installing acme.sh..."; curl -fsSL https://get.acme.sh | sh -s email="admin@$(hostname -f 2>/dev/null || echo localhost)" >/dev/null 2>&1; }; }
 
-cmd_cert(){
-  require_root
-  echo "Issuing an SSL certificate requires a domain whose A record points to this server's IP."
-  warn "If you're only using a raw IP with no domain, skip this step — the panel works fine over plain HTTP with no certificate errors."
-  read -r -p "Domain (empty = cancel): " domain
-  [[ -n "$domain" ]] || { info "Cancelled."; return; }
-  local domain_args=(-d "$domain") subdomain; subdomain=$(get_env_val ADMIN_SUBDOMAIN)
-  if [[ -n "$subdomain" && "$subdomain" != "$domain" ]]; then
-    read -r -p "Include the admin subdomain (${subdomain}) under the same certificate? [Y/n] " inc
-    [[ "$inc" != "n" && "$inc" != "N" ]] && domain_args+=(-d "$subdomain")
-  fi
-  install_acme
-  mkdir -p "${SSL_DIR}/${domain}"
-  info "Stopping the service temporarily to free port 80..."
-  systemctl stop "$SERVICE_NAME" 2>/dev/null || true
-  if ! "$HOME/.acme.sh/acme.sh" --issue "${domain_args[@]}" --standalone --httpport 80; then
-    err "Certificate issuance failed — check the domain(s) and that port 80 is free."
-    systemctl start "$SERVICE_NAME" 2>/dev/null || true; return 1
-  fi
+# Common tail shared by every issuance method: hand the fresh cert to the
+# app and point it at HTTPS. Assumes acme.sh already issued a cert for $1.
+activate_cert(){
+  local domain="$1"
   "$HOME/.acme.sh/acme.sh" --install-cert -d "$domain" \
     --fullchain-file "${SSL_DIR}/${domain}/fullchain.pem" \
     --key-file "${SSL_DIR}/${domain}/privkey.pem" \
@@ -413,8 +404,146 @@ cmd_cert(){
   set_env_val SSL_KEY_PATH "${SSL_DIR}/${domain}/privkey.pem"
   set_env_val PORT 443
   open_firewall_port 443
+}
+
+prompt_cert_domain(){
+  read -r -p "Domain (empty = cancel): " domain
+  [[ -n "$domain" ]] || return 1
+  domain_args=(-d "$domain")
+  local subdomain; subdomain=$(get_env_val ADMIN_SUBDOMAIN)
+  if [[ -n "$subdomain" && "$subdomain" != "$domain" ]]; then
+    read -r -p "Include the admin subdomain (${subdomain}) under the same certificate? [Y/n] " inc
+    [[ "$inc" != "n" && "$inc" != "N" ]] && domain_args+=(-d "$subdomain")
+  fi
+  return 0
+}
+
+cmd_cert(){
+  require_root
+  echo "Issuing an SSL certificate requires a domain whose A record points to this server's IP."
+  warn "If you're only using a raw IP with no domain, skip this step — the panel works fine over plain HTTP with no certificate errors."
+  local domain="" domain_args=()
+  prompt_cert_domain || { info "Cancelled."; return; }
+  install_acme
+  mkdir -p "${SSL_DIR}/${domain}"
+  info "Stopping the service temporarily to free port 80..."
+  systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+  if ! "$HOME/.acme.sh/acme.sh" --issue "${domain_args[@]}" --standalone --httpport 80; then
+    err "Certificate issuance failed — check the domain(s) and that port 80 is free."
+    systemctl start "$SERVICE_NAME" 2>/dev/null || true; return 1
+  fi
+  activate_cert "$domain"
   systemctl start "$SERVICE_NAME"; sleep 1
-  systemctl is-active --quiet "$SERVICE_NAME" && ok "Certificate issued and active — the panel is now on HTTPS (auto-renewed via acme.sh)." || err "Service failed to start with HTTPS — journalctl -u ${SERVICE_NAME} -n 50"
+  if systemctl is-active --quiet "$SERVICE_NAME"; then ok "Certificate issued and active — the panel is now on HTTPS (auto-renewed via acme.sh)."; print_access_info
+  else err "Service failed to start with HTTPS — journalctl -u ${SERVICE_NAME} -n 50"; fi
+}
+
+cmd_cert_cf(){
+  require_root
+  echo "Issues a certificate via the Cloudflare DNS API — no need for port 80 to be reachable, and works even before the domain finishes pointing at this server."
+  local domain="" domain_args=()
+  prompt_cert_domain || { info "Cancelled."; return; }
+  echo "Needs a Cloudflare API token with Zone:DNS:Edit on this domain's zone — create one at https://dash.cloudflare.com/profile/api-tokens"
+  read -r -p "Cloudflare API token: " cf_token
+  [[ -n "$cf_token" ]] || { info "Cancelled."; return; }
+  read -r -p "Cloudflare Account ID (dashboard right sidebar): " cf_account
+  [[ -n "$cf_account" ]] || { info "Cancelled."; return; }
+  install_acme
+  mkdir -p "${SSL_DIR}/${domain}"
+  if ! CF_Token="$cf_token" CF_Account_ID="$cf_account" "$HOME/.acme.sh/acme.sh" --issue --dns dns_cf "${domain_args[@]}"; then
+    err "Certificate issuance failed — check the token's permissions and that this domain's zone is on that Cloudflare account."
+    return 1
+  fi
+  activate_cert "$domain"
+  systemctl restart "$SERVICE_NAME"; sleep 1
+  if systemctl is-active --quiet "$SERVICE_NAME"; then ok "Certificate issued and active — the panel is now on HTTPS (auto-renewed via acme.sh)."; print_access_info
+  else err "Service failed to start with HTTPS — journalctl -u ${SERVICE_NAME} -n 50"; fi
+}
+
+prompt_domain_setup(){
+  echo
+  read -r -p "Do you have a domain pointing at this server's IP? Set up SSL now? [y/N] " ans
+  [[ "$ans" == "y" || "$ans" == "Y" ]] || return
+  echo "1) Let's Encrypt over HTTP-01 (needs port 80 reachable from the internet)"
+  echo "2) Let's Encrypt via Cloudflare DNS (needs a Cloudflare API token, works without port 80)"
+  read -r -p "Choice [1/2, empty = skip]: " m
+  case "$m" in
+    1) cmd_cert ;;
+    2) cmd_cert_cf ;;
+    *) info "Skipped — run \"dotinschool cert\" or \"dotinschool cert-cf\" later." ;;
+  esac
+}
+
+cmd_log(){
+  require_root
+  box_top; box_title "dotinschool — Logs"
+  box_item 0 "Back"; box_div
+  box_item 1 "Live log (Ctrl+C to stop)"
+  box_item 2 "Clear all logs"
+  box_bottom; echo
+  read -r -p "Choice [0-2]: " choice
+  case "$choice" in
+    0) return ;;
+    1) journalctl -u "$SERVICE_NAME" -e --no-pager -f ;;
+    2) journalctl --rotate >/dev/null 2>&1 || true; journalctl --vacuum-time=1s >/dev/null 2>&1 || true; ok "Logs cleared." ;;
+    *) warn "Invalid option." ;;
+  esac
+}
+
+cmd_reset(){
+  require_root
+  [[ -f "$ENV_FILE" ]] || die "Not installed yet."
+  warn "This wipes the database (all participants, the challenge, and event settings) and generates a new admin password and secret path — same as a fresh install, with the app itself left in place. The port, subdomain, and SSL certificate are not touched."
+  read -r -p "$(echo -e "${YELLOW}Are you sure? [y/N] ${NC}")" ans
+  [[ "$ans" == "y" || "$ans" == "Y" ]] || { info "Cancelled."; return; }
+  systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+  rm -rf "${INSTALL_DIR}/data"
+  local pass adminpath; pass=$(random_password); adminpath=$(random_admin_path)
+  set_env_val ADMIN_PASSWORD "$pass"
+  set_env_val ADMIN_PATH "$adminpath"
+  systemctl start "$SERVICE_NAME"; sleep 2
+  if systemctl is-active --quiet "$SERVICE_NAME"; then ok "Reset complete — fresh database, new admin credentials."; print_access_info
+  else err "Service failed to start — log:"; journalctl -u "$SERVICE_NAME" --no-pager -n 30 || true; return 1; fi
+}
+
+install_fail2ban(){
+  require_root
+  if ! command -v fail2ban-client >/dev/null 2>&1; then
+    info "Installing fail2ban..."
+    local pm; pm=$(detect_pkg_manager)
+    case "$pm" in
+      apt) apt-get update -y >/dev/null; apt-get install -y fail2ban >/dev/null ;;
+      dnf) dnf install -y fail2ban >/dev/null ;;
+      yum) yum install -y epel-release >/dev/null 2>&1 || true; yum install -y fail2ban >/dev/null ;;
+    esac
+  fi
+  mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d
+  cat > /etc/fail2ban/filter.d/dotinschool.conf <<'EOF'
+[Definition]
+failregex = ^.*msg="admin login failed" ip=<HOST>\s*$
+ignoreregex =
+EOF
+  cat > /etc/fail2ban/jail.d/dotinschool.conf <<EOF
+[dotinschool]
+enabled = true
+backend = systemd
+journalmatch = _SYSTEMD_UNIT=${SERVICE_NAME}.service
+filter = dotinschool
+maxretry = 5
+findtime = 10m
+bantime = 1h
+action = %(action_)s
+EOF
+  systemctl enable --now fail2ban >/dev/null 2>&1
+  systemctl restart fail2ban
+  ok "fail2ban is watching admin login attempts — 5 failures in 10 minutes bans the IP for 1 hour."
+  warn "If you ever lock yourself out: fail2ban-client set dotinschool unbanip <your-ip>"
+}
+
+cmd_banlog(){
+  require_root
+  command -v fail2ban-client >/dev/null 2>&1 || die "fail2ban is not installed — run \"dotinschool fail2ban\" first."
+  fail2ban-client status dotinschool 2>/dev/null || warn "The dotinschool jail isn't active yet."
 }
 
 cmd_service(){ require_root; systemctl "$1" "$SERVICE_NAME"; [[ "$1" == "status" ]] || ok "Command \"$1\" applied to the service."; }
@@ -433,19 +562,23 @@ show_menu(){
   box_item 3 "Update this menu script"
   box_item 4 "Uninstall"; box_div
   box_item 5 "Admin panel settings"
-  box_item 6 "SSL certificate"; box_div
-  box_item 7 "Start"; box_item 8 "Stop"; box_item 9 "Restart"; box_item 10 "Status"; box_div
-  box_item 11 "Enable autostart"; box_item 12 "Disable autostart"
+  box_item 6 "SSL certificate (HTTP-01)"
+  box_item 7 "SSL certificate (Cloudflare DNS)"
+  box_item 8 "Logs"
+  box_item 9 "Factory reset"
+  box_item 10 "Brute-force protection (fail2ban)"; box_div
+  box_item 11 "Start"; box_item 12 "Stop"; box_item 13 "Restart"; box_item 14 "Status"; box_div
+  box_item 15 "Enable autostart"; box_item 16 "Disable autostart"
   box_bottom; echo; show_status; echo
-  read -r -p "Choice [0-12]: " choice
+  read -r -p "Choice [0-16]: " choice
   case "$choice" in
     1) cmd_install ;; 2) cmd_update ;; 3) cmd_update_menu ;; 4) cmd_uninstall ;;
-    5) cmd_admin ;; 6) cmd_cert ;;
-    7) cmd_service start ;; 8) cmd_service stop ;; 9) cmd_service restart ;; 10) cmd_service status ;;
-    11) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "Autostart enabled." ;;
-    12) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "Autostart disabled." ;;
+    5) cmd_admin ;; 6) cmd_cert ;; 7) cmd_cert_cf ;; 8) cmd_log ;; 9) cmd_reset ;; 10) install_fail2ban ;;
+    11) cmd_service start ;; 12) cmd_service stop ;; 13) cmd_service restart ;; 14) cmd_service status ;;
+    15) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "Autostart enabled." ;;
+    16) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "Autostart disabled." ;;
     0) exit 0 ;;
-    *) warn "Enter a number between 0 and 12." ;;
+    *) warn "Enter a number between 0 and 16." ;;
   esac
 }
 
@@ -457,6 +590,11 @@ main(){
     uninstall) cmd_uninstall ;;
     admin) cmd_admin ;;
     cert) cmd_cert ;;
+    cert-cf) cmd_cert_cf ;;
+    log) cmd_log ;;
+    reset) cmd_reset ;;
+    fail2ban) install_fail2ban ;;
+    banlog) cmd_banlog ;;
     start|stop|restart|status) cmd_service "$1" ;;
     enable) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "Autostart enabled." ;;
     disable) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "Autostart disabled." ;;
