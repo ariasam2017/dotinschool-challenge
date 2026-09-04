@@ -3,11 +3,14 @@
 #   powershell -ExecutionPolicy Bypass -File .\docker-up.ps1
 #   (or just:  .\docker-up.ps1 )
 #
-# Installs any missing prerequisites (Go, Docker Desktop) via winget, compiles
-# the Linux binary on this Windows host (fast, reliable), packages it into a
-# tiny image (a ~5s file copy - NO in-container `go build`, so the
-# "rpc error ... EOF" build failure cannot happen), and starts the stack.
-# Re-run any time to rebuild + recreate.
+# Installs Go via winget if it's missing (no prompts). Docker Desktop is
+# NOT auto-installed - its installer is interactive and can require a
+# reboot for the WSL2 kernel update, so if it's missing this script just
+# prints where to get it and stops; re-run after installing it yourself.
+# Once both are present, compiles the Linux binary on this Windows host
+# (fast, reliable), packages it into a tiny image (a ~5s file copy - NO
+# in-container `go build`, so the "rpc error ... EOF" build failure cannot
+# happen), and starts the stack. Re-run any time to rebuild + recreate.
 #
 # ASCII-only on purpose: Windows PowerShell 5.1 mis-reads non-ASCII script files
 # unless they carry a UTF-8 BOM. Access info (URL + credentials) is printed at
@@ -54,7 +57,7 @@ if (-not $go) {
 }
 Say "using Go: $go"
 
-# ---- 2. Docker: locate it, install if missing, wait until the engine is ready ----
+# ---- 2. Docker: must already be installed - this script does not install it ----
 function Docker-On-Path { [bool](Get-Command docker -ErrorAction SilentlyContinue) }
 function Docker-Ready {
   if (-not (Docker-On-Path)) { return $false }
@@ -63,16 +66,7 @@ function Docker-Ready {
 }
 
 if (-not (Docker-On-Path)) {
-  Warn "Docker not found"
-  Winget-Install 'Docker.DockerDesktop' 'Docker Desktop'
-
-  $dockerCli = Join-Path $env:ProgramFiles 'Docker\Docker\resources\bin'
-  if ((Test-Path $dockerCli) -and ($env:PATH -notlike "*$dockerCli*")) { $env:PATH = "$dockerCli;$env:PATH" }
-
-  if (-not (Docker-On-Path)) {
-    Die "Docker Desktop was installed but is not on PATH yet. Open a new terminal (or sign out/in once) and re-run this script."
-  }
-  Say "Docker Desktop installed - first launch can take a minute, and on a fresh machine it may ask to install the WSL2 kernel update and reboot once. If that happens, finish that step and just re-run .\docker-up.ps1 afterwards."
+  Die "Docker Desktop for Windows is not installed. Please install it from https://www.docker.com/products/docker-desktop/ and then continue with the steps (re-run this script)."
 }
 
 if (-not (Docker-Ready)) {
