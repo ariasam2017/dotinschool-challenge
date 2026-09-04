@@ -2,7 +2,15 @@
 # =============================================================================
 # dotinschool — Docker installer for a Linux host.
 #
-#   bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
+# The dotinschool repo is private, so both fetching this file and the "git
+# clone" it runs need a GitHub token: a fine-grained personal access token,
+# scoped to just this repository with "Contents: Read-only", is enough.
+# Create one at https://github.com/settings/personal-access-tokens/new, then
+# install with:
+#
+#   export DOTINSCHOOL_GH_TOKEN=<your token>
+#   bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" \
+#     https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
 #
 # Installs Docker + Go if missing, clones the repo to /opt/dotinschool,
 # generates a .env with a random admin password + secret admin path, builds the
@@ -13,7 +21,6 @@
 # =============================================================================
 set -euo pipefail
 
-REPO_URL="${DOTINSCHOOL_REPO_URL:-https://github.com/ariasam2017/dotinschool.git}"
 BRANCH="${DOTINSCHOOL_BRANCH:-main}"
 INSTALL_DIR="/opt/dotinschool"
 CLI_PATH="/usr/local/bin/dotinschool"
@@ -27,6 +34,23 @@ warn(){ echo -e "${YELLOW}[!]${NC} $*"; }
 die(){ echo -e "${RED}[x]${NC} $*" >&2; exit 1; }
 
 require_root(){ [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run as root (sudo)."; }
+
+# The repo is private: prefer an explicitly-passed token, otherwise reuse the
+# one already embedded in the existing clone's git remote (set on first
+# install). Never echo the URL built from this — it carries the token.
+gh_token(){
+  if [[ -n "${DOTINSCHOOL_GH_TOKEN:-}" ]]; then echo "$DOTINSCHOOL_GH_TOKEN"; return; fi
+  if [[ -d "$INSTALL_DIR/.git" ]]; then
+    git -C "$INSTALL_DIR" remote get-url origin 2>/dev/null | sed -n 's#https://\([^@]*\)@github\.com/.*#\1#p'
+  fi
+}
+
+repo_url(){
+  if [[ -n "${DOTINSCHOOL_REPO_URL:-}" ]]; then echo "$DOTINSCHOOL_REPO_URL"; return; fi
+  local t; t=$(gh_token)
+  if [[ -n "$t" ]]; then echo "https://${t}@github.com/ariasam2017/dotinschool.git"
+  else echo "https://github.com/ariasam2017/dotinschool.git"; fi
+}
 
 install_prereqs(){
   if command -v apt-get >/dev/null 2>&1; then apt-get update -y >/dev/null; apt-get install -y curl git tar openssl ca-certificates >/dev/null
@@ -69,8 +93,10 @@ fetch_repo(){
     git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null
     git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}" >/dev/null
   else
+    local url; url=$(repo_url)
+    [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
     rm -rf "$INSTALL_DIR"
-    git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR" >/dev/null
+    git clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null
   fi
   ok "Source ready at ${INSTALL_DIR}."
 }

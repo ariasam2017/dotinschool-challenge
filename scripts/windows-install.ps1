@@ -1,12 +1,22 @@
 # dotinschool - Windows installer.
 #
-#   irm https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+# The dotinschool repo is private, so fetching this file and the git clone it
+# runs both need a GitHub token: a fine-grained personal access token, scoped
+# to just this repository with "Contents: Read-only", is enough. Create one at
+# https://github.com/settings/personal-access-tokens/new, then install with:
+#
+#   $env:DOTINSCHOOL_GH_TOKEN = '<your token>'
+#   $h = @{ Authorization = "token $env:DOTINSCHOOL_GH_TOKEN" }
+#   irm -Headers $h https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+#
+# The token is only needed for this first run: it gets embedded in the local
+# clone's git remote, so a later `.\docker-up.ps1` or re-run of this same
+# command line keeps working without it.
 #
 # Fetches the latest dotinschool source from GitHub into %USERPROFILE%\dotinschool
 # (or updates it if already there), then hands off to docker-up.ps1, which
 # installs Go and Docker Desktop if missing, compiles the Linux binary on this
-# host, builds the image, and starts the stack. Re-run the same command any
-# time to pull the latest version and rebuild.
+# host, builds the image, and starts the stack.
 #
 # ASCII-only on purpose: Windows PowerShell 5.1 mis-reads non-ASCII script files
 # unless they carry a UTF-8 BOM, and `irm | iex` has no file of its own to tag
@@ -17,9 +27,22 @@ $ErrorActionPreference = 'Stop'
 function Say($m) { Write-Host "==> $m" -ForegroundColor Cyan }
 function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; exit 1 }
 
-$RepoUrl    = 'https://github.com/ariasam2017/dotinschool.git'
 $Branch     = 'main'
 $InstallDir = Join-Path $env:USERPROFILE 'dotinschool'
+
+# Prefer an explicitly-passed token, otherwise reuse the one already embedded
+# in the existing clone's git remote (set on first install). Never print the
+# URL built from this - it carries the token.
+function Get-RepoUrl($git) {
+  if (Test-Path (Join-Path $InstallDir '.git')) {
+    $existing = & $git -C $InstallDir remote get-url origin 2>$null
+    if ($existing -match '^https://([^@]+)@github\.com/') { return $existing }
+  }
+  if ($env:DOTINSCHOOL_GH_TOKEN) {
+    return "https://$($env:DOTINSCHOOL_GH_TOKEN)@github.com/ariasam2017/dotinschool.git"
+  }
+  return 'https://github.com/ariasam2017/dotinschool.git'
+}
 
 # ---- 1. git: locate it, or install it via winget ----
 function Find-Git {
@@ -48,8 +71,12 @@ if (Test-Path (Join-Path $InstallDir '.git')) {
   & $git -C $InstallDir fetch --depth 1 origin $Branch
   & $git -C $InstallDir reset --hard "origin/$Branch"
 } else {
+  $repoUrl = Get-RepoUrl $git
+  if (-not $env:DOTINSCHOOL_GH_TOKEN -and $repoUrl -notlike '*@github.com*') {
+    Die "No GitHub token found (`$env:DOTINSCHOOL_GH_TOKEN) - this will fail, the repo is private. See the header of this script."
+  }
   Say "cloning dotinschool into $InstallDir"
-  & $git clone --depth 1 --branch $Branch $RepoUrl $InstallDir
+  & $git clone --depth 1 --branch $Branch $repoUrl $InstallDir
 }
 if ($LASTEXITCODE -ne 0) { Die "could not fetch the source from GitHub." }
 

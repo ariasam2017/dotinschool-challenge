@@ -2,8 +2,18 @@
 # =============================================================================
 # dotinschool — Linux installer / management script (x-ui / Sanaei-panel style)
 #
-# Install (one line):
-#   bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
+# The dotinschool repo is private, so both this script and the "git clone" it
+# runs need a GitHub token: a fine-grained personal access token, scoped to
+# just this repository with "Contents: Read-only", is enough. Create one at
+# https://github.com/settings/personal-access-tokens/new, then install with:
+#
+#   export DOTINSCHOOL_GH_TOKEN=<your token>
+#   bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" \
+#     https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
+#
+# The token is only needed for this first run: it gets embedded in the local
+# clone's git remote, so later updates (this script, the panel's "Update"
+# button, systemd's rebuild-on-restart) keep working without it.
 #
 # After install the "dotinschool" command is available:
 #   dotinschool                 interactive management menu
@@ -18,9 +28,7 @@
 # =============================================================================
 set -euo pipefail
 
-REPO_URL="${DOTINSCHOOL_REPO_URL:-https://github.com/ariasam2017/dotinschool.git}"
 BRANCH="${DOTINSCHOOL_BRANCH:-main}"
-CLI_SOURCE_URL="${DOTINSCHOOL_CLI_SOURCE_URL:-https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh}"
 
 INSTALL_DIR="/opt/dotinschool"
 CONFIG_DIR="/etc/dotinschool"
@@ -51,6 +59,23 @@ box_title(){ box_line "$1" "${BOLD}${1}${NC}"; }
 box_item(){ box_line "${1}.  ${2}" "${GREEN}${1}.${NC}  ${2}"; }
 
 require_root(){ [[ ${EUID:-$(id -u)} -eq 0 ]] || die "This script must be run as root (sudo bash install.sh)."; }
+
+# The repo is private: prefer an explicitly-passed token, otherwise reuse the
+# one already embedded in the existing clone's git remote (set on first
+# install). Never echo the URL built from this — it carries the token.
+gh_token(){
+  if [[ -n "${DOTINSCHOOL_GH_TOKEN:-}" ]]; then echo "$DOTINSCHOOL_GH_TOKEN"; return; fi
+  if [[ -d "$INSTALL_DIR/.git" ]]; then
+    git -C "$INSTALL_DIR" remote get-url origin 2>/dev/null | sed -n 's#https://\([^@]*\)@github\.com/.*#\1#p'
+  fi
+}
+
+repo_url(){
+  if [[ -n "${DOTINSCHOOL_REPO_URL:-}" ]]; then echo "$DOTINSCHOOL_REPO_URL"; return; fi
+  local t; t=$(gh_token)
+  if [[ -n "$t" ]]; then echo "https://${t}@github.com/ariasam2017/dotinschool.git"
+  else echo "https://github.com/ariasam2017/dotinschool.git"; fi
+}
 
 detect_pkg_manager(){
   if command -v apt-get >/dev/null 2>&1; then echo apt
@@ -116,13 +141,15 @@ find_free_port(){ local port="$1" tries=0; while port_in_use "$port"; do port=$(
 
 fetch_app(){
   if [[ -d "$INSTALL_DIR/.git" ]]; then
-    info "Updating source from ${REPO_URL} (${BRANCH})..."
+    info "Updating source from GitHub (${BRANCH})..."
     git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null
     git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}" >/dev/null
   else
-    info "Fetching source from ${REPO_URL} (${BRANCH})..."
+    info "Fetching source from GitHub (${BRANCH})..."
+    local url; url=$(repo_url)
+    [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
     rm -rf "$INSTALL_DIR"
-    git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR" >/dev/null
+    git clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null
   fi
   ok "Source ready at ${INSTALL_DIR}."
 }
@@ -275,8 +302,17 @@ cmd_update(){
 cmd_update_menu(){
   require_root
   info "Fetching the latest management script..."
-  local tmp; tmp=$(mktemp)
-  curl -fsSL "$CLI_SOURCE_URL" -o "$tmp" || { rm -f "$tmp"; die "Download failed."; }
+  local tmp t; tmp=$(mktemp); t=$(gh_token)
+  if [[ -n "${DOTINSCHOOL_CLI_SOURCE_URL:-}" ]]; then
+    curl -fsSL "$DOTINSCHOOL_CLI_SOURCE_URL" -o "$tmp" || { rm -f "$tmp"; die "Download failed."; }
+  elif [[ -n "$t" ]]; then
+    curl -fsSL -H "Authorization: token ${t}" \
+      "https://raw.githubusercontent.com/ariasam2017/dotinschool/${BRANCH}/scripts/install.sh" -o "$tmp" \
+      || { rm -f "$tmp"; die "Download failed."; }
+  else
+    curl -fsSL "https://raw.githubusercontent.com/ariasam2017/dotinschool/${BRANCH}/scripts/install.sh" -o "$tmp" \
+      || { rm -f "$tmp"; die "Download failed (the repo is private — set DOTINSCHOOL_GH_TOKEN)."; }
+  fi
   bash -n "$tmp" 2>/dev/null || { rm -f "$tmp"; die "Downloaded script failed the syntax check — nothing changed."; }
   install -m 755 "$tmp" "$CLI_PATH"; rm -f "$tmp"
   ok "Management script updated."
