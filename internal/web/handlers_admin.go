@@ -34,6 +34,9 @@ func (s *server) handleAdminLogin(c *gin.Context) {
 	ok := service.TimingSafeEqual(body.Username, s.cfg.AdminUsername) &&
 		service.TimingSafeEqual(body.Password, s.cfg.AdminPassword)
 	if !ok {
+		// Always-on (not gated by LOG_LEVEL), stable format so fail2ban can
+		// match it: `msg="admin login failed" ip=<IP>` — see scripts/install.sh.
+		s.log.WithField("ip", ip).Warn("admin login failed")
 		fail(c, apperr.New(http.StatusUnauthorized, "INVALID_CREDENTIALS", "نام کاربری یا رمز عبور اشتباه است."))
 		return
 	}
