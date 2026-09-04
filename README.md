@@ -24,14 +24,14 @@
 1. به [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) بروید.
 2. Resource owner: `ariasam2017` · Repository access: Only select repositories → `dotinschool`.
 3. Repository permissions → Contents: **Read-only**.
-4. Generate token و مقدارش را کپی کنید (فقط همان لحظه نشان داده می‌شود) — جای `<توکن>` در دستورهای زیر همین مقدار را بگذارید.
+4. Generate token و مقدارش را کپی کنید (فقط همان لحظه نشان داده می‌شود) — جای `YOUR_TOKEN` در دستورهای زیر همین مقدار را بگذارید.
 
 **لینوکس، نصب دائمی به‌عنوان سرویس سیستم (بدون Docker):**
 
 </div>
 
 ```bash
-export DOTINSCHOOL_GH_TOKEN=<توکن>; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
+export DOTINSCHOOL_GH_TOKEN=YOUR_TOKEN; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
 ```
 
 <div dir="rtl" align="right">
@@ -41,7 +41,7 @@ export DOTINSCHOOL_GH_TOKEN=<توکن>; bash <(curl -Ls -H "Authorization: token
 </div>
 
 ```bash
-export DOTINSCHOOL_GH_TOKEN=<توکن>; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
+export DOTINSCHOOL_GH_TOKEN=YOUR_TOKEN; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
 ```
 
 <div dir="rtl" align="right">
@@ -51,7 +51,7 @@ export DOTINSCHOOL_GH_TOKEN=<توکن>; bash <(curl -Ls -H "Authorization: token
 </div>
 
 ```powershell
-$env:DOTINSCHOOL_GH_TOKEN='<توکن>'; irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+$env:DOTINSCHOOL_GH_TOKEN='YOUR_TOKEN'; irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
 ```
 
 <div dir="rtl" align="right">
@@ -112,7 +112,7 @@ go run ./cmd/seed     # wipes and reseeds the DB with ~16 participants and a liv
 </div>
 
 ```bash
-export DOTINSCHOOL_GH_TOKEN=<توکن>; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
+export DOTINSCHOOL_GH_TOKEN=YOUR_TOKEN; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
 ```
 
 <div dir="rtl" align="right">
@@ -159,7 +159,7 @@ dotinschool cert
 </div>
 
 ```powershell
-$env:DOTINSCHOOL_GH_TOKEN='<توکن>'; irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+$env:DOTINSCHOOL_GH_TOKEN='YOUR_TOKEN'; irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
 ```
 
 <div dir="rtl" align="right">
@@ -183,7 +183,7 @@ $env:DOTINSCHOOL_GH_TOKEN='<توکن>'; irm -Headers @{Authorization="token $env
 </div>
 
 ```bash
-export DOTINSCHOOL_GH_TOKEN=<توکن>; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
+export DOTINSCHOOL_GH_TOKEN=YOUR_TOKEN; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
 ```
 
 <div dir="rtl" align="right">
