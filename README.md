@@ -2,7 +2,7 @@
 
 <div dir="rtl" align="right">
 
-سامانهٔ آنلاین چالش برنامه‌نویسی. نسخهٔ قبلیِ این پروژه با Node.js بود؛ کامل بازنویسی‌اش کردم، این‌بار روی پشتهٔ فنیِ پنل‌های **x-ui / 3x-ui**: یک باینری استاتیک تک‌فایل به زبان **Go** که هم فرانت‌اند Vue بیلدشده را داخل خودش embed می‌کند و هم یک REST API کوچک روی SQLite دارد. دو پنل مجزا دارد: **پنل شرکت‌کننده** و **پنل مدیریت**.
+سامانهٔ آنلاین چالش برنامه‌نویسی، با معماری‌ای مشابه پنل‌های **x-ui / 3x-ui**: یک باینری استاتیک تک‌فایل به زبان **Go** که هم فرانت‌اند Vue بیلدشده را داخل خودش embed می‌کند و هم یک REST API کوچک روی SQLite دارد. دو پنل مجزا دارد: **پنل شرکت‌کننده** و **پنل مدیریت**.
 
 روی **IP خام و HTTP ساده** بدون هیچ خطا کار می‌کند؛ اگر مسیر cert/key ست شده باشد مستقیم TLS می‌دهد.
 
@@ -13,16 +13,33 @@
 - ادیتور کد: CodeMirror 6 (های‌لایت جاوا، شماره خط، اتوکامپلیت، تطبیق پرانتز، Find/Replace، لینت سمت کلاینت)
 - استقرار: `scripts/install.sh` + systemd + دستور سراسری `dotinschool` · Docker (Dockerfile چندمرحله‌ای + compose + override پروداکشن با Caddy برای HTTPS خودکار)
 
-کد کامل در گیت‌هاب است:
+---
+
+## نصب سریع
+
+هر دو دستور، آخرین نسخه را مستقیم از گیت‌هاب می‌گیرند، پیش‌نیازهای لازم را خودشان نصب می‌کنند، و برنامه را بالا می‌آورند. همان دستور را دوباره اجرا کنید تا به‌روزرسانی بگیرید.
+
+**لینوکس** (نصب دائمی به‌عنوان سرویس سیستم):
 
 </div>
 
 ```bash
-git clone https://github.com/ariasam2017/dotinschool.git
-cd dotinschool
+bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
 ```
 
 <div dir="rtl" align="right">
+
+**ویندوز** (اجرای محلی روی Docker):
+
+</div>
+
+```powershell
+irm https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+```
+
+<div dir="rtl" align="right">
+
+جزئیات و گزینه‌های بیشتر هر مسیر در ادامهٔ همین سند آمده است.
 
 ---
 
@@ -33,6 +50,9 @@ cd dotinschool
 </div>
 
 ```bash
+git clone https://github.com/ariasam2017/dotinschool.git
+cd dotinschool
+
 # 1) build the frontend (output goes to web/assets/, embedded via go:embed)
 cd web && npm install && npm run build && cd ..
 
@@ -117,17 +137,19 @@ dotinschool cert
 
 ### روی ویندوز — یک دستور (نصب پیش‌نیازها + اجرا)
 
-اگر Docker Desktop یا Go روی سیستم نصب نباشد، اسکریپت خودش از راه `winget` نصبشان می‌کند، منتظر آماده‌شدن Docker Desktop می‌ماند، بعد باینری لینوکس را روی هاست کامپایل و ایمیج را می‌سازد و استک را بالا می‌آورد:
+همان دستور «نصب سریع» بالا: سورس را از گیت‌هاب می‌گیرد، و اگر Docker Desktop یا Go روی سیستم نصب نباشد از راه `winget` نصبشان می‌کند، منتظر آماده‌شدن Docker Desktop می‌ماند، بعد باینری لینوکس را روی هاست کامپایل و ایمیج را می‌سازد و استک را بالا می‌آورد:
 
 </div>
 
 ```powershell
-.\docker-up.ps1
+irm https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
 ```
 
 <div dir="rtl" align="right">
 
-### روی لینوکس / مک — یک دستور
+اگر سورس از قبل روی سیستم کلون شده، همان مسیر را با اجرای مستقیم `.\docker-up.ps1` از داخل پوشهٔ پروژه هم می‌شود تکرار کرد (بدون گرفتن نسخهٔ تازه از گیت‌هاب).
+
+### روی لینوکس / مک، از داخل سورس کلون‌شده
 
 </div>
 
@@ -137,7 +159,7 @@ dotinschool cert
 
 <div dir="rtl" align="right">
 
-خروجی هر دو اسکریپت: آدرس پنل‌ها + نام‌کاربری و رمز ادمین. هر دو idempotent‌اند — اجرای دوباره فقط rebuild و recreate می‌کند.
+خروجی هر دو مسیر: آدرس پنل‌ها + نام‌کاربری و رمز ادمین. اجرای دوباره فقط rebuild و recreate می‌کند.
 
 ### روی سرور لینوکس، بدون هیچ‌چیز از قبل نصب‌شده (یک خط)
 
@@ -253,9 +275,11 @@ design-system/            ui-ux-pro-max skill output (MASTER.md + pages/admin.md
 
 <div dir="rtl" align="right">
 
+فرانت یک SPA واحد است؛ سرور با تزریق `<meta name="dotin-mode">` (سازگار با CSP سخت‌گیرانه) مشخص می‌کند همان بیلد باید به‌عنوان پنل کاربر بارگذاری شود یا پنل ادمین.
+
 ### قرارداد API
 
-پایدار و مطابق نسخهٔ Node.js. خلاصه:
+خلاصهٔ endpointها:
 
 | متد و مسیر | احراز | توضیح |
 |---|---|---|
@@ -283,18 +307,11 @@ design-system/            ui-ux-pro-max skill output (MASTER.md + pages/admin.md
 
 - هدرهای امنیتی + CSP روی **همهٔ** پاسخ‌ها (script-src `'self'`؛ connect/img/default به `'self'` محدود).
 - مسیر مخفی و تصادفی پنل ادمین + امکان ساب‌دامین اختصاصی (روتینگ بر اساس Host).
-- rate-limit حافظه‌ای روی مسیرهای حساس؛ مقایسهٔ timing-safe برای رمز و OTP.
+- نشست ادمین با توکن Bearer در حافظهٔ سرور نگه داشته می‌شود؛ مقایسهٔ رمز و کد OTP هم timing-safe است.
+- rate-limit حافظه‌ای روی مسیرهای حساس.
 - TTL نشست: ادمین ۱۲ ساعت، کاربر ۳۰ روز (sliding). OTP: ۲دقیقه TTL، ۶۰ث cooldown، ۵ تلاش.
 - هیچ جزئیات داخلی (مسیر فایل، stack trace) به کلاینت درز نمی‌کند.
 - مهاجرت سبک خودکار (AutoMigrate) برای دیتابیس‌های قدیمی‌تر.
 - ری‌استارت graceful برای بکاپ‌ریستور و آپدیت (systemd/Docker دوباره بالا می‌آورد).
-
----
-
-## تفاوت‌های عمدی با نسخهٔ Node.js
-
-- **نشست ادمین** با توکن Bearer در حافظهٔ سرور نگه داشته می‌شود (همان قرارداد API نسخهٔ قبل). وابستگی `gin-contrib/sessions` در این نسخه استفاده نشده تا قرارداد API دست‌نخورده بماند.
-- **رندر PHP** حذف شده؛ به‌جای دو فایل HTML مجزا، یک SPA واحد است که سرور با تزریق `<meta name="dotin-mode">` (سازگار با CSP سخت‌گیرانه) مشخص می‌کند پنل کاربر است یا ادمین.
-- بررسی هدر بکاپ نسبت به نسخهٔ قبل اصلاح شده تا فایل‌های واقعی SQLite را رد نکند (بررسی `SQLite format 3`).
 
 </div>
