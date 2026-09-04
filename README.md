@@ -9,6 +9,13 @@
 
 روی **IP خام و HTTP ساده** بدون هیچ خطا کار می‌کند؛ اگر مسیر cert/key ست شده باشد مستقیم TLS می‌دهد.
 
+مخزن: <https://github.com/ariasam2017/dotinschool>
+
+```bash
+git clone https://github.com/ariasam2017/dotinschool.git
+cd dotinschool
+```
+
 ---
 
 ## اجرای محلی (توسعه)
@@ -46,10 +53,8 @@ go run ./cmd/seed     # پاک‌سازی و پرکردن دیتابیس با ~�
 با کاربر `root`:
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/YOUR_ORG/dotinschool/main/scripts/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
 ```
-
-> آدرس `YOUR_ORG/dotinschool` را با ریپوی واقعی خود جایگزین کنید (یا متغیر `DOTINSCHOOL_REPO_URL` را ست کنید).
 
 اسکریپت به‌صورت خودکار: پیش‌نیازها و **Go** را نصب می‌کند، سورس را کلون می‌کند، باینری را می‌سازد، سرویس systemd می‌سازد (اجرای دائمی + ری‌استارت خودکار)، یک **رمز ادمین تصادفی** و یک **مسیر مخفی تصادفی** برای پنل مدیریت تولید می‌کند، و آدرس‌ها را چاپ می‌کند.
 
@@ -128,7 +133,7 @@ $env:APP_PORT = "8091"; docker compose up -d --build
 ### روی سرور لینوکس (یک خط)
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/YOUR_ORG/dotinschool/main/build/docker-install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
 ```
 
 Docker و Go را نصب می‌کند، `.env` تصادفی می‌سازد، ایمیج را با کامپایل روی هاست می‌سازد،

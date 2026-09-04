@@ -2,7 +2,7 @@
 # =============================================================================
 # dotinschool — Docker installer for a Linux host.
 #
-#   bash <(curl -Ls https://raw.githubusercontent.com/YOUR_ORG/dotinschool/main/build/docker-install.sh)
+#   bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
 #
 # Installs Docker + Go if missing, clones the repo to /opt/dotinschool,
 # generates a .env with a random admin password + secret admin path, builds the
@@ -13,7 +13,7 @@
 # =============================================================================
 set -euo pipefail
 
-REPO_URL="${DOTINSCHOOL_REPO_URL:-https://github.com/YOUR_ORG/dotinschool.git}"
+REPO_URL="${DOTINSCHOOL_REPO_URL:-https://github.com/ariasam2017/dotinschool.git}"
 BRANCH="${DOTINSCHOOL_BRANCH:-main}"
 INSTALL_DIR="/opt/dotinschool"
 CLI_PATH="/usr/local/bin/dotinschool"
@@ -26,39 +26,39 @@ ok(){ echo -e "${GREEN}[✓]${NC} $*"; }
 warn(){ echo -e "${YELLOW}[!]${NC} $*"; }
 die(){ echo -e "${RED}[x]${NC} $*" >&2; exit 1; }
 
-require_root(){ [[ ${EUID:-$(id -u)} -eq 0 ]] || die "با کاربر root اجرا کنید (sudo)."; }
+require_root(){ [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run as root (sudo)."; }
 
 install_prereqs(){
   if command -v apt-get >/dev/null 2>&1; then apt-get update -y >/dev/null; apt-get install -y curl git tar openssl ca-certificates >/dev/null
   elif command -v dnf >/dev/null 2>&1; then dnf install -y curl git tar openssl ca-certificates >/dev/null
   elif command -v yum >/dev/null 2>&1; then yum install -y curl git tar openssl ca-certificates >/dev/null
-  else die "فقط apt/dnf/yum پشتیبانی می‌شود."; fi
-  ok "پیش‌نیازها آماده شد."
+  else die "Only apt/dnf/yum are supported."; fi
+  ok "Prerequisites ready."
 }
 
 install_docker(){
-  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then ok "Docker از قبل نصب است."; return; fi
-  info "نصب Docker..."
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then ok "Docker is already installed."; return; fi
+  info "Installing Docker..."
   curl -fsSL https://get.docker.com | sh >/dev/null
   systemctl enable --now docker >/dev/null 2>&1 || true
-  docker compose version >/dev/null 2>&1 || die "افزونهٔ docker compose در دسترس نیست."
-  ok "Docker نصب شد."
+  docker compose version >/dev/null 2>&1 || die "The docker compose plugin is not available."
+  ok "Docker installed."
 }
 
-arch_tag(){ case "$(uname -m)" in x86_64|amd64) echo amd64 ;; aarch64|arm64) echo arm64 ;; *) die "معماری پشتیبانی‌نشده: $(uname -m)";; esac; }
+arch_tag(){ case "$(uname -m)" in x86_64|amd64) echo amd64 ;; aarch64|arm64) echo arm64 ;; *) die "Unsupported architecture: $(uname -m)";; esac; }
 
 install_go(){
-  if [[ -x "${GO_ROOT}/bin/go" ]] && "${GO_ROOT}/bin/go" version 2>/dev/null | grep -q "go${GO_VERSION%.*}"; then ok "Go از قبل نصب است."; return; fi
+  if [[ -x "${GO_ROOT}/bin/go" ]] && "${GO_ROOT}/bin/go" version 2>/dev/null | grep -q "go${GO_VERSION%.*}"; then ok "Go is already installed."; return; fi
   local arch tgz tmp url; arch=$(arch_tag); tgz="go${GO_VERSION}.linux-${arch}.tar.gz"
-  info "دانلود Go ${GO_VERSION}..."
+  info "Downloading Go ${GO_VERSION}..."
   tmp=$(mktemp)
   for url in "https://go.dev/dl/${tgz}" "https://mirrors.aliyun.com/golang/${tgz}" "https://golang.google.cn/dl/${tgz}"; do
     curl -fsSL --connect-timeout 15 "$url" -o "$tmp" && break || { tmp=$(mktemp); }
   done
-  [[ -s "$tmp" ]] || die "دانلود Go ناموفق بود."
+  [[ -s "$tmp" ]] || die "Failed to download Go."
   rm -rf "$GO_ROOT"; tar -C /usr/local -xzf "$tmp"; rm -f "$tmp"
   export PATH="${GO_ROOT}/bin:$PATH"
-  ok "Go $("${GO_ROOT}/bin/go" version | awk '{print $3}') نصب شد."
+  ok "Go $("${GO_ROOT}/bin/go" version | awk '{print $3}') installed."
 }
 
 random_password(){ openssl rand -base64 18 | tr -dc 'A-Za-z0-9' | head -c 20; }
@@ -72,12 +72,12 @@ fetch_repo(){
     rm -rf "$INSTALL_DIR"
     git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR" >/dev/null
   fi
-  ok "سورس در ${INSTALL_DIR} آماده شد."
+  ok "Source ready at ${INSTALL_DIR}."
 }
 
 write_env(){
   local env="${INSTALL_DIR}/.env"
-  [[ -f "$env" ]] && { ok ".env از قبل وجود دارد — دست‌نخورده ماند."; return; }
+  [[ -f "$env" ]] && { ok ".env already exists — left untouched."; return; }
   cat > "$env" <<EOF
 APP_PORT=8080
 DOMAIN=
@@ -95,13 +95,13 @@ ADMIN_SUBDOMAIN=
 # AI_MODEL=gpt-4o-mini
 EOF
   chmod 600 "$env"
-  ok ".env ساخته شد — رمز ادمین تصادفی و مسیر مخفی تولید شد."
+  ok ".env created — random admin password and secret path generated."
 }
 
 build_image(){
-  info "کامپایل باینری روی هاست + ساخت ایمیج (بدون go build داخل کانتینر)..."
+  info "Compiling the binary on the host + building the image (no go build inside the container)..."
   ( cd "$INSTALL_DIR" && PATH="${GO_ROOT}/bin:$PATH" bash scripts/docker-build.sh "$(arch_tag)" )
-  ok "ایمیج dotinschool:local ساخته شد."
+  ok "Image dotinschool:local built."
 }
 
 install_cli(){
@@ -122,15 +122,15 @@ case "${1:-}" in
              && "${C[@]}" up -d ;;
   admin)
     e=.env
-    echo "پنل ادمین:  http://<server-ip>:$(grep -E '^APP_PORT=' $e | cut -d= -f2)/$(grep -E '^ADMIN_PATH=' $e | cut -d= -f2)/"
-    echo "نام کاربری:  $(grep -E '^ADMIN_USERNAME=' $e | cut -d= -f2)"
-    echo "رمز عبور:    $(grep -E '^ADMIN_PASSWORD=' $e | cut -d= -f2)"
+    echo "Admin panel:  http://<server-ip>:$(grep -E '^APP_PORT=' $e | cut -d= -f2)/$(grep -E '^ADMIN_PATH=' $e | cut -d= -f2)/"
+    echo "Username:     $(grep -E '^ADMIN_USERNAME=' $e | cut -d= -f2)"
+    echo "Password:     $(grep -E '^ADMIN_PASSWORD=' $e | cut -d= -f2)"
     ;;
   *) echo "usage: dotinschool {up|down|restart|logs|ps|rebuild|update|admin}"; exit 1 ;;
 esac
 WRAP
   chmod +x "$CLI_PATH"
-  ok "دستور «dotinschool» نصب شد."
+  ok "\"dotinschool\" command installed."
 }
 
 main(){
@@ -146,7 +146,7 @@ main(){
   echo
   ( cd "$INSTALL_DIR" && "$CLI_PATH" admin )
   echo
-  warn "برای HTTPS با دامنه: DOMAIN را در ${INSTALL_DIR}/.env تنظیم و اجرا کنید:"
+  warn "For HTTPS with a domain: set DOMAIN in ${INSTALL_DIR}/.env and run:"
   echo "  cd ${INSTALL_DIR} && docker compose -f build/docker-compose.yml -f build/docker-compose.prod.yml up -d"
 }
 main "$@"

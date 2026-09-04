@@ -3,7 +3,7 @@
 # dotinschool — Linux installer / management script (x-ui / Sanaei-panel style)
 #
 # Install (one line):
-#   bash <(curl -Ls https://raw.githubusercontent.com/YOUR_ORG/dotinschool/main/scripts/install.sh)
+#   bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
 #
 # After install the "dotinschool" command is available:
 #   dotinschool                 interactive management menu
@@ -18,9 +18,9 @@
 # =============================================================================
 set -euo pipefail
 
-REPO_URL="${DOTINSCHOOL_REPO_URL:-https://github.com/YOUR_ORG/dotinschool.git}"
+REPO_URL="${DOTINSCHOOL_REPO_URL:-https://github.com/ariasam2017/dotinschool.git}"
 BRANCH="${DOTINSCHOOL_BRANCH:-main}"
-CLI_SOURCE_URL="${DOTINSCHOOL_CLI_SOURCE_URL:-https://raw.githubusercontent.com/YOUR_ORG/dotinschool/main/scripts/install.sh}"
+CLI_SOURCE_URL="${DOTINSCHOOL_CLI_SOURCE_URL:-https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh}"
 
 INSTALL_DIR="/opt/dotinschool"
 CONFIG_DIR="/etc/dotinschool"
@@ -50,38 +50,38 @@ box_line(){ local plain="$1" colored="$2" pad=$((BOX_WIDTH - 2 - ${#plain})); ((
 box_title(){ box_line "$1" "${BOLD}${1}${NC}"; }
 box_item(){ box_line "${1}.  ${2}" "${GREEN}${1}.${NC}  ${2}"; }
 
-require_root(){ [[ ${EUID:-$(id -u)} -eq 0 ]] || die "این اسکریپت باید با کاربر root اجرا شود (sudo bash install.sh)."; }
+require_root(){ [[ ${EUID:-$(id -u)} -eq 0 ]] || die "This script must be run as root (sudo bash install.sh)."; }
 
 detect_pkg_manager(){
   if command -v apt-get >/dev/null 2>&1; then echo apt
   elif command -v dnf >/dev/null 2>&1; then echo dnf
   elif command -v yum >/dev/null 2>&1; then echo yum
-  else die "توزیع لینوکس شما پشتیبانی نمی‌شود (فقط apt/dnf/yum)."; fi
+  else die "Unsupported Linux distribution (apt/dnf/yum only)."; fi
 }
 
 install_prereqs(){
   local pm; pm=$(detect_pkg_manager)
-  info "نصب پیش‌نیازها (curl, git, tar, openssl)..."
+  info "Installing prerequisites (curl, git, tar, openssl)..."
   case "$pm" in
     apt) apt-get update -y >/dev/null; apt-get install -y curl git tar openssl ca-certificates >/dev/null ;;
     dnf) dnf install -y curl git tar openssl ca-certificates >/dev/null ;;
     yum) yum install -y curl git tar openssl ca-certificates >/dev/null ;;
   esac
-  ok "پیش‌نیازها آماده شد."
+  ok "Prerequisites ready."
 }
 
 arch_tag(){
   case "$(uname -m)" in
     x86_64|amd64) echo amd64 ;;
     aarch64|arm64) echo arm64 ;;
-    *) die "معماری پردازنده پشتیبانی نمی‌شود: $(uname -m)" ;;
+    *) die "Unsupported CPU architecture: $(uname -m)" ;;
   esac
 }
 
 go_ok(){ [[ -x "${GO_ROOT}/bin/go" ]] && "${GO_ROOT}/bin/go" version 2>/dev/null | grep -q "go${GO_VERSION%.*}"; }
 
 install_go(){
-  if go_ok; then ok "Go از قبل نصب است ($("${GO_ROOT}/bin/go" version | awk '{print $3}'))."; return; fi
+  if go_ok; then ok "Go is already installed ($("${GO_ROOT}/bin/go" version | awk '{print $3}'))."; return; fi
   local arch tgz url mirrors
   arch=$(arch_tag)
   tgz="go${GO_VERSION}.linux-${arch}.tar.gz"
@@ -90,23 +90,23 @@ install_go(){
     "https://mirrors.aliyun.com/golang/${tgz}"
     "https://golang.google.cn/dl/${tgz}"
   )
-  info "دانلود Go ${GO_VERSION} (${arch})..."
+  info "Downloading Go ${GO_VERSION} (${arch})..."
   local tmp; tmp=$(mktemp)
   for url in "${mirrors[@]}"; do
     if curl -fsSL --connect-timeout 15 "$url" -o "$tmp"; then break; fi
     tmp=""; tmp=$(mktemp)
   done
-  [[ -s "$tmp" ]] || die "دانلود Go از هیچ‌کدام از منابع ممکن نشد."
+  [[ -s "$tmp" ]] || die "Could not download Go from any of the mirrors."
   rm -rf "$GO_ROOT"
   tar -C /usr/local -xzf "$tmp"
   rm -f "$tmp"
-  go_ok || die "نصب Go ناموفق بود."
-  ok "Go $("${GO_ROOT}/bin/go" version | awk '{print $3}') نصب شد."
+  go_ok || die "Go installation failed."
+  ok "Go $("${GO_ROOT}/bin/go" version | awk '{print $3}') installed."
 }
 
 random_password(){
   local p; p=$(openssl rand -base64 18 2>/dev/null | tr -dc 'A-Za-z0-9' | head -c 20) || true
-  [[ -n "$p" ]] || die "ساخت رمز تصادفی ممکن نشد (openssl سالم است؟)."
+  [[ -n "$p" ]] || die "Could not generate a random password (is openssl working?)."
   echo "$p"
 }
 random_admin_path(){ echo "panel-$(openssl rand -hex 6)"; }
@@ -116,23 +116,23 @@ find_free_port(){ local port="$1" tries=0; while port_in_use "$port"; do port=$(
 
 fetch_app(){
   if [[ -d "$INSTALL_DIR/.git" ]]; then
-    info "به‌روزرسانی سورس از ${REPO_URL} (${BRANCH})..."
+    info "Updating source from ${REPO_URL} (${BRANCH})..."
     git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null
     git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}" >/dev/null
   else
-    info "دریافت سورس از ${REPO_URL} (${BRANCH})..."
+    info "Fetching source from ${REPO_URL} (${BRANCH})..."
     rm -rf "$INSTALL_DIR"
     git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR" >/dev/null
   fi
-  ok "سورس در ${INSTALL_DIR} آماده است."
+  ok "Source ready at ${INSTALL_DIR}."
 }
 
 build_binary(){
-  info "کامپایل باینری (CGO خاموش، فرانت از قبل بیلد و داخل مخزن است)..."
+  info "Compiling binary (CGO off, frontend already built and committed)..."
   ( cd "$INSTALL_DIR" && CGO_ENABLED=0 "${GO_ROOT}/bin/go" build -trimpath -ldflags="-s -w" -o "${BIN_NAME}.new" ./cmd/server )
   mv "${INSTALL_DIR}/${BIN_NAME}.new" "${INSTALL_DIR}/${BIN_NAME}"
   chmod +x "${INSTALL_DIR}/${BIN_NAME}"
-  ok "باینری ساخته شد: ${INSTALL_DIR}/${BIN_NAME}"
+  ok "Binary built: ${INSTALL_DIR}/${BIN_NAME}"
 }
 
 write_env_file(){
@@ -140,7 +140,7 @@ write_env_file(){
   if [[ ! -f "$ENV_FILE" ]]; then
     local pass adminpath port
     pass=$(random_password); adminpath=$(random_admin_path); port=$(find_free_port 8080)
-    [[ "$port" == "8080" ]] || warn "پورت ۸۰۸۰ اشغال بود — از ${port} استفاده می‌شود."
+    [[ "$port" == "8080" ]] || warn "Port 8080 is in use — using ${port} instead."
     cat > "$ENV_FILE" <<EOF
 # dotinschool service configuration — edit via "dotinschool admin" / "dotinschool cert"
 PORT=${port}
@@ -162,7 +162,7 @@ ADMIN_PATH=${adminpath}
 # AI_MODEL=gpt-4o-mini
 EOF
     chmod 600 "$ENV_FILE"
-    ok "فایل کانفیگ ساخته شد — رمز ادمین تصادفی و مسیر مخفی تولید شد."
+    ok "Config file created — random admin password and secret path generated."
   fi
 }
 
@@ -190,7 +190,7 @@ NoNewPrivileges=true
 WantedBy=multi-user.target
 EOF
   systemctl daemon-reload
-  ok "یونیت systemd نوشته شد."
+  ok "systemd unit written."
 }
 
 open_firewall_port(){
@@ -201,7 +201,7 @@ open_firewall_port(){
   fi
 }
 
-install_cli(){ cp "${INSTALL_DIR}/scripts/install.sh" "$CLI_PATH"; chmod +x "$CLI_PATH"; ok "دستور «dotinschool» نصب شد."; }
+install_cli(){ cp "${INSTALL_DIR}/scripts/install.sh" "$CLI_PATH"; chmod +x "$CLI_PATH"; ok "\"dotinschool\" command installed."; }
 
 get_env_val(){ grep -E "^${1}=" "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2- || true; }
 set_env_val(){
@@ -223,13 +223,13 @@ print_access_info(){
   adminpath=$(get_env_val ADMIN_PATH); adminpath=${adminpath:-admin}
   subdomain=$(get_env_val ADMIN_SUBDOMAIN)
   echo
-  ok "پنل کاربر (آدرس عمومی):        ${scheme}://${ip}:${port}/"
-  ok "پنل ادمین (مسیر مخفی — فقط شما): ${scheme}://${ip}:${port}/${adminpath}/"
-  [[ -n "$subdomain" ]] && ok "پنل ادمین (ساب‌دامین اختصاصی):  ${scheme}://${subdomain}/"
-  ok "نام کاربری ادمین:              $(get_env_val ADMIN_USERNAME)"
-  ok "رمز عبور ادمین:                $(get_env_val ADMIN_PASSWORD)"
+  ok "User panel (public address):          ${scheme}://${ip}:${port}/"
+  ok "Admin panel (secret path — you only): ${scheme}://${ip}:${port}/${adminpath}/"
+  [[ -n "$subdomain" ]] && ok "Admin panel (dedicated subdomain):    ${scheme}://${subdomain}/"
+  ok "Admin username:                       $(get_env_val ADMIN_USERNAME)"
+  ok "Admin password:                       $(get_env_val ADMIN_PASSWORD)"
   echo
-  warn "این اطلاعات را جایی امن ذخیره کنید — دوباره فقط با «dotinschool admin» قابل مشاهده است."
+  warn "Save this information somewhere safe — it can only be viewed again with \"dotinschool admin\"."
 }
 
 cmd_install(){
@@ -248,97 +248,97 @@ cmd_install(){
   while ! systemctl is-active --quiet "$SERVICE_NAME" && [[ $tries -lt 5 ]]; do
     if journalctl -u "$SERVICE_NAME" --no-pager -n 20 2>/dev/null | grep -q "address already in use"; then
       local oldport newport; oldport=$(get_env_val PORT); newport=$(find_free_port $((oldport+1)))
-      warn "پورت ${oldport} اشغال است — تغییر به ${newport}."
+      warn "Port ${oldport} is in use — switching to ${newport}."
       set_env_val PORT "$newport"; systemctl restart "$SERVICE_NAME"; sleep 2; tries=$((tries+1))
     else break; fi
   done
   open_firewall_port "$(get_env_val PORT)"
-  if systemctl is-active --quiet "$SERVICE_NAME"; then ok "نصب کامل شد و سرویس در حال اجراست."
-  else err "سرویس بالا نیامد — لاگ:"; journalctl -u "$SERVICE_NAME" --no-pager -n 30 || true; exit 1; fi
+  if systemctl is-active --quiet "$SERVICE_NAME"; then ok "Install complete and the service is running."
+  else err "Service failed to start — log:"; journalctl -u "$SERVICE_NAME" --no-pager -n 30 || true; exit 1; fi
   print_access_info
 }
 
 cmd_update(){
   require_root
-  [[ -d "$INSTALL_DIR" ]] || die "هنوز نصب نشده — اول «dotinschool install» را بزنید."
+  [[ -d "$INSTALL_DIR" ]] || die "Not installed yet — run \"dotinschool install\" first."
   local before after
   before=$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || echo "")
   fetch_app
   after=$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || echo "")
   install_cli
-  if [[ -n "$before" && "$before" == "$after" ]]; then ok "از قبل به‌روز است — نسخه‌ی جدیدی نیست."; return; fi
+  if [[ -n "$before" && "$before" == "$after" ]]; then ok "Already up to date — no new version."; return; fi
   build_binary
   systemctl restart "$SERVICE_NAME"
-  ok "به‌روزرسانی انجام و سرویس ری‌استارت شد."
+  ok "Update complete and the service restarted."
 }
 
 cmd_update_menu(){
   require_root
-  info "دریافت آخرین نسخه‌ی اسکریپت مدیریتی..."
+  info "Fetching the latest management script..."
   local tmp; tmp=$(mktemp)
-  curl -fsSL "$CLI_SOURCE_URL" -o "$tmp" || { rm -f "$tmp"; die "دانلود ناموفق بود."; }
-  bash -n "$tmp" 2>/dev/null || { rm -f "$tmp"; die "اسکریپت دانلودی از تست نحو رد نشد — چیزی تغییر نکرد."; }
+  curl -fsSL "$CLI_SOURCE_URL" -o "$tmp" || { rm -f "$tmp"; die "Download failed."; }
+  bash -n "$tmp" 2>/dev/null || { rm -f "$tmp"; die "Downloaded script failed the syntax check — nothing changed."; }
   install -m 755 "$tmp" "$CLI_PATH"; rm -f "$tmp"
-  ok "اسکریپت مدیریتی به‌روز شد."
+  ok "Management script updated."
 }
 
 cmd_uninstall(){
   require_root
-  read -r -p "$(echo -e "${YELLOW}سرویس، فایل‌ها و کانفیگ حذف می‌شوند. مطمئن هستید؟ [y/N] ${NC}")" ans
-  [[ "$ans" == "y" || "$ans" == "Y" ]] || { info "لغو شد."; return; }
+  read -r -p "$(echo -e "${YELLOW}The service, files, and config will be removed. Are you sure? [y/N] ${NC}")" ans
+  [[ "$ans" == "y" || "$ans" == "Y" ]] || { info "Cancelled."; return; }
   systemctl stop "$SERVICE_NAME" 2>/dev/null || true
   systemctl disable "$SERVICE_NAME" 2>/dev/null || true
   rm -f "$SERVICE_FILE"; systemctl daemon-reload
   rm -rf "$INSTALL_DIR" "$CONFIG_DIR" "$CLI_PATH"
-  ok "dotinschool کاملاً حذف شد."
+  ok "dotinschool fully removed."
 }
 
 cmd_admin(){
   require_root
-  [[ -f "$ENV_FILE" ]] || die "هنوز نصب نشده."
-  box_top; box_title "dotinschool — تنظیمات پنل ادمین"
-  box_item 0 "بازگشت"; box_div
-  box_item 1 "نمایش اطلاعات دسترسی فعلی"
-  box_item 2 "تغییر نام کاربری"
-  box_item 3 "رمز عبور تصادفی جدید"
-  box_item 4 "تغییر پورت"
-  box_item 5 "تغییر مسیر مخفی"
-  box_item 6 "تنظیم ساب‌دامین ادمین"
+  [[ -f "$ENV_FILE" ]] || die "Not installed yet."
+  box_top; box_title "dotinschool — Admin Panel Settings"
+  box_item 0 "Back"; box_div
+  box_item 1 "Show current access info"
+  box_item 2 "Change username"
+  box_item 3 "Generate a new random password"
+  box_item 4 "Change port"
+  box_item 5 "Change secret path"
+  box_item 6 "Set admin subdomain"
   box_bottom; echo
-  read -r -p "انتخاب [0-6]: " choice
+  read -r -p "Choice [0-6]: " choice
   case "$choice" in
     0) return ;;
     1) print_access_info ;;
-    2) read -r -p "نام کاربری جدید: " u; set_env_val ADMIN_USERNAME "$u"; systemctl restart "$SERVICE_NAME"; ok "تغییر یافت."; print_access_info ;;
-    3) local p; p=$(random_password); set_env_val ADMIN_PASSWORD "$p"; systemctl restart "$SERVICE_NAME"; ok "رمز جدید ساخته شد."; print_access_info ;;
-    4) read -r -p "پورت جدید: " p; set_env_val PORT "$p"; open_firewall_port "$p"; systemctl restart "$SERVICE_NAME"; ok "تغییر یافت."; print_access_info ;;
-    5) local np; np=$(random_admin_path); set_env_val ADMIN_PATH "$np"; systemctl restart "$SERVICE_NAME"; ok "مسیر مخفی عوض شد — آدرس قبلی دیگر کار نمی‌کند."; print_access_info ;;
-    6) read -r -p "ساب‌دامین کامل (خالی = غیرفعال): " sd; set_env_val ADMIN_SUBDOMAIN "$sd"; systemctl restart "$SERVICE_NAME";
-       [[ -n "$sd" ]] && warn "یک رکورد DNS از نوع A برای «${sd}» به IP این سرور اضافه کنید. برای SSL دوباره «dotinschool cert» را اجرا کنید."
+    2) read -r -p "New username: " u; set_env_val ADMIN_USERNAME "$u"; systemctl restart "$SERVICE_NAME"; ok "Changed."; print_access_info ;;
+    3) local p; p=$(random_password); set_env_val ADMIN_PASSWORD "$p"; systemctl restart "$SERVICE_NAME"; ok "New password generated."; print_access_info ;;
+    4) read -r -p "New port: " p; set_env_val PORT "$p"; open_firewall_port "$p"; systemctl restart "$SERVICE_NAME"; ok "Changed."; print_access_info ;;
+    5) local np; np=$(random_admin_path); set_env_val ADMIN_PATH "$np"; systemctl restart "$SERVICE_NAME"; ok "Secret path changed — the old address no longer works."; print_access_info ;;
+    6) read -r -p "Full subdomain (empty = disable): " sd; set_env_val ADMIN_SUBDOMAIN "$sd"; systemctl restart "$SERVICE_NAME";
+       [[ -n "$sd" ]] && warn "Add a DNS A record for \"${sd}\" pointing to this server's IP. Run \"dotinschool cert\" again for SSL."
        print_access_info ;;
-    *) warn "گزینه نامعتبر." ;;
+    *) warn "Invalid option." ;;
   esac
 }
 
-install_acme(){ [[ -x "$HOME/.acme.sh/acme.sh" ]] || { info "نصب acme.sh..."; curl -fsSL https://get.acme.sh | sh -s email="admin@$(hostname -f 2>/dev/null || echo localhost)" >/dev/null 2>&1; }; }
+install_acme(){ [[ -x "$HOME/.acme.sh/acme.sh" ]] || { info "Installing acme.sh..."; curl -fsSL https://get.acme.sh | sh -s email="admin@$(hostname -f 2>/dev/null || echo localhost)" >/dev/null 2>&1; }; }
 
 cmd_cert(){
   require_root
-  echo "برای گرفتن گواهی SSL به یک دامنه نیاز است که رکورد A آن به IP این سرور اشاره کند."
-  warn "اگر فقط با IP خام کار می‌کنید و دامنه ندارید، این مرحله را رد کنید — پنل روی HTTP معمولی بدون خطا کار می‌کند."
-  read -r -p "دامنه (خالی = انصراف): " domain
-  [[ -n "$domain" ]] || { info "لغو شد."; return; }
+  echo "Issuing an SSL certificate requires a domain whose A record points to this server's IP."
+  warn "If you're only using a raw IP with no domain, skip this step — the panel works fine over plain HTTP with no certificate errors."
+  read -r -p "Domain (empty = cancel): " domain
+  [[ -n "$domain" ]] || { info "Cancelled."; return; }
   local domain_args=(-d "$domain") subdomain; subdomain=$(get_env_val ADMIN_SUBDOMAIN)
   if [[ -n "$subdomain" && "$subdomain" != "$domain" ]]; then
-    read -r -p "ساب‌دامین ادمین (${subdomain}) هم زیر همین گواهی باشد؟ [Y/n] " inc
+    read -r -p "Include the admin subdomain (${subdomain}) under the same certificate? [Y/n] " inc
     [[ "$inc" != "n" && "$inc" != "N" ]] && domain_args+=(-d "$subdomain")
   fi
   install_acme
   mkdir -p "${SSL_DIR}/${domain}"
-  info "توقف موقت سرویس برای آزادسازی پورت ۸۰..."
+  info "Stopping the service temporarily to free port 80..."
   systemctl stop "$SERVICE_NAME" 2>/dev/null || true
   if ! "$HOME/.acme.sh/acme.sh" --issue "${domain_args[@]}" --standalone --httpport 80; then
-    err "صدور گواهی ناموفق بود — دامنه‌ها را و آزاد بودن پورت ۸۰ را بررسی کنید."
+    err "Certificate issuance failed — check the domain(s) and that port 80 is free."
     systemctl start "$SERVICE_NAME" 2>/dev/null || true; return 1
   fi
   "$HOME/.acme.sh/acme.sh" --install-cert -d "$domain" \
@@ -350,38 +350,38 @@ cmd_cert(){
   set_env_val PORT 443
   open_firewall_port 443
   systemctl start "$SERVICE_NAME"; sleep 1
-  systemctl is-active --quiet "$SERVICE_NAME" && ok "گواهی صادر و فعال شد — پنل روی HTTPS است (تمدید خودکار با acme.sh)." || err "سرویس با HTTPS بالا نیامد — journalctl -u ${SERVICE_NAME} -n 50"
+  systemctl is-active --quiet "$SERVICE_NAME" && ok "Certificate issued and active — the panel is now on HTTPS (auto-renewed via acme.sh)." || err "Service failed to start with HTTPS — journalctl -u ${SERVICE_NAME} -n 50"
 }
 
-cmd_service(){ require_root; systemctl "$1" "$SERVICE_NAME"; [[ "$1" == "status" ]] || ok "دستور «$1» روی سرویس اعمال شد."; }
+cmd_service(){ require_root; systemctl "$1" "$SERVICE_NAME"; [[ "$1" == "status" ]] || ok "Command \"$1\" applied to the service."; }
 
 show_status(){
-  if ! [[ -f "$ENV_FILE" ]]; then echo -e "وضعیت پنل: ${RED}نصب‌نشده${NC}"; return; fi
-  systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null && echo -e "وضعیت پنل: ${GREEN}در حال اجرا${NC}" || echo -e "وضعیت پنل: ${YELLOW}متوقف${NC}"
-  systemctl is-enabled --quiet "$SERVICE_NAME" 2>/dev/null && echo -e "اجرای خودکار در بوت: ${GREEN}بله${NC}" || echo -e "اجرای خودکار در بوت: ${RED}خیر${NC}"
+  if ! [[ -f "$ENV_FILE" ]]; then echo -e "Panel status: ${RED}not installed${NC}"; return; fi
+  systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null && echo -e "Panel status: ${GREEN}running${NC}" || echo -e "Panel status: ${YELLOW}stopped${NC}"
+  systemctl is-enabled --quiet "$SERVICE_NAME" 2>/dev/null && echo -e "Start on boot: ${GREEN}yes${NC}" || echo -e "Start on boot: ${RED}no${NC}"
 }
 
 show_menu(){
-  box_top; box_title "dotinschool — اسکریپت مدیریت"
-  box_item 0 "خروج"; box_div
-  box_item 1 "نصب"
-  box_item 2 "به‌روزرسانی به آخرین نسخه"
-  box_item 3 "به‌روزرسانی خودِ منو"
-  box_item 4 "حذف"; box_div
-  box_item 5 "تنظیمات پنل ادمین"
-  box_item 6 "گواهی SSL"; box_div
-  box_item 7 "شروع"; box_item 8 "توقف"; box_item 9 "ری‌استارت"; box_item 10 "وضعیت"; box_div
-  box_item 11 "فعال‌سازی اجرای خودکار"; box_item 12 "غیرفعال‌سازی اجرای خودکار"
+  box_top; box_title "dotinschool — Management Script"
+  box_item 0 "Exit"; box_div
+  box_item 1 "Install"
+  box_item 2 "Update to the latest version"
+  box_item 3 "Update this menu script"
+  box_item 4 "Uninstall"; box_div
+  box_item 5 "Admin panel settings"
+  box_item 6 "SSL certificate"; box_div
+  box_item 7 "Start"; box_item 8 "Stop"; box_item 9 "Restart"; box_item 10 "Status"; box_div
+  box_item 11 "Enable autostart"; box_item 12 "Disable autostart"
   box_bottom; echo; show_status; echo
-  read -r -p "انتخاب [0-12]: " choice
+  read -r -p "Choice [0-12]: " choice
   case "$choice" in
     1) cmd_install ;; 2) cmd_update ;; 3) cmd_update_menu ;; 4) cmd_uninstall ;;
     5) cmd_admin ;; 6) cmd_cert ;;
     7) cmd_service start ;; 8) cmd_service stop ;; 9) cmd_service restart ;; 10) cmd_service status ;;
-    11) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "اجرای خودکار فعال شد." ;;
-    12) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "اجرای خودکار غیرفعال شد." ;;
+    11) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "Autostart enabled." ;;
+    12) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "Autostart disabled." ;;
     0) exit 0 ;;
-    *) warn "عددی بین ۰ تا ۱۲ وارد کنید." ;;
+    *) warn "Enter a number between 0 and 12." ;;
   esac
 }
 
@@ -394,10 +394,10 @@ main(){
     admin) cmd_admin ;;
     cert) cmd_cert ;;
     start|stop|restart|status) cmd_service "$1" ;;
-    enable) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "اجرای خودکار فعال شد." ;;
-    disable) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "اجرای خودکار غیرفعال شد." ;;
+    enable) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "Autostart enabled." ;;
+    disable) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "Autostart disabled." ;;
     "") show_menu ;;
-    *) die "دستور نامعتبر: $1" ;;
+    *) die "Invalid command: $1" ;;
   esac
 }
 main "$@"
