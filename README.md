@@ -19,12 +19,21 @@
 
 هر دو دستور، آخرین نسخه را مستقیم از گیت‌هاب می‌گیرند، پیش‌نیازهای لازم را خودشان نصب می‌کنند، و برنامه را بالا می‌آورند. همان دستور را دوباره اجرا کنید تا به‌روزرسانی بگیرید.
 
+مخزن **Private** است، پس هر دو دستور یک توکن گیت‌هاب می‌خواهند — فقط برای همین یک‌بار؛ بعدش توکن داخل remote گیت کلونِ محلی ذخیره می‌شود و به‌روزرسانی‌های بعدی (چه از پنل ادمین، چه با دستور `dotinschool update`) بدون نیاز دوباره بهش کار می‌کنند:
+
+1. به [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) بروید.
+2. Resource owner: `ariasam2017` · Repository access: Only select repositories → `dotinschool`.
+3. Repository permissions → Contents: **Read-only**.
+4. Generate token و مقدارش را کپی کنید (فقط همان لحظه نشان داده می‌شود).
+
 **لینوکس** (نصب دائمی به‌عنوان سرویس سیستم):
 
 </div>
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
+export DOTINSCHOOL_GH_TOKEN=<توکن>
+bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" \
+  https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
 ```
 
 <div dir="rtl" align="right">
@@ -34,7 +43,9 @@ bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/s
 </div>
 
 ```powershell
-irm https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+$env:DOTINSCHOOL_GH_TOKEN = '<توکن>'
+irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} `
+  https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
 ```
 
 <div dir="rtl" align="right">
@@ -45,7 +56,7 @@ irm https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windo
 
 ## اجرای محلی (توسعه)
 
-پیش‌نیاز: Go 1.24+‏ و Node 20+‏.
+پیش‌نیاز: Go 1.24+‏ و Node 20+‏. مخزن Private است؛ اگر git شما از قبل به گیت‌هاب وصل نیست (مثلاً با `gh auth login`)، به‌جای آدرس ساده از `https://<TOKEN>@github.com/ariasam2017/dotinschool.git` با همان توکنِ بخش «نصب سریع» استفاده کنید.
 
 </div>
 
@@ -90,12 +101,14 @@ go run ./cmd/seed     # wipes and reseeds the DB with ~16 participants and a liv
 
 ## نصب روی سرور لینوکس (bare-metal)
 
-اسکریپت نصب همه‌چیز را خودش انجام می‌دهد — از نصب پیش‌نیازهای سیستم تا بالا آوردن سرویس؛ فقط با کاربر `root` اجرا کنید:
+اسکریپت نصب همه‌چیز را خودش انجام می‌دهد — از نصب پیش‌نیازهای سیستم تا بالا آوردن سرویس؛ فقط با کاربر `root` و توکنِ بخش «نصب سریع» اجرا کنید:
 
 </div>
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
+export DOTINSCHOOL_GH_TOKEN=<توکن>
+bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" \
+  https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
 ```
 
 <div dir="rtl" align="right">
@@ -142,7 +155,9 @@ dotinschool cert
 </div>
 
 ```powershell
-irm https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+$env:DOTINSCHOOL_GH_TOKEN = '<توکن>'
+irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} `
+  https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
 ```
 
 <div dir="rtl" align="right">
@@ -166,7 +181,9 @@ irm https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windo
 </div>
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
+export DOTINSCHOOL_GH_TOKEN=<توکن>
+bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" \
+  https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
 ```
 
 <div dir="rtl" align="right">
