@@ -26,12 +26,15 @@
 3. Repository permissions → Contents: **Read-only**.
 4. Generate token و مقدارش را کپی کنید (فقط همان لحظه نشان داده می‌شود) — جای `YOUR_TOKEN` در دستورهای زیر همین مقدار را بگذارید.
 
+روی لینوکس دستور در **دو خط ساده** است — یک `git clone` معمولی (بدون هیچ کوتیشن یا هدر خاصی، پس paste‌شدنش مشکلی ندارد) و بعد اجرای اسکریپت از همان کلون؛ توکن فقط همین یک‌بار لازم است:
+
 **لینوکس، نصب دائمی به‌عنوان سرویس سیستم (بدون Docker):**
 
 </div>
 
 ```bash
-export DOTINSCHOOL_GH_TOKEN=YOUR_TOKEN; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
+git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
+sudo bash dotinschool/scripts/install.sh
 ```
 
 <div dir="rtl" align="right">
@@ -41,10 +44,13 @@ export DOTINSCHOOL_GH_TOKEN=YOUR_TOKEN; bash <(curl -Ls -H "Authorization: token
 </div>
 
 ```bash
-export DOTINSCHOOL_GH_TOKEN=YOUR_TOKEN; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
+git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
+sudo bash dotinschool/build/docker-install.sh
 ```
 
 <div dir="rtl" align="right">
+
+پوشهٔ `dotinschool` که همین‌جا کلون شد را بعداً می‌توانید پاک کنید — نصب واقعی در `/opt/dotinschool` مستقل از آن است.
 
 **ویندوز، اجرای محلی روی Docker:**
 
@@ -112,7 +118,8 @@ go run ./cmd/seed     # wipes and reseeds the DB with ~16 participants and a liv
 </div>
 
 ```bash
-export DOTINSCHOOL_GH_TOKEN=YOUR_TOKEN; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
+git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
+sudo bash dotinschool/scripts/install.sh
 ```
 
 <div dir="rtl" align="right">
@@ -178,12 +185,13 @@ $env:DOTINSCHOOL_GH_TOKEN='YOUR_TOKEN'; irm -Headers @{Authorization="token $env
 
 خروجی هر دو مسیر: آدرس پنل‌ها + نام‌کاربری و رمز ادمین. اجرای دوباره فقط rebuild و recreate می‌کند.
 
-### روی سرور لینوکس، بدون هیچ‌چیز از قبل نصب‌شده (یک خط)
+### روی سرور لینوکس، بدون هیچ‌چیز از قبل نصب‌شده
 
 </div>
 
 ```bash
-export DOTINSCHOOL_GH_TOKEN=YOUR_TOKEN; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
+git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
+sudo bash dotinschool/build/docker-install.sh
 ```
 
 <div dir="rtl" align="right">
