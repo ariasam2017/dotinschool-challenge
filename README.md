@@ -1,8 +1,8 @@
 # dotinschool — سامانهٔ چالش برنامه‌نویسی
 
-بازنویسی کامل محصول Node.js روی پشتهٔ فنی پنل **x-ui / 3x-ui**: یک باینری استاتیک تک‌فایل به زبان **Go** که هم فرانت‌اند Vue بیلدشده را داخل خودش embed می‌کند و هم یک REST API کوچک روی SQLite دارد. دو پنل مجزا: **پنل شرکت‌کننده** و **پنل مدیریت**.
+نسخهٔ قبلیِ این پروژه با Node.js بود؛ کامل بازنویسی‌اش کردم، این‌بار روی پشتهٔ فنیِ پنل‌های **x-ui / 3x-ui**: یک باینری استاتیک تک‌فایل به زبان **Go** که هم فرانت‌اند Vue بیلدشده را داخل خودش embed می‌کند و هم یک REST API کوچک روی SQLite دارد. دو پنل مجزا دارد: **پنل شرکت‌کننده** و **پنل مدیریت**.
 
-- بک‌اند: Go ۱.۲۲+ · Gin · GORM + SQLite (درایور pure-Go، بدون CGO) · robfig/cron · logrus · `go:embed`
+- بک‌اند: Go 1.22+‏ · Gin · GORM + SQLite (درایور pure-Go، بدون CGO) · robfig/cron · logrus · `go:embed`
 - فرانت‌اند: Vue 3 + Ant Design Vue 4 + Vite · RTL کامل · فارسی · ارقام فارسی · تقویم جلالی · فونت Vazirmatn + JetBrains Mono
 - ادیتور کد: CodeMirror 6 (های‌لایت جاوا، شماره خط، اتوکامپلیت، تطبیق پرانتز، Find/Replace، لینت سمت کلاینت)
 - استقرار: `scripts/install.sh` + systemd + دستور سراسری `dotinschool` · Docker (Dockerfile چندمرحله‌ای + compose + override پروداکشن با Caddy برای HTTPS خودکار)
@@ -20,7 +20,7 @@ cd dotinschool
 
 ## اجرای محلی (توسعه)
 
-پیش‌نیاز: Go ۱.۲۴+ و Node ۲۰+.
+پیش‌نیاز: Go 1.24+‏ و Node 20+‏.
 
 ```bash
 # ۱) بیلد فرانت‌اند (خروجی در web/assets/ که go:embed می‌شود)
@@ -30,8 +30,8 @@ cd web && npm install && npm run build && cd ..
 go run ./cmd/server
 ```
 
-- پنل کاربر:  <http://127.0.0.1:8080/>
-- پنل ادمین:  <http://127.0.0.1:8080/admin/>  (روی نصب لینوکسی، مسیر مخفی تصادفی)
+- پنل کاربر: <http://127.0.0.1:8080/>
+- پنل ادمین: <http://127.0.0.1:8080/admin/> (روی نصب لینوکسی، مسیر مخفی تصادفی)
 - رمز ادمین: اگر `ADMIN_PASSWORD` در `.env` نباشد، یک رمز تصادفی ساخته، در `.env` ذخیره و در لاگ چاپ می‌شود.
 
 ### حالت توسعهٔ داغ (hot-reload فرانت)
@@ -108,12 +108,12 @@ docker compose up -d --build
 
 ```powershell
 $env:APP_PORT = "8091"; docker compose up -d --build
-#  یا در فایل .env کنار docker-compose.yml خط  APP_PORT=8091  را اضافه کنید
+# یا در فایل .env کنار docker-compose.yml خط APP_PORT=8091 را اضافه کنید
 ```
 
 > مرحلهٔ `go build` داخل ایمیج کمی حافظه می‌خواهد (با `-p 1` و `GOMEMLIMIT` تنظیم شده تا روی
 > Docker Desktop معمولی جا شود). اگر باز هم با `rpc error: code = Unavailable ... EOF` مُرد،
-> یا حافظهٔ Docker Desktop را در Settings → Resources بالا ببرید (۴GB کافی است)، یا از مسیر
+> یا حافظهٔ Docker Desktop را در Settings → Resources بالا ببرید (4GB کافی است)، یا از مسیر
 > «کامپایل روی هاست» پایین استفاده کنید که اصلاً `go build` داخل کانتینر ندارد.
 
 ### یک دستور — بدون هیچ ریسک بیلد (کامپایل روی هاست)
