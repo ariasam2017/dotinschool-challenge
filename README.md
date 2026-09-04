@@ -136,19 +136,27 @@ sudo bash dotinschool/scripts/install.sh
 | `dotinschool admin` | نمایش/تغییر آدرس مخفی، نام‌کاربری، رمز، پورت، ساب‌دامین |
 | `dotinschool update` | دریافت آخرین نسخه از گیت‌هاب + کامپایل مجدد + ری‌استارت |
 | `dotinschool update-menu` | به‌روزرسانی فقط همین اسکریپت |
-| `dotinschool cert` | گرفتن/تمدید گواهی SSL از Let's Encrypt (acme.sh standalone) |
+| `dotinschool cert` | گرفتن/تمدید گواهی SSL از Let's Encrypt، روش HTTP-01 (نیاز به پورت ۸۰ باز) |
+| `dotinschool cert-cf` | گرفتن/تمدید گواهی SSL از راه Cloudflare DNS (بدون نیاز به پورت ۸۰) |
+| `dotinschool log` | لاگ زنده یا پاک‌کردن لاگ‌ها |
+| `dotinschool reset` | بازنشانی کامل به پیش‌فرض — پاک‌کردن دیتابیس، رمز و مسیر مخفیِ تازه (مخرب، تأیید می‌خواهد) |
+| `dotinschool fail2ban` | فعال‌سازی بن خودکار IP بعد از چند بار ورود اشتباه به پنل ادمین |
+| `dotinschool banlog` | وضعیت جیل fail2ban مخصوص dotinschool |
 | `dotinschool start` / `stop` / `restart` / `status` | کنترل سرویس |
 | `dotinschool enable` / `disable` | اجرای خودکار در بوت |
 | `dotinschool uninstall` | حذف کامل |
 
+موقع نصب، اگر دامنه‌ای داشته باشید که به IP این سرور اشاره می‌کند، خودِ اسکریپت در همان لحظه ازتان می‌پرسد و SSL کامل (HTTP-01 یا Cloudflare DNS) را همان‌جا برایتان فعال می‌کند — نیازی به اجرای دستیِ `dotinschool cert` بعد از نصب نیست، مگر بخواهید بعداً اضافه‌اش کنید.
+
 یونیت systemd یک `ExecStartPre` دارد که در هر ری‌استارت باینری را از سورس فعلی می‌سازد؛ به همین دلیل دکمهٔ «به‌روزرسانی» داخل پنل (که `git reset --hard origin/main` + ری‌استارت می‌کند) واقعاً اعمال می‌شود. اگر بیلد شکست بخورد، باینری قبلیِ سالم دست‌نخورده می‌ماند.
 
-### SSL
+### SSL (اگر موقع نصب رد کردید)
 
 </div>
 
 ```bash
-dotinschool cert
+dotinschool cert       # HTTP-01, needs port 80 open
+dotinschool cert-cf    # Cloudflare DNS, no need for port 80
 ```
 
 <div dir="rtl" align="right">
@@ -333,7 +341,7 @@ design-system/            ui-ux-pro-max skill output (MASTER.md + pages/admin.md
 - هدرهای امنیتی + CSP روی **همهٔ** پاسخ‌ها (script-src `'self'`؛ connect/img/default به `'self'` محدود).
 - مسیر مخفی و تصادفی پنل ادمین + امکان ساب‌دامین اختصاصی (روتینگ بر اساس Host).
 - نشست ادمین با توکن Bearer در حافظهٔ سرور نگه داشته می‌شود؛ مقایسهٔ رمز و کد OTP هم timing-safe است.
-- rate-limit حافظه‌ای روی مسیرهای حساس.
+- rate-limit حافظه‌ای روی مسیرهای حساس؛ هر ورود ناموفق به پنل ادمین با IP در لاگ ثبت می‌شود (`dotinschool fail2ban` برای بن خودکار بعد از چند بار خطا).
 - TTL نشست: ادمین ۱۲ ساعت، کاربر ۳۰ روز (sliding). OTP: ۲دقیقه TTL، ۶۰ث cooldown، ۵ تلاش.
 - هیچ جزئیات داخلی (مسیر فایل، stack trace) به کلاینت درز نمی‌کند.
 - مهاجرت سبک خودکار (AutoMigrate) برای دیتابیس‌های قدیمی‌تر.
