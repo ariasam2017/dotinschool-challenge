@@ -142,11 +142,49 @@ sudo bash dotinschool/scripts/install.sh
 | `dotinschool reset` | بازنشانی کامل به پیش‌فرض — پاک‌کردن دیتابیس، رمز و مسیر مخفیِ تازه (مخرب، تأیید می‌خواهد) |
 | `dotinschool fail2ban` | فعال‌سازی بن خودکار IP بعد از چند بار ورود اشتباه به پنل ادمین |
 | `dotinschool banlog` | وضعیت جیل fail2ban مخصوص dotinschool |
+| `dotinschool warp` | رفع مشکل اتصال به گیت‌هاب با Cloudflare WARP (برخی شبکه‌ها گیت‌هاب را کامل بلاک می‌کنند) |
 | `dotinschool start` / `stop` / `restart` / `status` | کنترل سرویس |
 | `dotinschool enable` / `disable` | اجرای خودکار در بوت |
 | `dotinschool uninstall` | حذف کامل |
 
 موقع نصب، اگر دامنه‌ای داشته باشید که به IP این سرور اشاره می‌کند، خودِ اسکریپت در همان لحظه ازتان می‌پرسد و SSL کامل (HTTP-01 یا Cloudflare DNS) را همان‌جا برایتان فعال می‌کند — نیازی به اجرای دستیِ `dotinschool cert` بعد از نصب نیست، مگر بخواهید بعداً اضافه‌اش کنید.
+
+### اگر `git clone` روی سرور گیر کرد و چیزی دانلود نشد
+
+</div>
+
+```bash
+git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
+```
+
+<div dir="rtl" align="right">
+
+بعضی شبکه‌ها (مثل خیلی از سرورهای ایران) گیت‌هاب را کامل روی IP بلاک می‌کنند — نه فقط DNS، خودِ اتصال TCP هم تایم‌اوت می‌شود. علامتش این است: بعد از «Cloning into...» هیچ پیشرفتی نمی‌بینید و بعد از چند دقیقه با `Connection timed out` شکست می‌خورد. راه‌حل، مسیرکردن ترافیک از راه Cloudflare WARP است (رایگان، رسمی):
+
+</div>
+
+```bash
+curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflare-client.list
+apt-get update && apt-get install -y cloudflare-warp
+warp-cli --accept-tos registration new
+warp-cli --accept-tos connect
+```
+
+<div dir="rtl" align="right">
+
+روی CentOS/RHEL/Fedora به‌جای سه خط اول:
+
+</div>
+
+```bash
+curl -fsSL https://pkg.cloudflareclient.com/cloudflare-warp-ascii.repo -o /etc/yum.repos.d/cloudflare-warp.repo
+dnf install -y cloudflare-warp   # or: yum install -y cloudflare-warp
+```
+
+<div dir="rtl" align="right">
+
+با `warp-cli status` مطمئن شوید وصل است، بعد دوباره `git clone` را امتحان کنید. بعد از این‌که یک‌بار `dotinschool` نصب شد، همین کار را با یک دستور هم می‌شود انجام داد: `dotinschool warp`.
 
 یونیت systemd یک `ExecStartPre` دارد که در هر ری‌استارت باینری را از سورس فعلی می‌سازد؛ به همین دلیل دکمهٔ «به‌روزرسانی» داخل پنل (که `git reset --hard origin/main` + ری‌استارت می‌کند) واقعاً اعمال می‌شود. اگر بیلد شکست بخورد، باینری قبلیِ سالم دست‌نخورده می‌ماند.
 
