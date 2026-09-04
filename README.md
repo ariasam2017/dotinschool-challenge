@@ -17,52 +17,46 @@
 
 ## نصب سریع
 
-هر سه دستور، آخرین نسخه را مستقیم از گیت‌هاب می‌گیرند، پیش‌نیازهای لازم را خودشان نصب می‌کنند، و برنامه را بالا می‌آورند. همان دستور را دوباره اجرا کنید تا به‌روزرسانی بگیرید.
+هر سه دستور، همون لحظه که اجرا می‌کنید، توکن گیت‌هاب رو به‌صورت مخفی (مثل رمز عبور، دیده نمی‌شود) ازتان می‌پرسند — چیزی داخل خودِ دستور جای‌گذاری نمی‌کنید. بعد خودشان آخرین نسخه را می‌گیرند، پیش‌نیازهای لازم را نصب می‌کنند، و برنامه را بالا می‌آورند. همان دستور را دوباره اجرا کنید تا به‌روزرسانی بگیرید — این‌بار دیگر توکن نمی‌خواهد، چون همان اولی داخل remote کلون ذخیره شده.
 
-مخزن **Private** است، پس هر سه دستور یک توکن گیت‌هاب می‌خواهند — فقط برای همین یک‌بار؛ بعدش توکن داخل remote گیت کلونِ محلی ذخیره می‌شود و به‌روزرسانی‌های بعدی (چه از پنل ادمین، چه با دستور `dotinschool update`) بدون نیاز دوباره بهش کار می‌کنند:
+مخزن **Private** است، پس فقط برای همین اولین اجرا یک توکن گیت‌هاب لازم دارید:
 
 1. به [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) بروید.
 2. Resource owner: `ariasam2017` · Repository access: Only select repositories → `dotinschool`.
 3. Repository permissions → Contents: **Read-only**.
-4. Generate token و مقدارش را کپی کنید (فقط همان لحظه نشان داده می‌شود) — جای `YOUR_TOKEN` در دستورهای زیر همین مقدار را بگذارید.
-
-روی لینوکس دستور در **دو خط ساده** است — یک `git clone` معمولی (بدون هیچ کوتیشن یا هدر خاصی، پس paste‌شدنش مشکلی ندارد) و بعد اجرای اسکریپت از همان کلون؛ توکن فقط همین یک‌بار لازم است:
+4. Generate token و مقدارش را کپی کنید (فقط همان لحظه نشان داده می‌شود).
 
 **لینوکس، نصب دائمی به‌عنوان سرویس سیستم (بدون Docker):**
 
 </div>
 
 ```bash
-git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
-sudo bash dotinschool/scripts/install.sh
+bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)'
 ```
 
 <div dir="rtl" align="right">
 
-**لینوکس، اجرا روی Docker:**
+**لینوکس، اجرا روی Docker** (اگر Docker از قبل نصب نباشد، خودش نصبش می‌کند):
 
 </div>
 
 ```bash
-git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
-sudo bash dotinschool/build/docker-install.sh
+bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)'
 ```
 
 <div dir="rtl" align="right">
 
-پوشهٔ `dotinschool` که همین‌جا کلون شد را بعداً می‌توانید پاک کنید — نصب واقعی در `/opt/dotinschool` مستقل از آن است.
-
-**ویندوز، اجرای محلی روی Docker:**
+**ویندوز، اجرای محلی روی Docker** (Go را اگر نبود خودش با winget نصب می‌کند؛ اما Docker Desktop را نه — اگر نصب نباشد فقط پیام می‌دهد که نصبش کنید و دوباره همین دستور را بزنید):
 
 </div>
 
 ```powershell
-$env:DOTINSCHOOL_GH_TOKEN='YOUR_TOKEN'; irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+$s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s)); $env:DOTINSCHOOL_GH_TOKEN = $T; irm -Headers @{Authorization="token $T"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
 ```
 
 <div dir="rtl" align="right">
 
-جزئیات و گزینه‌های بیشتر هر مسیر در ادامهٔ همین سند آمده است.
+اگر ترجیح می‌دهید توکن را مستقیم داخل خودِ دستور (بدون پرامپت تعاملی) بگذارید — مثلاً برای اسکریپت‌های خودکار — همان `git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git` هم جواب می‌دهد؛ جزئیات هر دو روش در ادامهٔ همین سند آمده است.
 
 ---
 
@@ -113,13 +107,12 @@ go run ./cmd/seed     # wipes and reseeds the DB with ~16 participants and a liv
 
 ## نصب روی سرور لینوکس (bare-metal)
 
-اسکریپت نصب همه‌چیز را خودش انجام می‌دهد — از نصب پیش‌نیازهای سیستم تا بالا آوردن سرویس؛ فقط با کاربر `root` و توکنِ بخش «نصب سریع» اجرا کنید:
+اسکریپت نصب همه‌چیز را خودش انجام می‌دهد — از نصب پیش‌نیازهای سیستم تا بالا آوردن سرویس؛ فقط با کاربر `root` اجرا کنید (توکن گیت‌هاب را همان‌جا تعاملی می‌پرسد، توضیحش در «نصب سریع» بالا):
 
 </div>
 
 ```bash
-git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
-sudo bash dotinschool/scripts/install.sh
+bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)'
 ```
 
 <div dir="rtl" align="right">
@@ -205,14 +198,14 @@ dotinschool cert-cf    # Cloudflare DNS, no need for port 80
 
 ## نصب با Docker
 
-### روی ویندوز — یک دستور (نصب پیش‌نیازها + اجرا)
+### روی ویندوز — یک دستور (توکن را می‌پرسد + اجرا)
 
-همان دستور «نصب سریع» بالا: سورس را از گیت‌هاب می‌گیرد، و اگر Docker Desktop یا Go روی سیستم نصب نباشد از راه `winget` نصبشان می‌کند، منتظر آماده‌شدن Docker Desktop می‌ماند، بعد باینری لینوکس را روی هاست کامپایل و ایمیج را می‌سازد و استک را بالا می‌آورد:
+همان دستور «نصب سریع» بالا: توکن را تعاملی می‌پرسد، سورس را از گیت‌هاب می‌گیرد، Go را اگر نصب نباشد از راه `winget` نصب می‌کند، بعد باینری لینوکس را روی هاست کامپایل و ایمیج را می‌سازد و استک را بالا می‌آورد. Docker Desktop را خودش نصب نمی‌کند — اگر نصب نباشد فقط پیام می‌دهد که نصبش کنید و دوباره اجرا کنید:
 
 </div>
 
 ```powershell
-$env:DOTINSCHOOL_GH_TOKEN='YOUR_TOKEN'; irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+$s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s)); $env:DOTINSCHOOL_GH_TOKEN = $T; irm -Headers @{Authorization="token $T"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
 ```
 
 <div dir="rtl" align="right">
@@ -233,11 +226,12 @@ $env:DOTINSCHOOL_GH_TOKEN='YOUR_TOKEN'; irm -Headers @{Authorization="token $env
 
 ### روی سرور لینوکس، بدون هیچ‌چیز از قبل نصب‌شده
 
+توکن گیت‌هاب را همان‌جا تعاملی می‌پرسد (توضیحش در «نصب سریع» بالا):
+
 </div>
 
 ```bash
-git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
-sudo bash dotinschool/build/docker-install.sh
+bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)'
 ```
 
 <div dir="rtl" align="right">
