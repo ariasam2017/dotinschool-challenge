@@ -2,15 +2,22 @@
 # =============================================================================
 # dotinschool — Docker installer for a Linux host.
 #
-# The dotinschool repo is private, so both fetching this file and the "git
-# clone" it runs need a GitHub token: a fine-grained personal access token,
-# scoped to just this repository with "Contents: Read-only", is enough.
-# Create one at https://github.com/settings/personal-access-tokens/new, then
-# install with:
+# The dotinschool repo is private, so getting the source needs a GitHub
+# token: a fine-grained personal access token, scoped to just this repository
+# with "Contents: Read-only", is enough. Create one at
+# https://github.com/settings/personal-access-tokens/new, then install with:
 #
-#   export DOTINSCHOOL_GH_TOKEN=<your token>
-#   bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" \
-#     https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
+#   git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
+#   sudo bash dotinschool/build/docker-install.sh
+#
+# The token is only needed for that first "git clone": once cloned, this
+# script reuses the same remote for /opt/dotinschool, so later updates (this
+# script, or `dotinschool update`) keep working without it. The clone above
+# can be deleted afterwards - /opt/dotinschool is its own independent copy.
+#
+# If you'd rather skip the local clone entirely, this also works in one line:
+#
+#   bash <(curl -Ls -H "Authorization: token YOUR_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
 #
 # Installs Docker + Go if missing, clones the repo to /opt/dotinschool,
 # generates a .env with a random admin password + secret admin path, builds the
@@ -92,12 +99,30 @@ fetch_repo(){
   if [[ -d "$INSTALL_DIR/.git" ]]; then
     git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null
     git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}" >/dev/null
-  else
-    local url; url=$(repo_url)
-    [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
-    rm -rf "$INSTALL_DIR"
-    git clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null
+    ok "Source ready at ${INSTALL_DIR}."
+    return
   fi
+
+  # Running from inside an already-cloned checkout of this same repo? Reuse
+  # it instead of asking for the token again (see the header comment above).
+  local self_dir=""
+  if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+    self_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd) || self_dir=""
+  fi
+  if [[ -n "$self_dir" && -d "$self_dir/.git" ]]; then
+    local origin; origin=$(git -C "$self_dir" remote get-url origin 2>/dev/null)
+    if [[ "$origin" == *"github.com/ariasam2017/dotinschool"* ]]; then
+      git clone --depth 1 --branch "$BRANCH" "$self_dir" "$INSTALL_DIR" >/dev/null
+      git -C "$INSTALL_DIR" remote set-url origin "$origin"
+      ok "Source ready at ${INSTALL_DIR}."
+      return
+    fi
+  fi
+
+  local url; url=$(repo_url)
+  [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
+  rm -rf "$INSTALL_DIR"
+  git clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null
   ok "Source ready at ${INSTALL_DIR}."
 }
 

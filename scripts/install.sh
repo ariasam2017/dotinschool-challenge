@@ -2,18 +2,24 @@
 # =============================================================================
 # dotinschool — Linux installer / management script (x-ui / Sanaei-panel style)
 #
-# The dotinschool repo is private, so both this script and the "git clone" it
-# runs need a GitHub token: a fine-grained personal access token, scoped to
-# just this repository with "Contents: Read-only", is enough. Create one at
+# The dotinschool repo is private, so getting the source needs a GitHub
+# token: a fine-grained personal access token, scoped to just this repository
+# with "Contents: Read-only", is enough. Create one at
 # https://github.com/settings/personal-access-tokens/new, then install with:
 #
-#   export DOTINSCHOOL_GH_TOKEN=<your token>
-#   bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" \
-#     https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
+#   git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
+#   sudo bash dotinschool/scripts/install.sh
 #
-# The token is only needed for this first run: it gets embedded in the local
-# clone's git remote, so later updates (this script, the panel's "Update"
-# button, systemd's rebuild-on-restart) keep working without it.
+# The token is only needed for that first "git clone": once cloned, this
+# script reuses the same remote for /opt/dotinschool, so later updates (this
+# script, the panel's "Update" button, systemd's rebuild-on-restart) keep
+# working without it.
+#
+# The clone above can be deleted afterwards - /opt/dotinschool is its own
+# independent copy. If you'd rather skip the local clone entirely, this also
+# works in one line:
+#
+#   bash <(curl -Ls -H "Authorization: token YOUR_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
 #
 # After install the "dotinschool" command is available:
 #   dotinschool                 interactive management menu
@@ -144,13 +150,35 @@ fetch_app(){
     info "Updating source from GitHub (${BRANCH})..."
     git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null
     git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}" >/dev/null
-  else
-    info "Fetching source from GitHub (${BRANCH})..."
-    local url; url=$(repo_url)
-    [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
-    rm -rf "$INSTALL_DIR"
-    git clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null
+    ok "Source ready at ${INSTALL_DIR}."
+    return
   fi
+
+  # Running from inside an already-cloned checkout of this same repo? (e.g.
+  # `git clone https://TOKEN@github.com/.../dotinschool.git && sudo bash
+  # dotinschool/scripts/install.sh`) Reuse it instead of asking for the
+  # token again: a fast local clone, then repoint the remote at the
+  # original (token-bearing) URL so later updates go straight to GitHub.
+  local self_dir=""
+  if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+    self_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd) || self_dir=""
+  fi
+  if [[ -n "$self_dir" && -d "$self_dir/.git" ]]; then
+    local origin; origin=$(git -C "$self_dir" remote get-url origin 2>/dev/null)
+    if [[ "$origin" == *"github.com/ariasam2017/dotinschool"* ]]; then
+      info "Reusing the local checkout at ${self_dir}..."
+      git clone --depth 1 --branch "$BRANCH" "$self_dir" "$INSTALL_DIR" >/dev/null
+      git -C "$INSTALL_DIR" remote set-url origin "$origin"
+      ok "Source ready at ${INSTALL_DIR}."
+      return
+    fi
+  fi
+
+  info "Fetching source from GitHub (${BRANCH})..."
+  local url; url=$(repo_url)
+  [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
+  rm -rf "$INSTALL_DIR"
+  git clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null
   ok "Source ready at ${INSTALL_DIR}."
 }
 
