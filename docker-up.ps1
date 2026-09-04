@@ -3,8 +3,9 @@
 #   powershell -ExecutionPolicy Bypass -File .\docker-up.ps1
 #   (or just:  .\docker-up.ps1 )
 #
-# Compiles the Linux binary on this Windows host (fast, reliable), packages it
-# into a tiny image (a ~5s file copy - NO in-container `go build`, so the
+# Installs any missing prerequisites (Go, Docker Desktop) via winget, compiles
+# the Linux binary on this Windows host (fast, reliable), packages it into a
+# tiny image (a ~5s file copy - NO in-container `go build`, so the
 # "rpc error ... EOF" build failure cannot happen), and starts the stack.
 # Re-run any time to rebuild + recreate.
 #
@@ -16,19 +17,77 @@ $ErrorActionPreference = 'Stop'
 Set-Location -Path $PSScriptRoot
 
 function Say($m) { Write-Host "==> $m" -ForegroundColor Cyan }
+function Warn($m) { Write-Host "[!] $m" -ForegroundColor Yellow }
 function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; exit 1 }
 
-# ---- 1. tools ----
-$go = (Get-Command go -ErrorAction SilentlyContinue).Source
-if (-not $go) {
-  $cand = Join-Path $env:LOCALAPPDATA 'Programs\go\bin\go.exe'
-  if (Test-Path $cand) { $go = $cand } else { Die "Go not found. Install it or add it to PATH." }
-}
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Die "docker not found. Install Docker Desktop." }
-docker info 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { Die "Docker is not running. Open Docker Desktop and wait for it to be ready." }
+function Have-Winget { [bool](Get-Command winget -ErrorAction SilentlyContinue) }
 
-# ---- 2. .env (create on first run with a random admin password + secret path) ----
+function Winget-Install($id, $label) {
+  if (-not (Have-Winget)) {
+    Die "$label is missing and winget is not available on this system. Install $label manually and re-run this script."
+  }
+  Say "installing $label via winget (id: $id)"
+  winget install -e --id $id --accept-package-agreements --accept-source-agreements --silent
+  if ($LASTEXITCODE -ne 0) {
+    Die "winget could not install $label. Install it manually and re-run this script."
+  }
+}
+
+# ---- 1. Go: locate it, or install it ----
+function Find-Go {
+  $cmd = Get-Command go -ErrorAction SilentlyContinue
+  if ($cmd) { return $cmd.Source }
+  foreach ($p in @(
+    (Join-Path $env:ProgramFiles 'Go\bin\go.exe'),
+    (Join-Path $env:LOCALAPPDATA 'Programs\go\bin\go.exe'),
+    'C:\Go\bin\go.exe'
+  )) { if (Test-Path $p) { return $p } }
+  return $null
+}
+
+$go = Find-Go
+if (-not $go) {
+  Warn "Go not found"
+  Winget-Install 'GoLang.Go' 'Go'
+  $go = Find-Go
+  if (-not $go) { Die "Go was installed but could not be located. Open a new terminal (so PATH refreshes) and re-run this script." }
+}
+Say "using Go: $go"
+
+# ---- 2. Docker: locate it, install if missing, wait until the engine is ready ----
+function Docker-On-Path { [bool](Get-Command docker -ErrorAction SilentlyContinue) }
+function Docker-Ready {
+  if (-not (Docker-On-Path)) { return $false }
+  docker info *> $null
+  return ($LASTEXITCODE -eq 0)
+}
+
+if (-not (Docker-On-Path)) {
+  Warn "Docker not found"
+  Winget-Install 'Docker.DockerDesktop' 'Docker Desktop'
+
+  $dockerCli = Join-Path $env:ProgramFiles 'Docker\Docker\resources\bin'
+  if ((Test-Path $dockerCli) -and ($env:PATH -notlike "*$dockerCli*")) { $env:PATH = "$dockerCli;$env:PATH" }
+
+  if (-not (Docker-On-Path)) {
+    Die "Docker Desktop was installed but is not on PATH yet. Open a new terminal (or sign out/in once) and re-run this script."
+  }
+  Say "Docker Desktop installed - first launch can take a minute, and on a fresh machine it may ask to install the WSL2 kernel update and reboot once. If that happens, finish that step and just re-run .\docker-up.ps1 afterwards."
+}
+
+if (-not (Docker-Ready)) {
+  Say "starting Docker Desktop"
+  $dockerExe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
+  if (Test-Path $dockerExe) { Start-Process $dockerExe }
+  $tries = 0
+  while (-not (Docker-Ready) -and $tries -lt 60) { Start-Sleep -Seconds 3; $tries++ }
+  if (-not (Docker-Ready)) {
+    Die "Docker Desktop did not become ready in time. Open it manually, wait for the whale icon to say it's running, then re-run this script."
+  }
+}
+Say "Docker is ready"
+
+# ---- 3. .env (create on first run with a random admin password + secret path) ----
 if (-not (Test-Path .env)) {
   Say "creating .env (random admin password + secret admin path)"
   $chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -51,7 +110,7 @@ if (-not (Test-Path .env)) {
   ) | Set-Content -Encoding ascii .env
 }
 
-# ---- 3. pick a free host port (passed to compose as an env var, .env is not touched) ----
+# ---- 4. pick a free host port (passed to compose as an env var, .env is not touched) ----
 function PortFree($p) {
   try {
     $l = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $p)
@@ -64,7 +123,7 @@ if (-not $port) { $port = 8080 }
 $env:APP_PORT = "$port"
 Say "host port: $port"
 
-# ---- 4. compile the Linux binary on the host ----
+# ---- 5. compile the Linux binary on the host ----
 Say "compiling the linux binary on the host (first run may take ~1 min)"
 New-Item -ItemType Directory -Force -Path dist | Out-Null
 $env:GOOS = 'linux'; $env:GOARCH = 'amd64'; $env:CGO_ENABLED = '0'
@@ -75,7 +134,7 @@ try {
 }
 if (-not (Test-Path dist/dotinschool_linux_amd64)) { Die "go build failed." }
 
-# ---- 5. build image + start stack ----
+# ---- 6. build image + start stack ----
 Say "building the Docker image (packaging - a few seconds)"
 docker build -f build/Dockerfile -t dotinschool:local .
 if ($LASTEXITCODE -ne 0) { Die "docker build failed." }
@@ -83,7 +142,7 @@ Say "starting the stack"
 docker compose -f build/docker-compose.yml up -d
 if ($LASTEXITCODE -ne 0) { Die "docker compose up failed." }
 
-# ---- 6. access info ----
+# ---- 7. access info ----
 $cfg = @{}
 Get-Content .env | Where-Object { $_ -match '^\s*[^#].*=' } | ForEach-Object {
   $kv = $_ -split '=', 2; $cfg[$kv[0].Trim()] = $kv[1].Trim()
