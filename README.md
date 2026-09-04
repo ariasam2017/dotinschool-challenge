@@ -17,35 +17,41 @@
 
 ## نصب سریع
 
-هر دو دستور، آخرین نسخه را مستقیم از گیت‌هاب می‌گیرند، پیش‌نیازهای لازم را خودشان نصب می‌کنند، و برنامه را بالا می‌آورند. همان دستور را دوباره اجرا کنید تا به‌روزرسانی بگیرید.
+هر سه دستور، آخرین نسخه را مستقیم از گیت‌هاب می‌گیرند، پیش‌نیازهای لازم را خودشان نصب می‌کنند، و برنامه را بالا می‌آورند. همان دستور را دوباره اجرا کنید تا به‌روزرسانی بگیرید.
 
-مخزن **Private** است، پس هر دو دستور یک توکن گیت‌هاب می‌خواهند — فقط برای همین یک‌بار؛ بعدش توکن داخل remote گیت کلونِ محلی ذخیره می‌شود و به‌روزرسانی‌های بعدی (چه از پنل ادمین، چه با دستور `dotinschool update`) بدون نیاز دوباره بهش کار می‌کنند:
+مخزن **Private** است، پس هر سه دستور یک توکن گیت‌هاب می‌خواهند — فقط برای همین یک‌بار؛ بعدش توکن داخل remote گیت کلونِ محلی ذخیره می‌شود و به‌روزرسانی‌های بعدی (چه از پنل ادمین، چه با دستور `dotinschool update`) بدون نیاز دوباره بهش کار می‌کنند:
 
 1. به [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) بروید.
 2. Resource owner: `ariasam2017` · Repository access: Only select repositories → `dotinschool`.
 3. Repository permissions → Contents: **Read-only**.
-4. Generate token و مقدارش را کپی کنید (فقط همان لحظه نشان داده می‌شود).
+4. Generate token و مقدارش را کپی کنید (فقط همان لحظه نشان داده می‌شود) — جای `<توکن>` در دستورهای زیر همین مقدار را بگذارید.
 
-**لینوکس** (نصب دائمی به‌عنوان سرویس سیستم):
+**لینوکس، نصب دائمی به‌عنوان سرویس سیستم (بدون Docker):**
 
 </div>
 
 ```bash
-export DOTINSCHOOL_GH_TOKEN=<توکن>
-bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" \
-  https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
+export DOTINSCHOOL_GH_TOKEN=<توکن>; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
 ```
 
 <div dir="rtl" align="right">
 
-**ویندوز** (اجرای محلی روی Docker):
+**لینوکس، اجرا روی Docker:**
+
+</div>
+
+```bash
+export DOTINSCHOOL_GH_TOKEN=<توکن>; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
+```
+
+<div dir="rtl" align="right">
+
+**ویندوز، اجرای محلی روی Docker:**
 
 </div>
 
 ```powershell
-$env:DOTINSCHOOL_GH_TOKEN = '<توکن>'
-irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} `
-  https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+$env:DOTINSCHOOL_GH_TOKEN='<توکن>'; irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
 ```
 
 <div dir="rtl" align="right">
@@ -106,9 +112,7 @@ go run ./cmd/seed     # wipes and reseeds the DB with ~16 participants and a liv
 </div>
 
 ```bash
-export DOTINSCHOOL_GH_TOKEN=<توکن>
-bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" \
-  https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
+export DOTINSCHOOL_GH_TOKEN=<توکن>; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
 ```
 
 <div dir="rtl" align="right">
@@ -155,9 +159,7 @@ dotinschool cert
 </div>
 
 ```powershell
-$env:DOTINSCHOOL_GH_TOKEN = '<توکن>'
-irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} `
-  https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+$env:DOTINSCHOOL_GH_TOKEN='<توکن>'; irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
 ```
 
 <div dir="rtl" align="right">
@@ -181,9 +183,7 @@ irm -Headers @{Authorization="token $env:DOTINSCHOOL_GH_TOKEN"} `
 </div>
 
 ```bash
-export DOTINSCHOOL_GH_TOKEN=<توکن>
-bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" \
-  https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
+export DOTINSCHOOL_GH_TOKEN=<توکن>; bash <(curl -Ls -H "Authorization: token $DOTINSCHOOL_GH_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
 ```
 
 <div dir="rtl" align="right">
