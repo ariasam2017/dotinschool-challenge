@@ -33,6 +33,9 @@
 #   dotinschool reset           factory reset (wipe DB, new admin credentials)
 #   dotinschool fail2ban        enable IP banning after repeated failed logins
 #   dotinschool banlog          show fail2ban's dotinschool jail status
+#   dotinschool warp            fix GitHub connectivity via Cloudflare WARP
+#                               (some hosting networks block GitHub outright —
+#                               if `git clone`/`update` just hangs, run this)
 #   dotinschool start|stop|restart|status
 #   dotinschool enable|disable  auto-start on boot
 #   dotinschool uninstall
@@ -150,10 +153,17 @@ random_admin_path(){ echo "panel-$(openssl rand -hex 6)"; }
 port_in_use(){ (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && { exec 3<&- 2>/dev/null; exec 3>&- 2>/dev/null; return 0; }; return 1; }
 find_free_port(){ local port="$1" tries=0; while port_in_use "$port"; do port=$((port+1)); tries=$((tries+1)); [[ $tries -lt 50 ]] || { echo "$1"; return; }; done; echo "$port"; }
 
+github_unreachable_hint(){
+  local self=""
+  [[ -n "${BASH_SOURCE[0]:-}" ]] && self=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/$(basename "${BASH_SOURCE[0]}")
+  err "Could not reach GitHub. Some hosting networks block it outright — if this hangs for a long time before failing, that's almost certainly it."
+  err "Fix: sudo bash ${self:-scripts/install.sh} warp   (or option 11 in the menu) — installs Cloudflare WARP, then try again."
+}
+
 fetch_app(){
   if [[ -d "$INSTALL_DIR/.git" ]]; then
     info "Updating source from GitHub (${BRANCH})..."
-    git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null
+    git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null || { github_unreachable_hint; exit 1; }
     git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}" >/dev/null
     ok "Source ready at ${INSTALL_DIR}."
     return
@@ -183,7 +193,7 @@ fetch_app(){
   local url; url=$(repo_url)
   [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
   rm -rf "$INSTALL_DIR"
-  git clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null
+  git clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null || { github_unreachable_hint; exit 1; }
   ok "Source ready at ${INSTALL_DIR}."
 }
 
@@ -506,6 +516,46 @@ cmd_reset(){
   else err "Service failed to start — log:"; journalctl -u "$SERVICE_NAME" --no-pager -n 30 || true; return 1; fi
 }
 
+
+# Some hosting networks (notably in Iran) block GitHub's IPs outright, so
+# every git/curl call to github.com just hangs until it times out. Cloudflare
+# WARP tunnels outbound traffic through Cloudflare's network instead, which
+# is normally not blocked, and unblocks GitHub access as a side effect.
+install_warp(){
+  require_root
+  if command -v warp-cli >/dev/null 2>&1; then
+    ok "Cloudflare WARP is already installed."
+  else
+    info "Installing Cloudflare WARP..."
+    local pm; pm=$(detect_pkg_manager)
+    case "$pm" in
+      apt)
+        local codename=""
+        [[ -f /etc/os-release ]] && codename=$(. /etc/os-release && echo "${VERSION_CODENAME:-}")
+        [[ -n "$codename" ]] || codename=$(lsb_release -cs 2>/dev/null) || true
+        [[ -n "$codename" ]] || codename="focal"
+        curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ ${codename} main" > /etc/apt/sources.list.d/cloudflare-client.list
+        apt-get update -y >/dev/null && apt-get install -y cloudflare-warp >/dev/null
+        ;;
+      dnf|yum)
+        curl -fsSL https://pkg.cloudflareclient.com/cloudflare-warp-ascii.repo -o /etc/yum.repos.d/cloudflare-warp.repo
+        "$pm" install -y cloudflare-warp >/dev/null
+        ;;
+      *) die "Cloudflare WARP packaging is only set up for apt/dnf/yum here — install it manually from https://pkg.cloudflareclient.com/" ;;
+    esac
+  fi
+  command -v warp-cli >/dev/null 2>&1 || die "Cloudflare WARP installation failed."
+  warp-cli --accept-tos registration new >/dev/null 2>&1 || true
+  warp-cli --accept-tos connect >/dev/null 2>&1 || true
+  sleep 2
+  if curl -s --max-time 8 https://www.cloudflare.com/cdn-cgi/trace/ 2>/dev/null | grep -q "warp=on"; then
+    ok "Cloudflare WARP is connected — outbound traffic (including GitHub) now routes through Cloudflare."
+  else
+    warn "WARP installed but doesn't look connected yet. Check manually: warp-cli status"
+  fi
+}
+
 install_fail2ban(){
   require_root
   if ! command -v fail2ban-client >/dev/null 2>&1; then
@@ -566,19 +616,20 @@ show_menu(){
   box_item 7 "SSL certificate (Cloudflare DNS)"
   box_item 8 "Logs"
   box_item 9 "Factory reset"
-  box_item 10 "Brute-force protection (fail2ban)"; box_div
-  box_item 11 "Start"; box_item 12 "Stop"; box_item 13 "Restart"; box_item 14 "Status"; box_div
-  box_item 15 "Enable autostart"; box_item 16 "Disable autostart"
+  box_item 10 "Brute-force protection (fail2ban)"
+  box_item 11 "Fix GitHub connectivity (Cloudflare WARP)"; box_div
+  box_item 12 "Start"; box_item 13 "Stop"; box_item 14 "Restart"; box_item 15 "Status"; box_div
+  box_item 16 "Enable autostart"; box_item 17 "Disable autostart"
   box_bottom; echo; show_status; echo
-  read -r -p "Choice [0-16]: " choice
+  read -r -p "Choice [0-17]: " choice
   case "$choice" in
     1) cmd_install ;; 2) cmd_update ;; 3) cmd_update_menu ;; 4) cmd_uninstall ;;
-    5) cmd_admin ;; 6) cmd_cert ;; 7) cmd_cert_cf ;; 8) cmd_log ;; 9) cmd_reset ;; 10) install_fail2ban ;;
-    11) cmd_service start ;; 12) cmd_service stop ;; 13) cmd_service restart ;; 14) cmd_service status ;;
-    15) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "Autostart enabled." ;;
-    16) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "Autostart disabled." ;;
+    5) cmd_admin ;; 6) cmd_cert ;; 7) cmd_cert_cf ;; 8) cmd_log ;; 9) cmd_reset ;; 10) install_fail2ban ;; 11) install_warp ;;
+    12) cmd_service start ;; 13) cmd_service stop ;; 14) cmd_service restart ;; 15) cmd_service status ;;
+    16) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "Autostart enabled." ;;
+    17) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "Autostart disabled." ;;
     0) exit 0 ;;
-    *) warn "Enter a number between 0 and 16." ;;
+    *) warn "Enter a number between 0 and 17." ;;
   esac
 }
 
@@ -595,6 +646,7 @@ main(){
     reset) cmd_reset ;;
     fail2ban) install_fail2ban ;;
     banlog) cmd_banlog ;;
+    warp) install_warp ;;
     start|stop|restart|status) cmd_service "$1" ;;
     enable) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "Autostart enabled." ;;
     disable) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "Autostart disabled." ;;
