@@ -1,20 +1,28 @@
-# dotinschool — سامانهٔ چالش برنامه‌نویسی
+# dotinschool
 
-نسخهٔ قبلیِ این پروژه با Node.js بود؛ کامل بازنویسی‌اش کردم، این‌بار روی پشتهٔ فنیِ پنل‌های **x-ui / 3x-ui**: یک باینری استاتیک تک‌فایل به زبان **Go** که هم فرانت‌اند Vue بیلدشده را داخل خودش embed می‌کند و هم یک REST API کوچک روی SQLite دارد. دو پنل مجزا دارد: **پنل شرکت‌کننده** و **پنل مدیریت**.
+<div dir="rtl" align="right">
+
+سامانهٔ آنلاین چالش برنامه‌نویسی. نسخهٔ قبلیِ این پروژه با Node.js بود؛ کامل بازنویسی‌اش کردم، این‌بار روی پشتهٔ فنیِ پنل‌های **x-ui / 3x-ui**: یک باینری استاتیک تک‌فایل به زبان **Go** که هم فرانت‌اند Vue بیلدشده را داخل خودش embed می‌کند و هم یک REST API کوچک روی SQLite دارد. دو پنل مجزا دارد: **پنل شرکت‌کننده** و **پنل مدیریت**.
+
+روی **IP خام و HTTP ساده** بدون هیچ خطا کار می‌کند؛ اگر مسیر cert/key ست شده باشد مستقیم TLS می‌دهد.
+
+## امکانات
 
 - بک‌اند: Go 1.22+‏ · Gin · GORM + SQLite (درایور pure-Go، بدون CGO) · robfig/cron · logrus · `go:embed`
 - فرانت‌اند: Vue 3 + Ant Design Vue 4 + Vite · RTL کامل · فارسی · ارقام فارسی · تقویم جلالی · فونت Vazirmatn + JetBrains Mono
 - ادیتور کد: CodeMirror 6 (های‌لایت جاوا، شماره خط، اتوکامپلیت، تطبیق پرانتز، Find/Replace، لینت سمت کلاینت)
 - استقرار: `scripts/install.sh` + systemd + دستور سراسری `dotinschool` · Docker (Dockerfile چندمرحله‌ای + compose + override پروداکشن با Caddy برای HTTPS خودکار)
 
-روی **IP خام و HTTP ساده** بدون هیچ خطا کار می‌کند؛ اگر مسیر cert/key ست شده باشد مستقیم TLS می‌دهد.
+کد کامل در گیت‌هاب است:
 
-مخزن: <https://github.com/ariasam2017/dotinschool>
+</div>
 
 ```bash
 git clone https://github.com/ariasam2017/dotinschool.git
 cd dotinschool
 ```
+
+<div dir="rtl" align="right">
 
 ---
 
@@ -22,13 +30,17 @@ cd dotinschool
 
 پیش‌نیاز: Go 1.24+‏ و Node 20+‏.
 
+</div>
+
 ```bash
-# ۱) بیلد فرانت‌اند (خروجی در web/assets/ که go:embed می‌شود)
+# 1) build the frontend (output goes to web/assets/, embedded via go:embed)
 cd web && npm install && npm run build && cd ..
 
-# ۲) اجرای سرور
+# 2) run the server
 go run ./cmd/server
 ```
+
+<div dir="rtl" align="right">
 
 - پنل کاربر: <http://127.0.0.1:8080/>
 - پنل ادمین: <http://127.0.0.1:8080/admin/> (روی نصب لینوکسی، مسیر مخفی تصادفی)
@@ -36,27 +48,39 @@ go run ./cmd/server
 
 ### حالت توسعهٔ داغ (hot-reload فرانت)
 
+</div>
+
 ```bash
-make dev      # سرور Go روی :8080 + دیو‌سرور Vite روی :5173 با پروکسی /api
+make dev      # Go server on :8080 + Vite dev server on :5173, proxied through /api
 ```
+
+<div dir="rtl" align="right">
 
 ### دادهٔ دمو
 
+</div>
+
 ```bash
-go run ./cmd/seed     # پاک‌سازی و پرکردن دیتابیس با ~۱۶ شرکت‌کننده و یک رویداد زندهٔ ۹۰ دقیقه‌ای
+go run ./cmd/seed     # wipes and reseeds the DB with ~16 participants and a live 90-minute event
 ```
+
+<div dir="rtl" align="right">
 
 ---
 
 ## نصب روی سرور لینوکس (bare-metal)
 
-با کاربر `root`:
+اسکریپت نصب همه‌چیز را خودش انجام می‌دهد — از نصب پیش‌نیازهای سیستم تا بالا آوردن سرویس؛ فقط با کاربر `root` اجرا کنید:
+
+</div>
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
 ```
 
-اسکریپت به‌صورت خودکار: پیش‌نیازها و **Go** را نصب می‌کند، سورس را کلون می‌کند، باینری را می‌سازد، سرویس systemd می‌سازد (اجرای دائمی + ری‌استارت خودکار)، یک **رمز ادمین تصادفی** و یک **مسیر مخفی تصادفی** برای پنل مدیریت تولید می‌کند، و آدرس‌ها را چاپ می‌کند.
+<div dir="rtl" align="right">
+
+اسکریپت به‌صورت خودکار: پیش‌نیازهای سیستم (`curl`, `git`, `tar`, `openssl`) و **Go** را نصب می‌کند، سورس را کلون می‌کند، باینری را می‌سازد، سرویس systemd می‌سازد (اجرای دائمی + ری‌استارت خودکار)، یک **رمز ادمین تصادفی** و یک **مسیر مخفی تصادفی** برای پنل مدیریت تولید می‌کند، و در پایان آدرس‌ها و اطلاعات ورود را چاپ می‌کند. تمام پیام‌های اسکریپت انگلیسی است و منوی مدیریتش به سبک x-ui/Sanaei جعبه‌ای است.
 
 فرانت‌اند بیلدشده (`web/assets/`) داخل مخزن commit شده است، پس نصب سرور به Node نیاز ندارد.
 
@@ -73,13 +97,17 @@ bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/s
 | `dotinschool enable` / `disable` | اجرای خودکار در بوت |
 | `dotinschool uninstall` | حذف کامل |
 
-یونیت systemd یک `ExecStartPre` دارد که در هر ری‌استارت باینری را از سورس فعلی می‌سازد؛ به همین دلیل دکمهٔ **«به‌روزرسانی»** داخل پنل (که `git reset --hard origin/main` + ری‌استارت می‌کند) واقعاً اعمال می‌شود. اگر بیلد شکست بخورد، باینری قبلیِ سالم دست‌نخورده می‌ماند.
+یونیت systemd یک `ExecStartPre` دارد که در هر ری‌استارت باینری را از سورس فعلی می‌سازد؛ به همین دلیل دکمهٔ «به‌روزرسانی» داخل پنل (که `git reset --hard origin/main` + ری‌استارت می‌کند) واقعاً اعمال می‌شود. اگر بیلد شکست بخورد، باینری قبلیِ سالم دست‌نخورده می‌ماند.
 
 ### SSL
+
+</div>
 
 ```bash
 dotinschool cert
 ```
+
+<div dir="rtl" align="right">
 
 بدون دامنه (فقط IP)، این مرحله را رد کنید — پنل روی HTTP معمولی بدون خطای گواهی کار می‌کند.
 
@@ -87,65 +115,82 @@ dotinschool cert
 
 ## نصب با Docker
 
-### یک دستور (از ریشهٔ پروژه)
+### روی ویندوز — یک دستور (نصب پیش‌نیازها + اجرا)
 
-```bash
-cd proje_1
-docker compose up -d --build
-```
+اگر Docker Desktop یا Go روی سیستم نصب نباشد، اسکریپت خودش از راه `winget` نصبشان می‌کند، منتظر آماده‌شدن Docker Desktop می‌ماند، بعد باینری لینوکس را روی هاست کامپایل و ایمیج را می‌سازد و استک را بالا می‌آورد:
 
-همین. یک ایمیج (فرانت + باینری Go داخل خودش) و یک کانتینر `dotinschool` ساخته می‌شود.
-هیچ ابزار دیگری لازم نیست. `./Dockerfile` و `./docker-compose.yml` در ریشه هستند و
-`docker compose` خودش پیدایشان می‌کند.
-
-- پنل کاربر: <http://localhost:8080/> · پنل ادمین: `http://localhost:8080/<ADMIN_PATH>/`
-- رمز ادمین: اگر `.env` نساخته باشید، یک رمز تصادفی ساخته و در لاگ چاپ می‌شود
-  (`docker compose logs app`). برای رمز ثابت: `cp .env.example .env` و `ADMIN_PASSWORD` را پر کنید.
-- داده‌ها در ولوم `./data` — SQLite تک‌فایل.
-- لاگ: `docker compose logs -f app` · توقف: `docker compose down` · به‌روزرسانی: دوباره `docker compose up -d --build`
-
-**روی ویندوز** Docker Desktop معمولاً پورت ۸۰۸۰ را گرفته — پورت میزبان را عوض کنید:
+</div>
 
 ```powershell
-$env:APP_PORT = "8091"; docker compose up -d --build
-# یا در فایل .env کنار docker-compose.yml خط APP_PORT=8091 را اضافه کنید
+.\docker-up.ps1
 ```
 
-> مرحلهٔ `go build` داخل ایمیج کمی حافظه می‌خواهد (با `-p 1` و `GOMEMLIMIT` تنظیم شده تا روی
-> Docker Desktop معمولی جا شود). اگر باز هم با `rpc error: code = Unavailable ... EOF` مُرد،
-> یا حافظهٔ Docker Desktop را در Settings → Resources بالا ببرید (4GB کافی است)، یا از مسیر
-> «کامپایل روی هاست» پایین استفاده کنید که اصلاً `go build` داخل کانتینر ندارد.
+<div dir="rtl" align="right">
 
-### یک دستور — بدون هیچ ریسک بیلد (کامپایل روی هاست)
+### روی لینوکس / مک — یک دستور
 
-اگر Go روی سیستم نصب است، این مسیر باینری را روی هاست می‌سازد و `docker build` فقط یک کپیِ
-چندثانیه‌ای می‌شود (خطای حافظه/شبکه/BuildKit **غیرممکن**):
+</div>
 
-```powershell
-.\docker-up.ps1          # ویندوز
-```
 ```bash
-./docker-up.sh           # لینوکس / مک
+./docker-up.sh
 ```
 
-خودش `.env` (در صورت نبود)، انتخاب پورت آزاد، کامپایل، بیلد و بالا آوردن استک را انجام می‌دهد.
+<div dir="rtl" align="right">
 
-### روی سرور لینوکس (یک خط)
+خروجی هر دو اسکریپت: آدرس پنل‌ها + نام‌کاربری و رمز ادمین. هر دو idempotent‌اند — اجرای دوباره فقط rebuild و recreate می‌کند.
+
+### روی سرور لینوکس، بدون هیچ‌چیز از قبل نصب‌شده (یک خط)
+
+</div>
 
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)
 ```
 
-Docker و Go را نصب می‌کند، `.env` تصادفی می‌سازد، ایمیج را با کامپایل روی هاست می‌سازد،
-استک را بالا می‌آورد و دستور `dotinschool` را نصب می‌کند
-(`up | down | restart | logs | ps | rebuild | update | admin`).
+<div dir="rtl" align="right">
+
+Docker و Go را نصب می‌کند، `.env` تصادفی می‌سازد، ایمیج را با کامپایل روی هاست می‌سازد، استک را بالا می‌آورد و دستور `dotinschool` را نصب می‌کند (`up | down | restart | logs | ps | rebuild | update | admin`).
+
+### از ریشهٔ مخزن با compose خام
+
+اگر Docker از قبل روی سیستم هست، این مسیر هم جواب می‌دهد — یک ایمیج (فرانت + باینری Go داخل خودش) و یک کانتینر `dotinschool` می‌سازد، ابزار دیگری لازم نیست:
+
+</div>
+
+```bash
+docker compose up -d --build
+```
+
+<div dir="rtl" align="right">
+
+- پنل کاربر: <http://localhost:8080/> · پنل ادمین: `http://localhost:8080/<ADMIN_PATH>/`
+- رمز ادمین: اگر `.env` نساخته باشید، یک رمز تصادفی ساخته و در لاگ چاپ می‌شود (`docker compose logs app`). برای رمز ثابت: `cp .env.example .env` و `ADMIN_PASSWORD` را پر کنید.
+- داده‌ها در ولوم `./data` — SQLite تک‌فایل.
+- لاگ: `docker compose logs -f app` · توقف: `docker compose down` · به‌روزرسانی: دوباره `docker compose up -d --build`
+
+روی ویندوز، Docker Desktop معمولاً پورت ۸۰۸۰ را گرفته — پورت میزبان را عوض کنید:
+
+</div>
+
+```powershell
+$env:APP_PORT = "8091"; docker compose up -d --build
+# or add the line APP_PORT=8091 to the .env file next to docker-compose.yml
+```
+
+<div dir="rtl" align="right">
+
+> مرحلهٔ `go build` داخل ایمیج کمی حافظه می‌خواهد (با `-p 1` و `GOMEMLIMIT` تنظیم شده تا روی Docker Desktop معمولی جا شود). اگر باز هم با `rpc error: code = Unavailable ... EOF` مُرد، یا حافظهٔ Docker Desktop را در Settings → Resources بالا ببرید (4GB کافی است)، یا از `docker-up.ps1` / `docker-up.sh` بالا استفاده کنید که اصلاً `go build` داخل کانتینر ندارد.
 
 ### HTTPS خودکار با دامنه (Caddy)
 
+</div>
+
 ```bash
-# در .env مقدار DOMAIN=panel.example.com را ست کنید (رکورد A به IP سرور اشاره کند)
+# set DOMAIN=panel.example.com in .env (its DNS A record must point at this server)
 docker compose -f build/docker-compose.yml -f build/docker-compose.prod.yml up -d
 ```
+
+<div dir="rtl" align="right">
 
 Caddy گواهی Let's Encrypt را خودش می‌گیرد و تمدید می‌کند — بدون certbot، بدون downtime.
 
@@ -155,9 +200,13 @@ Caddy گواهی Let's Encrypt را خودش می‌گیرد و تمدید می�
 
 ## آرتیفکت‌های ریلیز (کراس‌کامپایل)
 
+</div>
+
 ```bash
-scripts/build.sh          # linux/amd64، linux/arm64، windows/amd64 → dist/
+scripts/build.sh          # linux/amd64, linux/arm64, windows/amd64 -> dist/
 ```
+
+<div dir="rtl" align="right">
 
 ---
 
@@ -182,23 +231,27 @@ scripts/build.sh          # linux/amd64، linux/arm64، windows/amd64 → dist/
 
 ## معماری
 
+</div>
+
 ```
-cmd/server/            بوت‌استرپ Gin + graceful shutdown
-cmd/seed/              اسکریپت دادهٔ دمو
-internal/config/       لود کانفیگ (env + .env + پیش‌فرض‌ها)
-internal/database/     init GORM/SQLite، AutoMigrate، seed پیش‌فرض
-internal/model/        Participant، Setting، ClientError، Challenge، AISettings
-internal/service/      Participant، Setting، Session، RateLimiter، OTP،
-                       SMSProvider (interface + ippanel)، AI (کلاینت OpenAI-compatible)، Scheduler
-internal/apperr/       شکل واحد خطای HTTP (status + code + پیام فارسی)
-internal/web/          روتر Gin، میدل‌ورها (security headers/CSP، admin auth،
-                       admin-host)، هندلرهای /api، سرو استاتیکِ embed‌شده
-web/                   سورس فرانت (Vue 3 + Vite + Ant Design Vue 4)
-web/assets/            خروجی بیلد فرانت (commit می‌شود؛ go:embed)
-scripts/               install.sh (bare-metal) · build.sh (کراس‌کامپایل) · docker-build.sh
-build/                 Dockerfile (پکیجینگ) · Dockerfile.hermetic · docker-compose*.yml · Caddyfile · docker-install.sh
-design-system/         خروجی اسکیل ui-ux-pro-max (MASTER.md + pages/admin.md)
+cmd/server/              Gin bootstrap + graceful shutdown
+cmd/seed/                demo data seed script
+internal/config/         config loading (env + .env + defaults)
+internal/database/       GORM/SQLite init, AutoMigrate, default seed
+internal/model/          Participant, Setting, ClientError, Challenge, AISettings
+internal/service/        Participant, Setting, Session, RateLimiter, OTP,
+                          SMSProvider (interface + ippanel), AI (OpenAI-compatible client), Scheduler
+internal/apperr/         unified HTTP error shape (status + code + Persian message)
+internal/web/            Gin router, middleware (security headers/CSP, admin auth,
+                          admin-host), /api handlers, embedded static file serving
+web/                      frontend source (Vue 3 + Vite + Ant Design Vue 4)
+web/assets/               built frontend output (committed; go:embed)
+scripts/                  install.sh (bare-metal), build.sh (cross-compile), docker-build.sh
+build/                    Dockerfile (packaging), Dockerfile.hermetic, docker-compose*.yml, Caddyfile, docker-install.sh
+design-system/            ui-ux-pro-max skill output (MASTER.md + pages/admin.md)
 ```
+
+<div dir="rtl" align="right">
 
 ### قرارداد API
 
@@ -243,3 +296,5 @@ design-system/         خروجی اسکیل ui-ux-pro-max (MASTER.md + pages/ad
 - **نشست ادمین** با توکن Bearer در حافظهٔ سرور نگه داشته می‌شود (همان قرارداد API نسخهٔ قبل). وابستگی `gin-contrib/sessions` در این نسخه استفاده نشده تا قرارداد API دست‌نخورده بماند.
 - **رندر PHP** حذف شده؛ به‌جای دو فایل HTML مجزا، یک SPA واحد است که سرور با تزریق `<meta name="dotin-mode">` (سازگار با CSP سخت‌گیرانه) مشخص می‌کند پنل کاربر است یا ادمین.
 - بررسی هدر بکاپ نسبت به نسخهٔ قبل اصلاح شده تا فایل‌های واقعی SQLite را رد نکند (بررسی `SQLite format 3`).
+
+</div>
