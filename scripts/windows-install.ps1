@@ -36,10 +36,27 @@ $ErrorActionPreference = 'Stop'
 try { Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force } catch {}
 
 function Say($m) { Write-Host "==> $m" -ForegroundColor Cyan }
-# `exit` would close the whole PowerShell window here, since this file runs
-# via `irm | iex` directly in the caller's own session rather than as a
-# separate process - `throw` stops the script but leaves the window open.
-function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; throw $m }
+function Warn($m) { Write-Host "[!] $m" -ForegroundColor Yellow }
+
+# Some launch paths (a desktop shortcut, "Win+R" -> powershell -Command "...",
+# a batch file) run this in a PowerShell window that closes itself the instant
+# the command ends - success OR failure - which was hiding every error behind
+# a window that vanished before it could be read. `throw` alone (as opposed to
+# `exit`) keeps the window open ONLY when this is `iex`'d into an already-
+# interactive session; it does nothing for a window with no prompt loop under
+# it. Pausing explicitly is the only thing that works in both cases.
+# Guarded by an env var so a failure inside docker-up.ps1 (which pauses in
+# its own Die() before rethrowing) doesn't prompt twice for the same error.
+function Wait-BeforeClose {
+  if ($env:DOTINSCHOOL_PAUSED_ONCE) { return }
+  $env:DOTINSCHOOL_PAUSED_ONCE = '1'
+  try { Write-Host ""; Read-Host "Press Enter to close this window" | Out-Null } catch {}
+}
+function Die($m) {
+  Write-Host "[x] $m" -ForegroundColor Red
+  Wait-BeforeClose
+  throw $m
+}
 
 $Branch     = 'main'
 $InstallDir = Join-Path $env:USERPROFILE 'dotinschool'
@@ -89,22 +106,85 @@ if (-not $git) {
   if (-not $git) { Die "Git was installed but could not be located. Open a new terminal and re-run this command." }
 }
 
-# ---- 2. fetch or update the source from GitHub ----
-Ensure-GhToken
-if (Test-Path (Join-Path $InstallDir '.git')) {
-  Say "updating existing checkout at $InstallDir"
-  & $git -C $InstallDir fetch --depth 1 origin $Branch
-  & $git -C $InstallDir reset --hard "origin/$Branch"
-} else {
-  $repoUrl = Get-RepoUrl $git
-  if (-not $env:DOTINSCHOOL_GH_TOKEN -and $repoUrl -notlike '*@github.com*') {
-    Die "No GitHub token found (`$env:DOTINSCHOOL_GH_TOKEN) - this will fail, the repo is private. See the header of this script."
-  }
-  Say "cloning dotinschool into $InstallDir"
-  & $git clone --depth 1 --branch $Branch $repoUrl $InstallDir
+# A file that can only exist once the working tree is actually fully checked
+# out - used below to tell a genuinely complete clone/update apart from one
+# that got cut short (slow/filtered connection, window closed mid-transfer,
+# etc.) and left a `.git` folder that LOOKS present but isn't usable.
+$MarkerFile = 'docker-up.ps1'
+
+function Checkout-Complete {
+  Test-Path (Join-Path $InstallDir $MarkerFile)
 }
-if ($LASTEXITCODE -ne 0) { Die "could not fetch the source from GitHub." }
+
+# ---- 2. fetch or update the source from GitHub, verified, with one retry ----
+# A `git fetch`/`reset --hard` that fails partway through does not always
+# exit non-zero in a way that stops the script here (e.g. against a `.git`
+# left behind by an earlier interrupted attempt) - so completeness is
+# verified explicitly afterwards rather than trusted from exit codes alone.
+Ensure-GhToken
+$attempt = 0
+$fetched = $false
+while (-not $fetched -and $attempt -lt 2) {
+  $attempt++
+  if (Test-Path (Join-Path $InstallDir '.git')) {
+    Say "updating existing checkout at $InstallDir (attempt $attempt)"
+    # Plain `&` (no stream redirection): in Windows PowerShell 5.1, `2>&1` on a
+    # native command wraps every stderr line (git writes its normal progress
+    # there) in a NativeCommandError and aborts the whole script under
+    # $ErrorActionPreference = 'Stop', even on a genuine exit code 0. Letting
+    # git's own stderr pass straight through to the console avoids that.
+    & $git -C $InstallDir fetch --depth 1 origin $Branch
+    $fetchOk = ($LASTEXITCODE -eq 0)
+    if ($fetchOk) {
+      & $git -C $InstallDir reset --hard "origin/$Branch"
+      $fetchOk = ($LASTEXITCODE -eq 0)
+    }
+  } else {
+    $repoUrl = Get-RepoUrl $git
+    if (-not $env:DOTINSCHOOL_GH_TOKEN -and $repoUrl -notlike '*@github.com*') {
+      Die "No GitHub token found (`$env:DOTINSCHOOL_GH_TOKEN) - this will fail, the repo is private. See the header of this script."
+    }
+    Say "cloning dotinschool into $InstallDir (attempt $attempt)"
+    & $git clone --depth 1 --branch $Branch $repoUrl $InstallDir
+    $fetchOk = ($LASTEXITCODE -eq 0)
+  }
+
+  if ($fetchOk -and (Checkout-Complete)) {
+    $fetched = $true
+  } else {
+    Warn "checkout looks incomplete or failed (this can happen on a slow or filtered connection)"
+    if ($attempt -lt 2) {
+      Warn "removing the partial checkout and retrying once more..."
+      if (Test-Path $InstallDir) { Remove-Item $InstallDir -Recurse -Force -ErrorAction SilentlyContinue }
+      Start-Sleep -Seconds 2
+    }
+  }
+}
+
+if (-not $fetched) {
+  Die @"
+Could not get a complete copy of the source from GitHub after $attempt attempt(s).
+This usually means the connection to GitHub is slow or blocked on this network. Two things to try:
+  1) Cloudflare WARP for Windows (free): install from https://1.1.1.1/, turn it on, then re-run this command.
+  2) Just re-run this command again in a few minutes - transient network issues are the most common cause.
+"@
+}
 
 # ---- 3. build + run via Docker ----
+# docker-up.ps1's own Die() throws rather than exits, so a failure there
+# propagates up as a terminating error instead of just setting $LASTEXITCODE -
+# caught here so this window still pauses instead of vanishing with it.
 Say "handing off to docker-up.ps1"
-& (Join-Path $InstallDir 'docker-up.ps1')
+$dockerUp = Join-Path $InstallDir 'docker-up.ps1'
+try {
+  & $dockerUp
+  if ($LASTEXITCODE -ne 0) { throw "docker-up.ps1 exited with code $LASTEXITCODE" }
+} catch {
+  Write-Host "[x] $($_.Exception.Message)" -ForegroundColor Red
+  Wait-BeforeClose
+  throw
+}
+# Success: docker-up.ps1 already printed the panel URL + admin credentials -
+# pause here too so a window that would otherwise close itself doesn't take
+# that information down with it before it's been read.
+Wait-BeforeClose

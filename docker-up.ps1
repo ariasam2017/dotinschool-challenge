@@ -30,7 +30,20 @@ function Warn($m) { Write-Host "[!] $m" -ForegroundColor Yellow }
 # and as `.\docker-up.ps1` typed directly at a prompt also does) rather than
 # launched as its own process - `throw` stops the script but leaves the
 # window open so the error above stays readable.
-function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; throw $m }
+#
+# That said, if THIS script itself is what a shortcut/Run-dialog launched
+# directly (no windows-install.ps1 wrapper catching the throw), the window
+# still closes the instant the process ends either way - so pause here too.
+# Guarded by an env var (not a script-scope flag) because this can be called
+# from this script directly OR after it's been invoked with `&` from
+# windows-install.ps1's own catch block - both share the same process, so this
+# still only prompts once instead of twice for the same failure.
+function Wait-BeforeClose {
+  if ($env:DOTINSCHOOL_PAUSED_ONCE) { return }
+  $env:DOTINSCHOOL_PAUSED_ONCE = '1'
+  try { Write-Host ""; Read-Host "Press Enter to close this window" | Out-Null } catch {}
+}
+function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; Wait-BeforeClose; throw $m }
 
 # ---- 1. Go: locate it, or install it from the official zip ----
 # No version is hardcoded: go.dev sometimes lists a release as stable in its
