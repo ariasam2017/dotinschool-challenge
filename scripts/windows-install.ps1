@@ -26,6 +26,15 @@
 
 $ErrorActionPreference = 'Stop'
 
+# This whole file runs via `irm | iex`, which evaluates it as text and isn't
+# subject to the script-file execution policy - but the moment it later
+# invokes docker-up.ps1 AS A FILE (below), that specific file load IS checked,
+# and fails on the still-common default (Restricted) with "cannot be loaded
+# because running scripts is disabled on this system". Loosen it for just
+# this process (no admin rights needed, does not touch the machine/user-wide
+# policy, reverts automatically when this PowerShell process exits).
+try { Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force } catch {}
+
 function Say($m) { Write-Host "==> $m" -ForegroundColor Cyan }
 function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; exit 1 }
 
