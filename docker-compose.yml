@@ -34,4 +34,12 @@ services:
         required: false
     volumes:
       - ./data:/app/data
+    # The pure-Go SQLite driver needs a syscall that OLDER Docker's default
+    # seccomp profile blocks - inside such a container it fails on startup with
+    # "unable to open database file: out of memory (14)" even with plenty of
+    # RAM free. Drops the seccomp sandbox for this one trusted container to the
+    # same posture as running the binary directly on the host. Newer Docker
+    # doesn't need it; harmless to keep set.
+    security_opt:
+      - seccomp=unconfined
     restart: unless-stopped

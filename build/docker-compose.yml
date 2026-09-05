@@ -31,7 +31,21 @@ services:
       - DATA_DIR=/app/data
       - DOTINSCHOOL_DOCKER=1
     env_file:
-      - ../.env
+      - path: ../.env
+        required: false
     volumes:
-      - ./data:/app/data
+      # ../data (one level up from this file), i.e. the project root's data/ —
+      # the same directory the installed CLI's chown targets. Was ./data, which
+      # resolves to build/data and left the two out of sync.
+      - ../data:/app/data
+    # The pure-Go SQLite driver needs a syscall that OLDER Docker's default
+    # seccomp profile blocks - inside such a container it fails on startup with
+    # "unable to open database file: out of memory (14)" even with plenty of
+    # RAM (the same binary run outside Docker on that same host is fine). This
+    # drops the seccomp sandbox for this one container down to the same posture
+    # as running the trusted binary directly on the host. A newer Docker
+    # (its default profile already allows the syscall) does not need it, but
+    # keeping it set is harmless there.
+    security_opt:
+      - seccomp=unconfined
     restart: unless-stopped
