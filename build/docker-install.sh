@@ -213,6 +213,16 @@ install_cli(){
 #!/usr/bin/env bash
 set -euo pipefail
 cd /opt/dotinschool
+# The app runs as a non-root user (uid 10001) inside the container, but
+# ../data:/app/data is a bind mount to a HOST directory - if Docker had to
+# auto-create that host directory the first time (e.g. the very first "up"
+# never got far enough to succeed, such as the port-8080-in-use failure this
+# was chasing), it creates it as root:root, and the container then crash-
+# loops forever with "unable to open database file" (SQLITE_CANTOPEN) since
+# uid 10001 can't write there. Idempotent, so safe to run on every
+# invocation, not just the first.
+mkdir -p data
+chown -R 10001:10001 data 2>/dev/null || true
 # --env-file .env (not relying on compose's own auto-discovery): compose
 # resolves ${APP_PORT:-8080} in build/docker-compose.yml relative to the
 # COMPOSE FILE's directory (build/), not this cd'd-to directory - so without
