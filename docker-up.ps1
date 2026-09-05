@@ -171,6 +171,34 @@ if (-not (Docker-Ready)) {
 }
 Say "Docker is ready"
 
+# ---- 2b. install the global "dotinschool" command (Windows counterpart of the
+# Linux Docker install's CLI wrapper) - a thin .cmd shim in
+# %LOCALAPPDATA%\Microsoft\WindowsApps (already on every user's PATH, no admin
+# rights, works in already-open shells too since only the PATH *variable* is
+# cached, not directory listings) that dispatches into this checkout's own
+# scripts\dotinschool-cli.ps1 - so it always runs the current version, no
+# separate re-install step after "dotinschool update".
+function Install-DotinschoolCli {
+  try {
+    $aliasDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'
+    if (-not (Test-Path $aliasDir)) { return }
+    $cliScript = Join-Path $InstallDir 'scripts\dotinschool-cli.ps1'
+    if (-not (Test-Path $cliScript)) { return }
+    $shimPath = Join-Path $aliasDir 'dotinschool.cmd'
+    $shimContent = "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"$cliScript`" %*`r`n"
+    $existing = if (Test-Path $shimPath) { Get-Content $shimPath -Raw } else { '' }
+    if ($existing -ne $shimContent) {
+      Set-Content -Path $shimPath -Value $shimContent -Encoding ascii -NoNewline
+      Say "installed the 'dotinschool' command (try: dotinschool)"
+    }
+  } catch {
+    # Never fail the whole run over this - it's a convenience, not a requirement.
+    Warn "could not install the 'dotinschool' command ($($_.Exception.Message)) - use .\docker-up.ps1 / .\update.ps1 directly instead"
+  }
+}
+$InstallDir = $PSScriptRoot
+Install-DotinschoolCli
+
 # ---- 3. .env (create on first run with a random admin password + secret path) ----
 if (-not (Test-Path .env)) {
   Say "creating .env (random admin password + secret admin path)"
@@ -241,3 +269,6 @@ Write-Host (" password   :  {0}" -f $cfg['ADMIN_PASSWORD']) -ForegroundColor Gre
 Write-Host "----------------------------------------------" -ForegroundColor Green
 Write-Host " logs : docker compose -f build/docker-compose.yml logs -f app"
 Write-Host " stop : docker compose -f build/docker-compose.yml down"
+if (Get-Command dotinschool -ErrorAction SilentlyContinue) {
+  Write-Host " menu : dotinschool          (also: up / down / restart / logs / ps / rebuild / update / admin)"
+}

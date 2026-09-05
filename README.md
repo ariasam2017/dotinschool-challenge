@@ -212,6 +212,17 @@ $s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Mar
 
 اگر سورس از قبل روی سیستم کلون شده، همان مسیر را با اجرای مستقیم `.\docker-up.ps1` از داخل پوشهٔ پروژه هم می‌شود تکرار کرد (بدون گرفتن نسخهٔ تازه از گیت‌هاب). اگر PowerShell با خطای «running scripts is disabled on this system» جواب داد (پیش‌فرضِ رایج ویندوز)، به‌جایش این را بزنید: `powershell -ExecutionPolicy Bypass -File .\docker-up.ps1`
 
+اولین بار که `docker-up.ps1` (یا `windows-install.ps1`) کامل اجرا شود، دستور سراسری **`dotinschool`** هم نصب می‌شود — دقیقاً معادل نسخهٔ لینوکسی Docker (بدون نیاز به دسترسی ادمین، در هر پنجرهٔ PowerShell/cmd باز یا جدیدی کار می‌کند):
+
+| دستور | کاربرد |
+|---|---|
+| `dotinschool` | منوی مدیریت تعاملی (به سبک x-ui) |
+| `dotinschool up` / `down` / `restart` | شروع / توقف / ری‌استارت استک |
+| `dotinschool logs` / `ps` | لاگ زنده / وضعیت کانتینر |
+| `dotinschool rebuild` | کامپایل مجدد + ساخت ایمیج + بازسازی (بدون گرفتن نسخهٔ جدید از گیت‌هاب) |
+| `dotinschool update` | گرفتن آخرین نسخه از گیت‌هاب + کامپایل مجدد + ری‌استارت |
+| `dotinschool admin` | نمایش آدرس پنل + نام‌کاربری/رمز ادمین |
+
 ### روی لینوکس / مک، از داخل سورس کلون‌شده
 
 </div>
