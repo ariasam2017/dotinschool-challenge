@@ -209,7 +209,19 @@ build_image(){
 }
 
 install_cli(){
-  cat > "$CLI_PATH" <<'WRAP'
+  # Written to a temp file and moved into place (atomic rename), NEVER
+  # truncated in place - install_cli() can run from INSIDE an already-running
+  # /usr/local/bin/dotinschool process (its own "update" action calls this
+  # script with --reinstall-cli), and `cat > "$CLI_PATH"` truncating that
+  # exact file WHILE it's still executing corrupts the running interpreter's
+  # read of it ("unexpected EOF" mid-run, an in-place-self-overwrite hazard,
+  # not something specific to this script). A rename swaps the directory
+  # entry to a new inode - the still-open old one stays intact and fully
+  # readable for whatever's still running from it.
+  # Same directory as $CLI_PATH (not the default /tmp, which can be a
+  # different filesystem) - mv is only atomic within one filesystem.
+  local tmp; tmp=$(mktemp "$(dirname "$CLI_PATH")/.dotinschool.XXXXXX")
+  cat > "$tmp" <<'WRAP'
 #!/usr/bin/env bash
 set -euo pipefail
 cd /opt/dotinschool
@@ -328,7 +340,8 @@ show_menu(){
 
 if [[ $# -eq 0 ]]; then show_menu; else run_action "$1"; fi
 WRAP
-  chmod +x "$CLI_PATH"
+  chmod +x "$tmp"
+  mv "$tmp" "$CLI_PATH"
   ok "\"dotinschool\" command installed."
 }
 
