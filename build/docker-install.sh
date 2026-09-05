@@ -20,7 +20,8 @@
 # then package it — never an in-container `go build`), brings the stack up,
 # and installs a wrapper command:
 #
-#   dotinschool up | down | restart | logs | update | admin | ps | rebuild
+#   dotinschool                 interactive menu (includes "find a free port")
+#   dotinschool up | down | restart | logs | update | admin | ps | rebuild | port
 # =============================================================================
 set -euo pipefail
 
@@ -134,6 +135,17 @@ install_go(){
 random_password(){ openssl rand -base64 18 | tr -dc 'A-Za-z0-9' | head -c 20; }
 random_admin_path(){ echo "panel-$(openssl rand -hex 6)"; }
 
+# A server already running something else (a VPN/proxy panel, another app...)
+# may well have 8080 taken - this used to hardcode it anyway, which is exactly
+# what caused "failed to bind host port 0.0.0.0:8080/tcp: address already in
+# use" on a server with 3x-ui or similar already installed.
+port_in_use(){ (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && { exec 3<&- 2>/dev/null; exec 3>&- 2>/dev/null; return 0; }; return 1; }
+find_free_port(){
+  local port="${1:-8080}" tries=0
+  while port_in_use "$port"; do port=$((port+1)); tries=$((tries+1)); [[ $tries -lt 100 ]] || { echo "$1"; return; }; done
+  echo "$port"
+}
+
 fetch_repo(){
   if [[ -d "$INSTALL_DIR/.git" ]]; then
     git_nc -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null
@@ -168,8 +180,10 @@ fetch_repo(){
 write_env(){
   local env="${INSTALL_DIR}/.env"
   [[ -f "$env" ]] && { ok ".env already exists — left untouched."; return; }
+  local port; port=$(find_free_port 8080)
+  [[ "$port" == "8080" ]] || warn "Port 8080 is already in use on this server — using ${port} instead."
   cat > "$env" <<EOF
-APP_PORT=8080
+APP_PORT=${port}
 DOMAIN=
 ADMIN_USERNAME=administrator
 ADMIN_PASSWORD=$(random_password)
@@ -200,25 +214,92 @@ install_cli(){
 set -euo pipefail
 cd /opt/dotinschool
 C=(docker compose -f build/docker-compose.yml)
-case "${1:-}" in
-  up)      "${C[@]}" up -d ;;
-  down)    "${C[@]}" down ;;
-  restart) "${C[@]}" restart ;;
-  logs)    "${C[@]}" logs -f app ;;
-  ps)      "${C[@]}" ps ;;
-  rebuild) PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" && "${C[@]}" up -d ;;
-  update)  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git fetch --depth 1 origin main \
-             && GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git reset --hard origin/main \
-             && PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
-             && "${C[@]}" up -d ;;
-  admin)
-    e=.env
-    echo "Admin panel:  http://<server-ip>:$(grep -E '^APP_PORT=' $e | cut -d= -f2)/$(grep -E '^ADMIN_PATH=' $e | cut -d= -f2)/"
-    echo "Username:     $(grep -E '^ADMIN_USERNAME=' $e | cut -d= -f2)"
-    echo "Password:     $(grep -E '^ADMIN_PASSWORD=' $e | cut -d= -f2)"
-    ;;
-  *) echo "usage: dotinschool {up|down|restart|logs|ps|rebuild|update|admin}"; exit 1 ;;
-esac
+
+port_in_use(){ (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && { exec 3<&- 2>/dev/null; exec 3>&- 2>/dev/null; return 0; }; return 1; }
+find_free_port(){
+  local port="${1:-8080}" tries=0
+  while port_in_use "$port"; do port=$((port+1)); tries=$((tries+1)); [[ $tries -lt 100 ]] || { echo ""; return 1; }; done
+  echo "$port"
+}
+show_ports(){
+  echo "Ports currently listening on this server:"
+  (ss -tulpn 2>/dev/null || netstat -tulpn 2>/dev/null) | awk 'NR==1 || /LISTEN|udp/'
+  echo
+  local cur; cur=$(grep -E '^APP_PORT=' .env 2>/dev/null | cut -d= -f2)
+  echo "dotinschool is currently using port: ${cur:-unknown}"
+  local suggestion; suggestion=$(find_free_port 8080)
+  if [[ -n "$suggestion" ]]; then
+    echo "First free port found (from 8080 up): $suggestion"
+  else
+    echo "Could not find a free port in the 8080-8179 range."
+    return
+  fi
+  if [[ -t 0 && "$suggestion" != "$cur" ]]; then
+    read -rp "Set APP_PORT to $suggestion and restart now? [y/N] " ans
+    if [[ "$ans" == "y" || "$ans" == "Y" ]]; then
+      sed -i "s|^APP_PORT=.*|APP_PORT=${suggestion}|" .env
+      "${C[@]}" up -d
+      echo "APP_PORT set to $suggestion - restarted."
+    fi
+  fi
+}
+
+run_action(){
+  case "$1" in
+    up)      "${C[@]}" up -d ;;
+    down)    "${C[@]}" down ;;
+    restart) "${C[@]}" restart ;;
+    logs)    "${C[@]}" logs -f app ;;
+    ps)      "${C[@]}" ps ;;
+    port)    show_ports ;;
+    rebuild) PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" && "${C[@]}" up -d ;;
+    update)  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git fetch --depth 1 origin main \
+               && GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git reset --hard origin/main \
+               && PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
+               && "${C[@]}" up -d ;;
+    admin)
+      e=.env
+      echo "Admin panel:  http://<server-ip>:$(grep -E '^APP_PORT=' $e | cut -d= -f2)/$(grep -E '^ADMIN_PATH=' $e | cut -d= -f2)/"
+      echo "Username:     $(grep -E '^ADMIN_USERNAME=' $e | cut -d= -f2)"
+      echo "Password:     $(grep -E '^ADMIN_PASSWORD=' $e | cut -d= -f2)"
+      ;;
+    *) echo "usage: dotinschool {up|down|restart|logs|ps|port|rebuild|update|admin}"; exit 1 ;;
+  esac
+}
+
+show_menu(){
+  echo
+  echo "+----------------------------------------+"
+  echo "|          dotinschool - management        |"
+  echo "+----------------------------------------+"
+  echo "|  0. Exit                                |"
+  echo "|  1. Start (up)                          |"
+  echo "|  2. Stop (down)                         |"
+  echo "|  3. Restart                             |"
+  echo "|  4. Rebuild (recompile + recreate)      |"
+  echo "|  5. Update (pull latest + rebuild)      |"
+  echo "|  6. Show logs                           |"
+  echo "|  7. Show container status               |"
+  echo "|  8. Find a free port                    |"
+  echo "|  9. Show admin URL + credentials        |"
+  echo "+----------------------------------------+"
+  read -rp "Choice [0-9]: " choice
+  case "$choice" in
+    0) return ;;
+    1) run_action up ;;
+    2) run_action down ;;
+    3) run_action restart ;;
+    4) run_action rebuild ;;
+    5) run_action update ;;
+    6) run_action logs ;;
+    7) run_action ps ;;
+    8) run_action port ;;
+    9) run_action admin ;;
+    *) echo "Enter a number from 0 to 9." ;;
+  esac
+}
+
+if [[ $# -eq 0 ]]; then show_menu; else run_action "$1"; fi
 WRAP
   chmod +x "$CLI_PATH"
   ok "\"dotinschool\" command installed."
