@@ -38,13 +38,21 @@ die(){ echo -e "${RED}[x]${NC} $*" >&2; exit 1; }
 
 require_root(){ [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run as root (sudo)."; }
 
+# Some hosts have a global/system git config with a "url.insteadOf" rewrite
+# (a common convenience for people who normally use SSH keys with GitHub) that
+# silently turns "https://TOKEN@github.com/..." into "git@github.com:...",
+# which then fails with "Permission denied (publickey)" since this uses a
+# token over HTTPS, not an SSH key. Bypass ANY such rewrite for git calls that
+# touch GitHub, rather than trying to detect or explain the specific rule.
+git_nc(){ GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git "$@"; }
+
 # The repo is private: prefer an explicitly-passed token, otherwise reuse the
 # one already embedded in the existing clone's git remote (set on first
 # install). Never echo the URL built from this — it carries the token.
 gh_token(){
   if [[ -n "${DOTINSCHOOL_GH_TOKEN:-}" ]]; then echo "$DOTINSCHOOL_GH_TOKEN"; return; fi
   if [[ -d "$INSTALL_DIR/.git" ]]; then
-    git -C "$INSTALL_DIR" remote get-url origin 2>/dev/null | sed -n 's#https://\([^@]*\)@github\.com/.*#\1#p'
+    git_nc -C "$INSTALL_DIR" remote get-url origin 2>/dev/null | sed -n 's#https://\([^@]*\)@github\.com/.*#\1#p'
   fi
 }
 
@@ -128,8 +136,8 @@ random_admin_path(){ echo "panel-$(openssl rand -hex 6)"; }
 
 fetch_repo(){
   if [[ -d "$INSTALL_DIR/.git" ]]; then
-    git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null
-    git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}" >/dev/null
+    git_nc -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null
+    git_nc -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}" >/dev/null
     ok "Source ready at ${INSTALL_DIR}."
     return
   fi
@@ -141,10 +149,10 @@ fetch_repo(){
     self_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd) || self_dir=""
   fi
   if [[ -n "$self_dir" && -d "$self_dir/.git" ]]; then
-    local origin; origin=$(git -C "$self_dir" remote get-url origin 2>/dev/null)
+    local origin; origin=$(git_nc -C "$self_dir" remote get-url origin 2>/dev/null)
     if [[ "$origin" == *"github.com/ariasam2017/dotinschool"* ]]; then
-      git clone --depth 1 --branch "$BRANCH" "$self_dir" "$INSTALL_DIR" >/dev/null
-      git -C "$INSTALL_DIR" remote set-url origin "$origin"
+      git_nc clone --depth 1 --branch "$BRANCH" "$self_dir" "$INSTALL_DIR" >/dev/null
+      git_nc -C "$INSTALL_DIR" remote set-url origin "$origin"
       ok "Source ready at ${INSTALL_DIR}."
       return
     fi
@@ -153,7 +161,7 @@ fetch_repo(){
   local url; url=$(repo_url)
   [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
   rm -rf "$INSTALL_DIR"
-  git clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null
+  git_nc clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null
   ok "Source ready at ${INSTALL_DIR}."
 }
 
@@ -199,7 +207,8 @@ case "${1:-}" in
   logs)    "${C[@]}" logs -f app ;;
   ps)      "${C[@]}" ps ;;
   rebuild) PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" && "${C[@]}" up -d ;;
-  update)  git fetch --depth 1 origin main && git reset --hard origin/main \
+  update)  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git fetch --depth 1 origin main \
+             && GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git reset --hard origin/main \
              && PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
              && "${C[@]}" up -d ;;
   admin)

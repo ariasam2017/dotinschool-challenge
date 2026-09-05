@@ -74,13 +74,21 @@ box_item(){ box_line "${1}.  ${2}" "${GREEN}${1}.${NC}  ${2}"; }
 
 require_root(){ [[ ${EUID:-$(id -u)} -eq 0 ]] || die "This script must be run as root (sudo bash install.sh)."; }
 
+# Some hosts have a global/system git config with a "url.insteadOf" rewrite
+# (a common convenience for people who normally use SSH keys with GitHub) that
+# silently turns "https://TOKEN@github.com/..." into "git@github.com:...",
+# which then fails with "Permission denied (publickey)" since this uses a
+# token over HTTPS, not an SSH key. Bypass ANY such rewrite for git calls that
+# touch GitHub, rather than trying to detect or explain the specific rule.
+git_nc(){ GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git "$@"; }
+
 # The repo is private: prefer an explicitly-passed token, otherwise reuse the
 # one already embedded in the existing clone's git remote (set on first
 # install). Never echo the URL built from this — it carries the token.
 gh_token(){
   if [[ -n "${DOTINSCHOOL_GH_TOKEN:-}" ]]; then echo "$DOTINSCHOOL_GH_TOKEN"; return; fi
   if [[ -d "$INSTALL_DIR/.git" ]]; then
-    git -C "$INSTALL_DIR" remote get-url origin 2>/dev/null | sed -n 's#https://\([^@]*\)@github\.com/.*#\1#p'
+    git_nc -C "$INSTALL_DIR" remote get-url origin 2>/dev/null | sed -n 's#https://\([^@]*\)@github\.com/.*#\1#p'
   fi
 }
 
@@ -192,8 +200,8 @@ github_unreachable_hint(){
 fetch_app(){
   if [[ -d "$INSTALL_DIR/.git" ]]; then
     info "Updating source from GitHub (${BRANCH})..."
-    git -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null || { github_unreachable_hint; exit 1; }
-    git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}" >/dev/null
+    git_nc -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null || { github_unreachable_hint; exit 1; }
+    git_nc -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}" >/dev/null
     ok "Source ready at ${INSTALL_DIR}."
     return
   fi
@@ -208,11 +216,11 @@ fetch_app(){
     self_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd) || self_dir=""
   fi
   if [[ -n "$self_dir" && -d "$self_dir/.git" ]]; then
-    local origin; origin=$(git -C "$self_dir" remote get-url origin 2>/dev/null)
+    local origin; origin=$(git_nc -C "$self_dir" remote get-url origin 2>/dev/null)
     if [[ "$origin" == *"github.com/ariasam2017/dotinschool"* ]]; then
       info "Reusing the local checkout at ${self_dir}..."
-      git clone --depth 1 --branch "$BRANCH" "$self_dir" "$INSTALL_DIR" >/dev/null
-      git -C "$INSTALL_DIR" remote set-url origin "$origin"
+      git_nc clone --depth 1 --branch "$BRANCH" "$self_dir" "$INSTALL_DIR" >/dev/null
+      git_nc -C "$INSTALL_DIR" remote set-url origin "$origin"
       ok "Source ready at ${INSTALL_DIR}."
       return
     fi
@@ -222,7 +230,7 @@ fetch_app(){
   local url; url=$(repo_url)
   [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
   rm -rf "$INSTALL_DIR"
-  git clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null || { github_unreachable_hint; exit 1; }
+  git_nc clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null || { github_unreachable_hint; exit 1; }
   ok "Source ready at ${INSTALL_DIR}."
 }
 
