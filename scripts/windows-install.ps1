@@ -61,6 +61,40 @@ function Die($m) {
 $Branch     = 'main'
 $InstallDir = Join-Path $env:USERPROFILE 'dotinschool'
 
+# On some machines, plain `& git.exe ...` does NOT block the way it normally
+# does - git spins up in its own separate console window and this script
+# races ahead to the next step (checking the checkout, or even starting a
+# SECOND git call) before that window's clone/fetch has actually finished.
+# That produces two symptoms seen together in practice: this script gives up
+# ("could not get a complete copy") while the OTHER window is still visibly
+# transferring, and a second concurrent git call against the same folder
+# fails with "Unable to create '.git/shallow.lock': File exists." (a second
+# process colliding with the first one still running).
+#
+# Start-Process -NoNewWindow -Wait is the actual fix, not a workaround: it
+# forces the child process to share this console (no window of its own) and
+# guarantees this script does not continue until it has genuinely exited.
+function Invoke-Git {
+  param([Parameter(Mandatory)][string[]]$GitArgs)
+  $p = Start-Process -FilePath $git -ArgumentList $GitArgs -NoNewWindow -Wait -PassThru
+  return $p.ExitCode
+}
+
+# Clears a lock file left behind by an earlier git process that either got
+# interrupted mid-operation or - see above - was still running when this
+# script wrongly moved on without it. Safe to remove now that Invoke-Git
+# guarantees this script's OWN git calls never overlap with each other.
+function Clear-StaleGitLocks {
+  param([string]$Dir)
+  foreach ($name in @('index.lock', 'shallow.lock', 'HEAD.lock', 'config.lock')) {
+    $p = Join-Path $Dir (Join-Path '.git' $name)
+    if (Test-Path $p) {
+      Warn "removing a leftover git lock file from an earlier attempt: $name"
+      Remove-Item $p -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
 # Prompts once (hidden input), if nothing else already supplies a token.
 function Ensure-GhToken {
   if ($env:DOTINSCHOOL_GH_TOKEN) { return }
@@ -74,7 +108,7 @@ function Ensure-GhToken {
 # Prefer an explicitly-passed token, otherwise reuse the one already embedded
 # in the existing clone's git remote (set on first install). Never print the
 # URL built from this - it carries the token.
-function Get-RepoUrl($git) {
+function Get-RepoUrl {
   if (Test-Path (Join-Path $InstallDir '.git')) {
     $existing = & $git -C $InstallDir remote get-url origin 2>$null
     if ($existing -match '^https://([^@]+)@github\.com/') { return $existing }
@@ -108,62 +142,56 @@ if (-not $git) {
 
 # A file that can only exist once the working tree is actually fully checked
 # out - used below to tell a genuinely complete clone/update apart from one
-# that got cut short (slow/filtered connection, window closed mid-transfer,
-# etc.) and left a `.git` folder that LOOKS present but isn't usable.
+# that got cut short and left a `.git` folder that LOOKS present but isn't
+# usable.
 $MarkerFile = 'docker-up.ps1'
 
 function Checkout-Complete {
   Test-Path (Join-Path $InstallDir $MarkerFile)
 }
 
-# ---- 2. fetch or update the source from GitHub, verified, with one retry ----
+# ---- 2. fetch or update the source from GitHub, verified, with retries ----
 # A `git fetch`/`reset --hard` that fails partway through does not always
 # exit non-zero in a way that stops the script here (e.g. against a `.git`
 # left behind by an earlier interrupted attempt) - so completeness is
 # verified explicitly afterwards rather than trusted from exit codes alone.
 Ensure-GhToken
+$maxAttempts = 3
 $attempt = 0
 $fetched = $false
-while (-not $fetched -and $attempt -lt 2) {
+while (-not $fetched -and $attempt -lt $maxAttempts) {
   $attempt++
   if (Test-Path (Join-Path $InstallDir '.git')) {
-    Say "updating existing checkout at $InstallDir (attempt $attempt)"
-    # Plain `&` (no stream redirection): in Windows PowerShell 5.1, `2>&1` on a
-    # native command wraps every stderr line (git writes its normal progress
-    # there) in a NativeCommandError and aborts the whole script under
-    # $ErrorActionPreference = 'Stop', even on a genuine exit code 0. Letting
-    # git's own stderr pass straight through to the console avoids that.
-    & $git -C $InstallDir fetch --depth 1 origin $Branch
-    $fetchOk = ($LASTEXITCODE -eq 0)
+    Clear-StaleGitLocks $InstallDir
+    Say "updating existing checkout at $InstallDir (attempt $attempt of $maxAttempts)"
+    $fetchOk = ((Invoke-Git -GitArgs @('-C', $InstallDir, 'fetch', '--depth', '1', 'origin', $Branch)) -eq 0)
     if ($fetchOk) {
-      & $git -C $InstallDir reset --hard "origin/$Branch"
-      $fetchOk = ($LASTEXITCODE -eq 0)
+      $fetchOk = ((Invoke-Git -GitArgs @('-C', $InstallDir, 'reset', '--hard', "origin/$Branch")) -eq 0)
     }
   } else {
-    $repoUrl = Get-RepoUrl $git
+    $repoUrl = Get-RepoUrl
     if (-not $env:DOTINSCHOOL_GH_TOKEN -and $repoUrl -notlike '*@github.com*') {
       Die "No GitHub token found (`$env:DOTINSCHOOL_GH_TOKEN) - this will fail, the repo is private. See the header of this script."
     }
-    Say "cloning dotinschool into $InstallDir (attempt $attempt)"
-    & $git clone --depth 1 --branch $Branch $repoUrl $InstallDir
-    $fetchOk = ($LASTEXITCODE -eq 0)
+    Say "cloning dotinschool into $InstallDir (attempt $attempt of $maxAttempts)"
+    $fetchOk = ((Invoke-Git -GitArgs @('clone', '--depth', '1', '--branch', $Branch, $repoUrl, $InstallDir)) -eq 0)
   }
 
   if ($fetchOk -and (Checkout-Complete)) {
     $fetched = $true
   } else {
     Warn "checkout looks incomplete or failed (this can happen on a slow or filtered connection)"
-    if ($attempt -lt 2) {
-      Warn "removing the partial checkout and retrying once more..."
+    if ($attempt -lt $maxAttempts) {
+      Warn "removing the partial checkout and retrying..."
       if (Test-Path $InstallDir) { Remove-Item $InstallDir -Recurse -Force -ErrorAction SilentlyContinue }
-      Start-Sleep -Seconds 2
+      Start-Sleep -Seconds 3
     }
   }
 }
 
 if (-not $fetched) {
   Die @"
-Could not get a complete copy of the source from GitHub after $attempt attempt(s).
+Could not get a complete copy of the source from GitHub after $maxAttempts attempts.
 This usually means the connection to GitHub is slow or blocked on this network. Two things to try:
   1) Cloudflare WARP for Windows (free): install from https://1.1.1.1/, turn it on, then re-run this command.
   2) Just re-run this command again in a few minutes - transient network issues are the most common cause.
