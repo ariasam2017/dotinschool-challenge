@@ -20,8 +20,10 @@
 # then package it — never an in-container `go build`), brings the stack up,
 # and installs a wrapper command:
 #
-#   dotinschool                 interactive menu (includes "find a free port")
+#   dotinschool                 interactive menu (free-port finder, HTTPS cert, ...)
 #   dotinschool up | down | restart | logs | update | admin | ps | rebuild | port
+#   dotinschool cert <domain>   get + auto-renew an HTTPS cert (Caddy/Let's Encrypt)
+#   dotinschool cert off        turn HTTPS back off (plain HTTP on APP_PORT)
 # =============================================================================
 set -euo pipefail
 
@@ -242,7 +244,17 @@ chown -R 10001:10001 data 2>/dev/null || true
 # back to the literal default 8080, no matter what .env actually says. This
 # is exactly what made the "port" menu option (below) look like it worked
 # (it wrote the new port to .env and said so) while docker still bound 8080.
-C=(docker compose --env-file .env -f build/docker-compose.yml)
+# When DOMAIN is set in .env, every action needs the prod override too (it
+# adds the Caddy container that terminates HTTPS) - otherwise a plain
+# "restart" would quietly drop back to HTTP-only and stop Caddy.
+COMPOSE_FILES=(-f build/docker-compose.yml)
+if grep -qE '^DOMAIN=[^[:space:]]' .env 2>/dev/null; then
+  COMPOSE_FILES+=(-f build/docker-compose.prod.yml)
+fi
+C=(docker compose --env-file .env "${COMPOSE_FILES[@]}")
+
+has_domain(){ grep -qE '^DOMAIN=[^[:space:]]' .env 2>/dev/null; }
+get_domain(){ grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2-; }
 
 port_in_use(){ (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && { exec 3<&- 2>/dev/null; exec 3>&- 2>/dev/null; return 0; }; return 1; }
 find_free_port(){
@@ -279,14 +291,47 @@ server_ip(){
   echo "${ip:-<this-server-IP>}"
 }
 
+# Point a domain's DNS A record at this server first, then: dotinschool cert
+# <domain>. Writes DOMAIN into .env and brings the stack up with the Caddy
+# override - Caddy then fetches and auto-renews a Let's Encrypt certificate
+# on its own, no certbot/acme.sh. "dotinschool cert off" reverts to plain
+# HTTP on APP_PORT.
+do_cert(){
+  local domain="${1:-}"
+  if [[ "$domain" == "off" ]]; then
+    if grep -qE '^DOMAIN=' .env; then sed -i 's|^DOMAIN=.*|DOMAIN=|' .env; fi
+    echo "HTTPS disabled - back to plain HTTP on APP_PORT."
+    docker compose --env-file .env -f build/docker-compose.yml up -d --remove-orphans
+    return
+  fi
+  if [[ -z "$domain" && -t 0 ]]; then
+    read -rp "Domain (its DNS A record must already point at this server), e.g. panel.example.com: " domain
+  fi
+  [[ -n "$domain" ]] || { echo "No domain given."; return 1; }
+  local blocked=0 p
+  for p in 80 443; do
+    if port_in_use "$p"; then echo "Port $p is already in use (another web server / panel?). Free it first."; blocked=1; fi
+  done
+  [[ $blocked -eq 0 ]] || return 1
+  if grep -qE '^DOMAIN=' .env; then sed -i "s|^DOMAIN=.*|DOMAIN=${domain}|" .env; else echo "DOMAIN=${domain}" >> .env; fi
+  echo "Bringing up with Caddy (automatic HTTPS via Let's Encrypt)..."
+  docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.prod.yml up -d
+  local apath; apath=$(grep -E '^ADMIN_PATH=' .env | cut -d= -f2-)
+  echo
+  echo "Done. Caddy fetches the certificate on the first HTTPS request (~30s)."
+  echo "  panel : https://${domain}/${apath}/"
+  echo "  logs  : dotinschool logs   (Caddy prints the cert issuance there)"
+}
+
 run_action(){
   case "$1" in
     up)      "${C[@]}" up -d ;;
     down)    "${C[@]}" down ;;
     restart) "${C[@]}" restart ;;
-    logs)    "${C[@]}" logs -f app ;;
+    logs)    "${C[@]}" logs -f ;;
     ps)      "${C[@]}" ps ;;
     port)    show_ports ;;
+    cert)    do_cert "${2:-}" ;;
     rebuild) PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" && "${C[@]}" up -d ;;
     update)  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git fetch --depth 1 origin main \
                && GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git reset --hard origin/main \
@@ -295,34 +340,40 @@ run_action(){
                && "${C[@]}" up -d ;;
     admin)
       e=.env
-      ip=$(server_ip)
-      port=$(grep -E '^APP_PORT=' $e | cut -d= -f2)
-      echo "User panel:   http://${ip}:${port}/"
-      echo "Admin panel:  http://${ip}:${port}/$(grep -E '^ADMIN_PATH=' $e | cut -d= -f2)/"
-      echo "Username:     $(grep -E '^ADMIN_USERNAME=' $e | cut -d= -f2)"
-      echo "Password:     $(grep -E '^ADMIN_PASSWORD=' $e | cut -d= -f2)"
+      apath=$(grep -E '^ADMIN_PATH=' $e | cut -d= -f2-)
+      if has_domain; then
+        base="https://$(get_domain)"
+      else
+        base="http://$(server_ip):$(grep -E '^APP_PORT=' $e | cut -d= -f2-)"
+      fi
+      echo "User panel:   ${base}/"
+      echo "Admin panel:  ${base}/${apath}/"
+      echo "Username:     $(grep -E '^ADMIN_USERNAME=' $e | cut -d= -f2-)"
+      echo "Password:     $(grep -E '^ADMIN_PASSWORD=' $e | cut -d= -f2-)"
       ;;
-    *) echo "usage: dotinschool {up|down|restart|logs|ps|port|rebuild|update|admin}"; exit 1 ;;
+    *) echo "usage: dotinschool {up|down|restart|logs|ps|port|cert|rebuild|update|admin}"; exit 1 ;;
   esac
 }
 
 show_menu(){
   echo
-  echo "+----------------------------------------+"
-  echo "|          dotinschool - management        |"
-  echo "+----------------------------------------+"
-  echo "|  0. Exit                                |"
-  echo "|  1. Start (up)                          |"
-  echo "|  2. Stop (down)                         |"
-  echo "|  3. Restart                             |"
-  echo "|  4. Rebuild (recompile + recreate)      |"
-  echo "|  5. Update (pull latest + rebuild)      |"
-  echo "|  6. Show logs                           |"
-  echo "|  7. Show container status               |"
-  echo "|  8. Find a free port                    |"
-  echo "|  9. Show admin URL + credentials        |"
-  echo "+----------------------------------------+"
-  read -rp "Choice [0-9]: " choice
+  echo "+-------------------------------------------------+"
+  echo "|             dotinschool - management             |"
+  echo "+-------------------------------------------------+"
+  echo "|   0. Exit                                        |"
+  echo "|   1. Start (up)                                  |"
+  echo "|   2. Stop (down)                                 |"
+  echo "|   3. Restart                                     |"
+  echo "|   4. Rebuild (recompile + recreate)              |"
+  echo "|   5. Update (pull latest + rebuild)             |"
+  echo "|   6. Show logs                                   |"
+  echo "|   7. Show container status                       |"
+  echo "|   8. Find a free port                            |"
+  echo "|   9. Show admin URL + credentials                |"
+  echo "|  10. Get HTTPS certificate (needs a domain)      |"
+  echo "|  11. Disable HTTPS (back to plain HTTP)          |"
+  echo "+-------------------------------------------------+"
+  read -rp "Choice [0-11]: " choice
   case "$choice" in
     0) return ;;
     1) run_action up ;;
@@ -334,7 +385,9 @@ show_menu(){
     7) run_action ps ;;
     8) run_action port ;;
     9) run_action admin ;;
-    *) echo "Enter a number from 0 to 9." ;;
+    10) do_cert "" ;;
+    11) do_cert off ;;
+    *) echo "Enter a number from 0 to 11." ;;
   esac
 }
 
@@ -362,8 +415,7 @@ main(){
   echo
   ( cd "$INSTALL_DIR" && "$CLI_PATH" admin )
   echo
-  warn "For HTTPS with a domain: set DOMAIN in ${INSTALL_DIR}/.env and run:"
-  echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.prod.yml up -d"
+  warn "For HTTPS: point a domain's DNS A record at this server, then run:  dotinschool cert <domain>"
 }
 # Lets the installed CLI's own "update" action refresh /usr/local/bin/
 # dotinschool from whatever this file's install_cli() currently contains,
