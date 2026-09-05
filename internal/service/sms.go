@@ -3,7 +3,6 @@ package service
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/dotinschool/dotinschool/internal/config"
+	"github.com/dotinschool/dotinschool/internal/model"
 )
 
 // SMSProvider sends a pattern (template) SMS. The registration/login OTP and the
@@ -23,6 +23,9 @@ type SMSProvider interface {
 	// upstream status/body so a misconfigured pattern, line, or credit is
 	// actually visible.
 	Verbose(phone, patternCode string, params map[string]string) SMSResult
+	// Info reports the *currently effective* configuration (panel settings take
+	// priority per-field over the .env fallback) — always fresh, never cached,
+	// so a panel edit takes effect immediately with no restart.
 	Info() SMSInfo
 }
 
@@ -35,7 +38,7 @@ type SMSResult struct {
 	RawBody  string `json:"rawBody"`
 }
 
-// SMSInfo is the non-secret provider configuration, for the admin panel.
+// SMSInfo is the non-secret effective configuration, for the admin panel.
 type SMSInfo struct {
 	Configured      bool   `json:"configured"`
 	Provider        string `json:"provider"`
@@ -46,35 +49,67 @@ type SMSInfo struct {
 	AdminPattern    string `json:"adminPattern"`
 	AdminPhone      string `json:"adminPhone"`
 	AuthScheme      string `json:"authScheme"`
+	Source          string `json:"source"` // "panel" | "env" | ""
 }
 
 // ---- ippanel implementation -------------------------------------------
 
 type ippanelProvider struct {
-	cfg      *config.Config
-	apiKey   string
-	sender   string
-	endpoint string
-	// authScheme: "" (raw key), "AccessKey", "apikey", "Bearer"
-	authScheme string
-	client     *http.Client
-	log        *logrus.Logger
+	cfg      *config.Config  // env fallback, per field
+	settings *SettingService // panel override (DB + self-healing sidecar)
+	client   *http.Client
+	log      *logrus.Logger
 }
 
-func newIppanelProvider(cfg *config.Config, log *logrus.Logger) *ippanelProvider {
-	endpoint := cfg.IppanelBaseURL
-	if endpoint == "" {
-		endpoint = "https://edge.ippanel.com/v1/api/send"
-	}
+func newIppanelProvider(cfg *config.Config, settings *SettingService, log *logrus.Logger) *ippanelProvider {
 	return &ippanelProvider{
-		cfg:        cfg,
-		apiKey:     cfg.IppanelAPIKey,
-		sender:     cfg.IppanelSender,
-		endpoint:   endpoint,
-		authScheme: cfg.IppanelAuthScheme,
-		client:     &http.Client{Timeout: 12 * time.Second},
-		log:        log,
+		cfg:      cfg,
+		settings: settings,
+		client:   &http.Client{Timeout: 12 * time.Second},
+		log:      log,
 	}
+}
+
+const defaultIppanelEndpoint = "https://edge.ippanel.com/v1/api/send"
+
+// resolve merges the panel-managed settings over the .env defaults, field by
+// field — so an admin can set *only* the API key from the panel and keep
+// everything else (sender, patterns) at their working defaults.
+func (p *ippanelProvider) resolve() SMSInfo {
+	panel := p.settings.SMSSettings()
+	pick := func(panelVal, envVal string) string {
+		if strings.TrimSpace(panelVal) != "" {
+			return panelVal
+		}
+		return envVal
+	}
+	source := "env"
+	if strings.TrimSpace(panel.APIKey) != "" {
+		source = "panel"
+	}
+	apiKey := pick(panel.APIKey, p.cfg.IppanelAPIKey)
+	return SMSInfo{
+		Configured:      apiKey != "",
+		Provider:        "ippanel",
+		Endpoint:        strings.TrimRight(pick(panel.BaseURL, orDefault(p.cfg.IppanelBaseURL, defaultIppanelEndpoint)), "/"),
+		Sender:          pick(panel.Sender, p.cfg.IppanelSender),
+		RegisterPattern: pick(panel.RegisterPattern, p.cfg.IppanelRegisterPattern),
+		LoginPattern:    pick(panel.LoginPattern, p.cfg.IppanelLoginPattern),
+		AdminPattern:    pick(panel.AdminNotifyPattern, p.cfg.IppanelAdminNotifyPattern),
+		AdminPhone:      pick(panel.AdminPhone, p.cfg.IppanelAdminPhone),
+		AuthScheme:      orDefault(pick(panel.AuthScheme, p.cfg.IppanelAuthScheme), "raw"),
+		Source:          source,
+	}
+}
+
+// apiKey resolves just the secret (kept separate from SMSInfo, which is safe
+// to hand to the browser).
+func (p *ippanelProvider) apiKey() string {
+	panel := p.settings.SMSSettings()
+	if strings.TrimSpace(panel.APIKey) != "" {
+		return panel.APIKey
+	}
+	return p.cfg.IppanelAPIKey
 }
 
 type ippanelRequest struct {
@@ -133,47 +168,49 @@ func (r ippanelResponse) message() string {
 	return ""
 }
 
-func (p *ippanelProvider) authHeader() string {
-	switch strings.ToLower(p.authScheme) {
+func authHeaderFor(scheme, key string) string {
+	switch strings.ToLower(scheme) {
 	case "accesskey":
-		return "AccessKey " + p.apiKey
+		return "AccessKey " + key
 	case "apikey":
-		return "apikey " + p.apiKey
+		return "apikey " + key
 	case "bearer":
-		return "Bearer " + p.apiKey
+		return "Bearer " + key
 	default:
-		return p.apiKey
+		return key
 	}
 }
 
 func (p *ippanelProvider) Verbose(phone, patternCode string, params map[string]string) SMSResult {
-	res := SMSResult{Endpoint: p.endpoint}
-	if p.apiKey == "" {
-		res.Message = "IPPANEL_API_KEY تنظیم نشده است."
+	info := p.resolve()
+	key := p.apiKey()
+	res := SMSResult{Endpoint: info.Endpoint}
+	if key == "" {
+		res.Message = "سرویس پیامک تنظیم نشده — کلید ippanel را در پنل (نمای کلی → کارت «پیامک») یا در .env بگذارید."
 		return res
 	}
 
 	body, _ := json.Marshal(ippanelRequest{
 		SendingType: "pattern",
-		FromNumber:  p.sender,
+		FromNumber:  info.Sender,
 		Code:        patternCode,
 		Recipients:  []string{"+98" + strings.TrimLeft(phone, "0")},
 		Params:      params,
 	})
 
-	req, err := http.NewRequest(http.MethodPost, p.endpoint, bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, info.Endpoint, bytes.NewReader(body))
 	if err != nil {
 		res.Message = err.Error()
 		return res
 	}
-	req.Header.Set("Authorization", p.authHeader())
+	req.Header.Set("Authorization", authHeaderFor(info.AuthScheme, key))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
 	httpRes, err := p.client.Do(req)
 	if err != nil {
 		res.Message = "اتصال به سرویس پیامک برقرار نشد: " + err.Error()
-		p.log.WithError(err).WithField("endpoint", p.endpoint).Error("ippanel: request failed")
+		p.log.WithError(err).WithField("endpoint", info.Endpoint).Error("ippanel: request failed")
 		return res
 	}
 	defer httpRes.Body.Close()
@@ -189,7 +226,7 @@ func (p *ippanelProvider) Verbose(phone, patternCode string, params map[string]s
 
 	if !res.OK {
 		p.log.WithFields(logrus.Fields{
-			"endpoint": p.endpoint,
+			"endpoint": info.Endpoint,
 			"status":   httpRes.StatusCode,
 			"pattern":  patternCode,
 			"body":     truncate(string(raw), 800),
@@ -206,52 +243,43 @@ func (p *ippanelProvider) SendPattern(phone, patternCode string, params map[stri
 	if r.Message != "" {
 		return fmt.Errorf("سرویس پیامک: %s", r.Message)
 	}
-	return fmt.Errorf("ارسال پیامک ناموفق بود (کد %d).", r.Status)
+	return fmt.Errorf("ارسال پیامک ناموفق بود (کد %d)", r.Status)
 }
 
-func (p *ippanelProvider) Info() SMSInfo {
-	scheme := p.authScheme
-	if scheme == "" {
-		scheme = "raw"
-	}
-	return SMSInfo{
-		Configured:      p.apiKey != "",
-		Provider:        "ippanel",
-		Endpoint:        p.endpoint,
-		Sender:          p.sender,
-		RegisterPattern: p.cfg.IppanelRegisterPattern,
-		LoginPattern:    p.cfg.IppanelLoginPattern,
-		AdminPattern:    p.cfg.IppanelAdminNotifyPattern,
-		AdminPhone:      p.cfg.IppanelAdminPhone,
-		AuthScheme:      scheme,
-	}
-}
-
-// ---- disabled provider (no API key) ----------------------------------
-
-type nullSMSProvider struct{ cfg *config.Config }
-
-func (nullSMSProvider) SendPattern(string, string, map[string]string) error {
-	return errors.New("سرویس پیامک تنظیم نشده — کلید IPPANEL_API_KEY را در .env بگذارید.")
-}
-func (nullSMSProvider) Verbose(string, string, map[string]string) SMSResult {
-	return SMSResult{Message: "سرویس پیامک تنظیم نشده — کلید IPPANEL_API_KEY را در .env بگذارید."}
-}
-func (n nullSMSProvider) Info() SMSInfo {
-	i := SMSInfo{Provider: "ippanel", Endpoint: "https://edge.ippanel.com/v1/api/send", AuthScheme: "raw"}
-	if n.cfg != nil {
-		i.Sender = n.cfg.IppanelSender
-		i.RegisterPattern = n.cfg.IppanelRegisterPattern
-		i.LoginPattern = n.cfg.IppanelLoginPattern
-		i.AdminPattern = n.cfg.IppanelAdminNotifyPattern
-		i.AdminPhone = n.cfg.IppanelAdminPhone
-	}
-	return i
-}
+func (p *ippanelProvider) Info() SMSInfo { return p.resolve() }
 
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
 	return s[:n] + "…"
+}
+
+// MaskedSMSSettings is the safe shape for GET/PUT /api/admin/sms-settings — the
+// key is never sent back in full.
+type MaskedSMSSettings struct {
+	HasKey             bool   `json:"hasKey"`
+	KeyMask            string `json:"keyMask"`
+	Sender             string `json:"sender"`
+	RegisterPattern    string `json:"registerPattern"`
+	LoginPattern       string `json:"loginPattern"`
+	AdminNotifyPattern string `json:"adminNotifyPattern"`
+	AdminPhone         string `json:"adminPhone"`
+	BaseURL            string `json:"baseUrl"`
+	AuthScheme         string `json:"authScheme"`
+}
+
+// MaskedSMSSettingsFor strips the API key down to a display-safe mask.
+func MaskedSMSSettingsFor(v model.SMSSettings) MaskedSMSSettings {
+	return MaskedSMSSettings{
+		HasKey:             v.APIKey != "",
+		KeyMask:            MaskKey(v.APIKey),
+		Sender:             v.Sender,
+		RegisterPattern:    v.RegisterPattern,
+		LoginPattern:       v.LoginPattern,
+		AdminNotifyPattern: v.AdminNotifyPattern,
+		AdminPhone:         v.AdminPhone,
+		BaseURL:            v.BaseURL,
+		AuthScheme:         v.AuthScheme,
+	}
 }

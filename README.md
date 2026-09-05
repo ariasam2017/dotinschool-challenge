@@ -224,6 +224,19 @@ $s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Mar
 
 خروجی هر دو مسیر: آدرس پنل‌ها + نام‌کاربری و رمز ادمین. اجرای دوباره فقط rebuild و recreate می‌کند.
 
+بعداً برای گرفتن نسخهٔ جدید از گیت‌هاب و ری‌استارت، به‌جای `docker-up.ps1` / `docker-up.sh` همین‌ها را از همان پوشه بزنید (اول `git fetch` + `reset --hard` می‌کنند، بعد دقیقاً همان مراحل بالا را):
+
+</div>
+
+```powershell
+.\update.ps1              # ویندوز
+```
+```bash
+./update.sh               # لینوکس / مک
+```
+
+<div dir="rtl" align="right">
+
 ### روی سرور لینوکس، بدون هیچ‌چیز از قبل نصب‌شده
 
 توکن گیت‌هاب را همان‌جا تعاملی می‌پرسد (توضیحش در «نصب سریع» بالا):
@@ -253,7 +266,10 @@ docker compose up -d --build
 - پنل کاربر: <http://localhost:8080/> · پنل ادمین: `http://localhost:8080/<ADMIN_PATH>/`
 - رمز ادمین: اگر `.env` نساخته باشید، یک رمز تصادفی ساخته و در لاگ چاپ می‌شود (`docker compose logs app`). برای رمز ثابت: `cp .env.example .env` و `ADMIN_PASSWORD` را پر کنید.
 - داده‌ها در ولوم `./data` — SQLite تک‌فایل.
-- لاگ: `docker compose logs -f app` · توقف: `docker compose down` · به‌روزرسانی: دوباره `docker compose up -d --build`
+- لاگ: `docker compose logs -f app` · توقف: `docker compose down`
+- به‌روزرسانی: `./update.sh` (لینوکس/مک) یا `.\update.ps1` (ویندوز) — نسخهٔ جدید را از گیت‌هاب می‌گیرد،
+  باینری را روی هاست دوباره می‌سازد و استک را ری‌استارت می‌کند؛ صرفاً دوباره زدن
+  `docker compose up -d --build` کافی نیست چون باینری از قبل باید روی هاست کامپایل شده باشد.
 
 روی ویندوز، Docker Desktop معمولاً پورت ۸۰۸۰ را گرفته — پورت میزبان را عوض کنید:
 
@@ -281,7 +297,7 @@ docker compose -f build/docker-compose.yml -f build/docker-compose.prod.yml up -
 
 Caddy گواهی Let's Encrypt را خودش می‌گیرد و تمدید می‌کند — بدون certbot، بدون downtime.
 
-داخل Docker، دکمهٔ «به‌روزرسانی» پنل پیام می‌دهد که روی هاست `dotinschool update` (یا `dotinschool rebuild`) را اجرا کنید — این دستور `git reset --hard origin/main`، سپس کامپایل مجدد باینری روی هاست و `docker compose up -d` را انجام می‌دهد. داده‌ها در ولوم `data/` دست‌نخورده می‌مانند.
+داخل Docker، دکمهٔ «به‌روزرسانی» پنل پیام می‌دهد که از پوشهٔ ریشهٔ پروژه روی همان سرور `.\update.ps1` (ویندوز) یا `./update.sh` (لینوکس/مک) را اجرا کنید — یا اگر با `docker-install.sh` نصب کرده‌اید، دستور `dotinschool update` را. هر سه یک کار را انجام می‌دهند: `git reset --hard origin/main`، سپس کامپایل مجدد باینری روی هاست و `docker compose up -d`. داده‌ها در ولوم `data/` دست‌نخورده می‌مانند.
 
 ---
 

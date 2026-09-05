@@ -129,6 +129,7 @@ export interface SmsInfo {
   adminPattern: string
   adminPhone: string
   authScheme: string
+  source: 'panel' | 'env' | ''
 }
 
 export interface SmsTestResult {
@@ -137,4 +138,29 @@ export interface SmsTestResult {
   endpoint: string
   message: string
   rawBody: string
+}
+
+// The panel-managed override — every field optional; blank falls back to the
+// matching IPPANEL_* env var (see SmsInfo for what's actually in effect).
+export interface SmsSettings {
+  hasKey: boolean
+  keyMask: string
+  sender: string
+  registerPattern: string
+  loginPattern: string
+  adminNotifyPattern: string
+  adminPhone: string
+  baseUrl: string
+  authScheme: string
+}
+
+export interface SmsSettingsInput {
+  apiKey?: string
+  sender?: string
+  registerPattern?: string
+  loginPattern?: string
+  adminNotifyPattern?: string
+  adminPhone?: string
+  baseUrl?: string
+  authScheme?: string
 }

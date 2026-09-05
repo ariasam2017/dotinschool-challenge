@@ -29,13 +29,10 @@ type Services struct {
 // New constructs every service with its dependencies.
 func New(cfg *config.Config, db *gorm.DB, log *logrus.Logger) *Services {
 	settings := newSettingService(cfg, db, log)
-
-	var sms SMSProvider
-	if cfg.IppanelAPIKey != "" {
-		sms = newIppanelProvider(cfg, log)
-	} else {
-		sms = nullSMSProvider{cfg: cfg}
-	}
+	// Always the real provider — whether it's "configured" is resolved fresh on
+	// every call (panel settings override .env, per field), so saving a key from
+	// the admin panel takes effect immediately with no restart.
+	var sms SMSProvider = newIppanelProvider(cfg, settings, log)
 
 	return &Services{
 		Config: cfg,
@@ -56,4 +53,5 @@ func New(cfg *config.Config, db *gorm.DB, log *logrus.Logger) *Services {
 // RestoreAISidecarIfMissing is called once at boot.
 func (s *Services) RestoreAISidecarIfMissing() {
 	s.Settings.RestoreAISidecarIfMissing()
+	s.Settings.RestoreSMSSidecarIfMissing()
 }

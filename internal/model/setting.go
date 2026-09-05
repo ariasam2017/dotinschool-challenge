@@ -17,6 +17,7 @@ const (
 	KeyPausedRemainMs = "pausedRemainMs"
 	KeyChallenge      = "challenge"
 	KeyAISettings     = "aiSettings"
+	KeySMSSettings    = "smsSettings"
 )
 
 // Challenge is the problem statement published to entrants.
@@ -76,4 +77,19 @@ type AIProvider struct {
 	BaseURL string `json:"baseUrl"`
 	Model   string `json:"model"`
 	APIKey  string `json:"apiKey"`
+}
+
+// SMSSettings is the panel-managed ippanel configuration. Any field left empty
+// falls back to the matching IPPANEL_* environment variable (and its built-in
+// default) — so on a fresh deploy with the same ippanel account, the admin only
+// has to paste the API key here instead of editing .env / rebuilding.
+type SMSSettings struct {
+	APIKey             string `json:"apiKey"`
+	Sender             string `json:"sender"`
+	RegisterPattern    string `json:"registerPattern"`
+	LoginPattern       string `json:"loginPattern"`
+	AdminNotifyPattern string `json:"adminNotifyPattern"`
+	AdminPhone         string `json:"adminPhone"`
+	BaseURL            string `json:"baseUrl"`
+	AuthScheme         string `json:"authScheme"`
 }

@@ -13,6 +13,8 @@ import type {
   ReviewResult,
   SessionParticipant,
   SmsInfo,
+  SmsSettings,
+  SmsSettingsInput,
   SmsTestResult,
   UpdateResult,
 } from './types'
@@ -171,10 +173,13 @@ export async function restoreBackup(file: File) {
 export const checkForUpdate = () =>
   apiFetch<UpdateResult>('/api/admin/update', { method: 'POST' })
 
-/* ---- SMS (ippanel) diagnostics ---- */
+/* ---- SMS (ippanel) diagnostics + panel-managed settings ---- */
 export const smsStatus = () => apiFetch<SmsInfo>('/api/admin/sms-status')
 export const smsTest = (payload: { phone: string; purpose?: 'register' | 'login'; pattern?: string }) =>
   apiFetch<SmsTestResult>('/api/admin/sms-test', { method: 'POST', body: payload })
+export const getSmsSettings = () => apiFetch<SmsSettings>('/api/admin/sms-settings')
+export const saveSmsSettings = (payload: SmsSettingsInput) =>
+  apiFetch<SmsSettings>('/api/admin/sms-settings', { method: 'PUT', body: payload })
 
 /* ---- AI assistant (admin) ---- */
 export const aiStatus = () => apiFetch<AiStatus>('/api/admin/ai-status')

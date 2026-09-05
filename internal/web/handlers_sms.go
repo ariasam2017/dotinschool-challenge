@@ -2,18 +2,80 @@ package web
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/dotinschool/dotinschool/internal/apperr"
+	"github.com/dotinschool/dotinschool/internal/model"
+	"github.com/dotinschool/dotinschool/internal/service"
 )
 
 // GET /api/admin/sms-status — the non-secret SMS provider configuration, so the
 // admin can see which endpoint / sender / pattern codes are actually in effect.
 func (s *server) handleSMSStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, s.svc.SMS.Info())
+}
+
+// GET /api/admin/sms-settings — the panel-managed ippanel config (masked key),
+// so the admin can see what's saved and edit it — e.g. after moving the app to
+// a new server, just paste the API key here instead of touching .env.
+func (s *server) handleGetSMSSettings(c *gin.Context) {
+	c.JSON(http.StatusOK, service.MaskedSMSSettingsFor(s.svc.Settings.SMSSettings()))
+}
+
+// PUT /api/admin/sms-settings — save the ippanel config. Leaving a field blank
+// keeps the .env fallback for that field; the API key is only replaced when the
+// admin actually types a new value (not the mask).
+func (s *server) handlePutSMSSettings(c *gin.Context) {
+	var body struct {
+		APIKey             string `json:"apiKey"`
+		Sender             string `json:"sender"`
+		RegisterPattern    string `json:"registerPattern"`
+		LoginPattern       string `json:"loginPattern"`
+		AdminNotifyPattern string `json:"adminNotifyPattern"`
+		AdminPhone         string `json:"adminPhone"`
+		BaseURL            string `json:"baseUrl"`
+		AuthScheme         string `json:"authScheme"`
+	}
+	if err := bindJSON(c, &body); err != nil {
+		fail(c, err)
+		return
+	}
+
+	baseURL := clip(strings.TrimRight(strings.TrimSpace(body.BaseURL), "/"), 300)
+	if baseURL != "" {
+		u, err := url.Parse(baseURL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+			fail(c, apperr.InvalidInput("آدرس اندپوینت نامعتبر است."))
+			return
+		}
+	}
+
+	cur := s.svc.Settings.SMSSettings()
+	typedKey := strings.TrimSpace(body.APIKey)
+	apiKey := cur.APIKey
+	if typedKey != "" && !service.LooksLikeMask(typedKey) {
+		apiKey = clip(typedKey, 400)
+	}
+
+	v := model.SMSSettings{
+		APIKey:             apiKey,
+		Sender:             clip(strings.TrimSpace(body.Sender), 40),
+		RegisterPattern:    clip(strings.TrimSpace(body.RegisterPattern), 60),
+		LoginPattern:       clip(strings.TrimSpace(body.LoginPattern), 60),
+		AdminNotifyPattern: clip(strings.TrimSpace(body.AdminNotifyPattern), 60),
+		AdminPhone:         clip(strings.TrimPrefix(strings.TrimSpace(body.AdminPhone), "0"), 15),
+		BaseURL:            baseURL,
+		AuthScheme:         clip(strings.TrimSpace(body.AuthScheme), 20),
+	}
+	if err := s.svc.Settings.SaveSMSSettings(v); err != nil {
+		s.failWith(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, service.MaskedSMSSettingsFor(v))
 }
 
 // POST /api/admin/sms-test — send a real pattern SMS to a phone and return the

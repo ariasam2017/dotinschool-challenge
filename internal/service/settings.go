@@ -21,7 +21,8 @@ type SettingService struct {
 	cfg *config.Config
 	log *logrus.Logger
 
-	aiMu sync.Mutex // guards the sidecar read/write race
+	aiMu  sync.Mutex // guards the AI sidecar read/write race
+	smsMu sync.Mutex // guards the SMS sidecar read/write race
 }
 
 func newSettingService(cfg *config.Config, db *gorm.DB, log *logrus.Logger) *SettingService {
@@ -215,5 +216,82 @@ func (s *SettingService) writeAISidecar(v model.AISettings) {
 	}
 	if err := os.WriteFile(s.cfg.AIConfigPath(), b, 0o600); err != nil {
 		s.log.Errorf("نوشتن data/ai-config.json ناموفق بود: %v", err)
+	}
+}
+
+// ---- SMS (ippanel) settings — same self-healing sidecar idiom as AI --------
+//
+// Every field is optional here: an empty field falls back to the matching
+// IPPANEL_* env var (see sms.go's resolve()). This lets an admin move the app
+// to a new server/container and just paste the API key, without editing .env.
+
+// SMSSettings reads the panel-managed ippanel config, restoring it from the
+// sidecar file if the DB row is missing but the sidecar still has a key.
+func (s *SettingService) SMSSettings() model.SMSSettings {
+	s.smsMu.Lock()
+	defer s.smsMu.Unlock()
+
+	var out model.SMSSettings
+	if ok, _ := s.GetInto(model.KeySMSSettings, &out); ok && out.APIKey != "" {
+		return out
+	}
+	if parsed, err := s.readSMSSidecar(); err == nil && parsed.APIKey != "" {
+		_ = s.Set(model.KeySMSSettings, parsed)
+		return parsed
+	}
+	return model.SMSSettings{}
+}
+
+// SaveSMSSettings persists the ippanel config to the DB and to the sidecar file.
+func (s *SettingService) SaveSMSSettings(v model.SMSSettings) error {
+	s.smsMu.Lock()
+	defer s.smsMu.Unlock()
+	if err := s.Set(model.KeySMSSettings, v); err != nil {
+		return err
+	}
+	s.writeSMSSidecar(v)
+	return nil
+}
+
+// RestoreSMSSidecarIfMissing runs once at boot.
+func (s *SettingService) RestoreSMSSidecarIfMissing() {
+	s.smsMu.Lock()
+	defer s.smsMu.Unlock()
+
+	var cur model.SMSSettings
+	if ok, _ := s.GetInto(model.KeySMSSettings, &cur); ok && cur.APIKey != "" {
+		return
+	}
+	parsed, err := s.readSMSSidecar()
+	if err != nil || parsed.APIKey == "" {
+		return
+	}
+	if err := s.Set(model.KeySMSSettings, parsed); err == nil {
+		s.log.Info("تنظیمات پیامک از data/sms-config.json بازیابی شد.")
+	}
+}
+
+func (s *SettingService) readSMSSidecar() (model.SMSSettings, error) {
+	var out model.SMSSettings
+	b, err := os.ReadFile(s.cfg.SMSConfigPath())
+	if err != nil {
+		return out, err
+	}
+	if err := json.Unmarshal(b, &out); err != nil {
+		return out, err
+	}
+	if out.APIKey == "" {
+		return out, errors.New("sidecar has no api key")
+	}
+	return out, nil
+}
+
+func (s *SettingService) writeSMSSidecar(v model.SMSSettings) {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return
+	}
+	if err := os.WriteFile(s.cfg.SMSConfigPath(), b, 0o600); err != nil {
+		s.log.Errorf("نوشتن data/sms-config.json ناموفق بود: %v", err)
 	}
 }

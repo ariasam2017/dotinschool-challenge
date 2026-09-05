@@ -131,6 +131,9 @@ func Load(root string, log *logrus.Logger) *Config {
 // AIConfigPath is the self-healing sidecar copy of the panel AI settings.
 func (c *Config) AIConfigPath() string { return filepath.Join(c.DataDir, "ai-config.json") }
 
+// SMSConfigPath is the self-healing sidecar copy of the panel SMS settings.
+func (c *Config) SMSConfigPath() string { return filepath.Join(c.DataDir, "sms-config.json") }
+
 // DBPath is the single SQLite file that holds all state.
 func (c *Config) DBPath() string { return filepath.Join(c.DataDir, "arena.db") }
 

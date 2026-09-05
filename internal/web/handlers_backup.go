@@ -101,7 +101,11 @@ func (s *server) handleUpdate(c *gin.Context) {
 	if s.cfg.InDocker {
 		c.JSON(http.StatusOK, gin.H{
 			"updated": false,
-			"message": "این نصب روی Docker است — برای به‌روزرسانی، روی سرور دستور «dotinschool update» را اجرا کنید (یا: git pull && docker compose up -d --build). داده‌ها در ولوم data/ دست‌نخورده می‌مانند.",
+			"message": "این نصب روی Docker است — برای به‌روزرسانی، از پوشهٔ ریشهٔ پروژه روی همان سرور (همان‌جا که docker-up.ps1 / docker-up.sh هست) دستور زیر را اجرا کنید:\n" +
+				"• ویندوز (PowerShell): .\\update.ps1\n" +
+				"• لینوکس/مک: ./update.sh\n" +
+				"(اگر با اسکریپت نصب لینوکسی docker-install.sh نصب کرده‌اید، دستور «dotinschool update» هم همین کار را می‌کند.)\n" +
+				"این اسکریپت‌ها نسخهٔ جدید را از گیت‌هاب می‌گیرند، باینری را دوباره می‌سازند و سرویس را ری‌استارت می‌کنند — بدون نیاز به build داخل کانتینر. داده‌ها در ولوم ./data دست‌نخورده می‌مانند.",
 		})
 		return
 	}

@@ -102,5 +102,7 @@ func (s *server) mountAPI(r *gin.Engine) {
 
 		admin.GET("/admin/sms-status", s.handleSMSStatus)
 		admin.POST("/admin/sms-test", s.handleSMSTest)
+		admin.GET("/admin/sms-settings", s.handleGetSMSSettings)
+		admin.PUT("/admin/sms-settings", s.handlePutSMSSettings)
 	}
 }

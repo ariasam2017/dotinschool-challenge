@@ -11,8 +11,10 @@ import {
   checkForUpdate,
   smsStatus,
   smsTest,
+  getSmsSettings,
+  saveSmsSettings,
 } from '@/api/client'
-import type { SmsInfo, SmsTestResult } from '@/api/types'
+import type { SmsInfo, SmsTestResult, SmsSettings } from '@/api/types'
 import { toFa, fmtPhone, statusLabel } from '@/lib/fa'
 
 import StatCard from '@/components/StatCard.vue'
@@ -159,12 +161,77 @@ const smsSending = ref(false)
 const smsResult = ref<SmsTestResult | null>(null)
 const smsRawOpen = ref(false)
 
-onMounted(async () => {
+async function refreshSmsStatus() {
   try {
     sms.value = await smsStatus()
   } catch (e) {
     admin.handleAuthError(e)
   }
+}
+
+/* SMS (ippanel) panel-managed settings — so the admin can paste the API key
+   here after moving the app to a new server, with no .env edit / rebuild. */
+const smsSettingsForm = reactive({
+  apiKey: '',
+  sender: '',
+  baseUrl: '',
+  registerPattern: '',
+  loginPattern: '',
+  adminNotifyPattern: '',
+  adminPhone: '',
+  authScheme: '',
+})
+const smsSettingsHasKey = ref(false)
+const smsSettingsKeyMask = ref('')
+const smsSettingsSaving = ref(false)
+
+function applySmsSettings(v: SmsSettings) {
+  smsSettingsForm.apiKey = ''
+  smsSettingsForm.sender = v.sender
+  smsSettingsForm.baseUrl = v.baseUrl
+  smsSettingsForm.registerPattern = v.registerPattern
+  smsSettingsForm.loginPattern = v.loginPattern
+  smsSettingsForm.adminNotifyPattern = v.adminNotifyPattern
+  smsSettingsForm.adminPhone = v.adminPhone
+  smsSettingsForm.authScheme = v.authScheme
+  smsSettingsHasKey.value = v.hasKey
+  smsSettingsKeyMask.value = v.keyMask
+}
+
+async function refreshSmsSettings() {
+  try {
+    applySmsSettings(await getSmsSettings())
+  } catch (e) {
+    admin.handleAuthError(e)
+  }
+}
+
+async function saveSmsSettingsForm() {
+  smsSettingsSaving.value = true
+  try {
+    const saved = await saveSmsSettings({
+      apiKey: smsSettingsForm.apiKey.trim() || undefined,
+      sender: smsSettingsForm.sender.trim(),
+      baseUrl: smsSettingsForm.baseUrl.trim(),
+      registerPattern: smsSettingsForm.registerPattern.trim(),
+      loginPattern: smsSettingsForm.loginPattern.trim(),
+      adminNotifyPattern: smsSettingsForm.adminNotifyPattern.trim(),
+      adminPhone: smsSettingsForm.adminPhone.trim(),
+      authScheme: smsSettingsForm.authScheme.trim(),
+    })
+    applySmsSettings(saved)
+    message.success('تنظیمات پیامک ذخیره شد')
+    await refreshSmsStatus()
+  } catch (e) {
+    admin.toastError(e, 'خطا در ذخیرهٔ تنظیمات پیامک')
+  } finally {
+    smsSettingsSaving.value = false
+  }
+}
+
+onMounted(() => {
+  void refreshSmsStatus()
+  void refreshSmsSettings()
 })
 
 async function sendTestSms() {
@@ -321,17 +388,75 @@ async function doUpdate() {
         </Chip>
       </div>
       <p class="faint hint">
-        اگر ثبت‌نام/ورود کاربر کد پیامکی نمی‌فرستد، این‌جا یک پیامک آزمایشی بفرستید تا پاسخِ دقیقِ
-        سرویس ippanel (رد شدن پترن، خط فرستنده، نبودِ اعتبار …) دیده شود.
+        اگر روی سرور جدیدی (لینوکس یا ویندوز) بالا آورده‌اید، کلید API ippanel را همین‌جا وارد و
+        ذخیره کنید — نیازی به ویرایش <code>.env</code> یا build دوباره نیست. فیلدهای خالی از مقدار
+        پیش‌فرض/<code>.env</code> استفاده می‌کنند.
       </p>
 
+      <div class="sms-settings-grid">
+        <label class="sms-field">
+          <span>کلید API ippanel</span>
+          <a-input-password
+            v-model:value="smsSettingsForm.apiKey"
+            dir="ltr"
+            autocomplete="off"
+            :placeholder="smsSettingsHasKey ? smsSettingsKeyMask + ' — برای تغییر، کلید جدید بزنید' : 'کلید API را وارد کنید'"
+          />
+        </label>
+        <label class="sms-field">
+          <span>خط فرستنده (اختیاری)</span>
+          <a-input v-model:value="smsSettingsForm.sender" dir="ltr" placeholder="پیش‌فرض .env" />
+        </label>
+        <label class="sms-field">
+          <span>آدرس اندپوینت (اختیاری)</span>
+          <a-input v-model:value="smsSettingsForm.baseUrl" dir="ltr" placeholder="https://edge.ippanel.com/v1/api/send" />
+        </label>
+        <label class="sms-field">
+          <span>نوع Authorization (اختیاری)</span>
+          <a-select
+            v-model:value="smsSettingsForm.authScheme"
+            :allow-clear="true"
+            placeholder="پیش‌فرض .env"
+            :options="[
+              { value: 'raw', label: 'raw (خودِ کلید)' },
+              { value: 'accesskey', label: 'AccessKey' },
+              { value: 'apikey', label: 'apikey' },
+              { value: 'bearer', label: 'Bearer' },
+            ]"
+          />
+        </label>
+        <label class="sms-field">
+          <span>پترن ثبت‌نام (اختیاری)</span>
+          <a-input v-model:value="smsSettingsForm.registerPattern" dir="ltr" placeholder="پیش‌فرض .env" />
+        </label>
+        <label class="sms-field">
+          <span>پترن ورود (اختیاری)</span>
+          <a-input v-model:value="smsSettingsForm.loginPattern" dir="ltr" placeholder="پیش‌فرض .env" />
+        </label>
+        <label class="sms-field">
+          <span>پترن اطلاع‌رسانی ادمین (اختیاری)</span>
+          <a-input v-model:value="smsSettingsForm.adminNotifyPattern" dir="ltr" placeholder="پیش‌فرض .env" />
+        </label>
+        <label class="sms-field">
+          <span>شمارهٔ ادمین (اختیاری)</span>
+          <a-input v-model:value="smsSettingsForm.adminPhone" dir="ltr" placeholder="9XXXXXXXXX" />
+        </label>
+      </div>
+
+      <div class="row-wrap" style="margin-top: 10px">
+        <a-button type="primary" :loading="smsSettingsSaving" @click="saveSmsSettingsForm">
+          <template #icon><AppIcon name="check" :size="15" /></template>ذخیره تنظیمات پیامک
+        </a-button>
+      </div>
+
       <div v-if="sms" class="sms-info num">
-        <span>اندپوینت: <code dir="ltr">{{ sms.endpoint }}</code></span>
-        <span>خط فرستنده: <code dir="ltr">{{ sms.sender || '—' }}</code></span>
-        <span>پترن ثبت‌نام: <code dir="ltr">{{ sms.registerPattern || '—' }}</code></span>
-        <span>پترن ورود: <code dir="ltr">{{ sms.loginPattern || '—' }}</code></span>
-        <span>شمارهٔ ادمین: <code dir="ltr">{{ sms.adminPhone || '—' }}</code></span>
-        <span>نوع Authorization: <code dir="ltr">{{ sms.authScheme }}</code></span>
+        <span>اندپوینت مؤثر: <code dir="ltr">{{ sms.endpoint }}</code></span>
+        <span>خط فرستنده مؤثر: <code dir="ltr">{{ sms.sender || '—' }}</code></span>
+        <span>پترن ثبت‌نام مؤثر: <code dir="ltr">{{ sms.registerPattern || '—' }}</code></span>
+        <span>پترن ورود مؤثر: <code dir="ltr">{{ sms.loginPattern || '—' }}</code></span>
+        <span>شمارهٔ ادمین مؤثر: <code dir="ltr">{{ sms.adminPhone || '—' }}</code></span>
+        <span>نوع Authorization مؤثر: <code dir="ltr">{{ sms.authScheme }}</code></span>
+        <span>منبع تنظیمات: <code dir="ltr">{{ sms.source === 'panel' ? 'پنل' : sms.source === 'env' ? '.env' : '—' }}</code></span>
       </div>
 
       <div class="row-wrap" style="margin-top: 12px; align-items: flex-end">
@@ -467,6 +592,7 @@ async function doUpdate() {
   margin-top: 10px;
   font-size: 0.8rem;
   color: var(--text-dim);
+  white-space: pre-line;
 }
 .sms-info {
   display: grid;
@@ -487,6 +613,20 @@ async function doUpdate() {
   gap: 4px;
   font-size: 0.76rem;
   color: var(--text-dim);
+}
+.sms-settings-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+  margin-top: 4px;
+}
+@media (min-width: 720px) {
+  .sms-settings-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.sms-settings-grid .sms-field > span {
+  font-weight: 600;
 }
 .sms-raw {
   margin: 8px 0 0;

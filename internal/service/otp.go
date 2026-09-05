@@ -75,9 +75,12 @@ func (s *OTPService) CooldownRemaining(phone string) time.Duration {
 // cooldown checks that precede this.
 func (s *OTPService) Send(phone, purpose string) error {
 	code := generateCode()
-	pattern := s.cfg.IppanelRegisterPattern
+	// Resolved fresh from the SMS provider — reflects whatever the admin has
+	// saved in the panel (falls back to .env when the panel has nothing set).
+	info := s.sms.Info()
+	pattern := info.RegisterPattern
 	if purpose == "login" {
-		pattern = s.cfg.IppanelLoginPattern
+		pattern = info.LoginPattern
 	}
 	if err := s.sms.SendPattern(phone, pattern, map[string]string{"code": code}); err != nil {
 		s.log.Errorf("ارسال کد تأیید به %s شکست خورد: %v", phone, err)
@@ -122,11 +125,12 @@ func (s *OTPService) Consume(phone, otp string) error {
 // NotifyAdminOfNewRegistration fires the admin-only "someone just registered"
 // SMS. Best effort: a failure is logged and never affects the registration.
 func (s *OTPService) NotifyAdminOfNewRegistration(firstName, lastName string) {
-	if s.cfg.IppanelAdminPhone == "" {
+	info := s.sms.Info()
+	if info.AdminPhone == "" {
 		return
 	}
 	go func() {
-		err := s.sms.SendPattern(s.cfg.IppanelAdminPhone, s.cfg.IppanelAdminNotifyPattern,
+		err := s.sms.SendPattern(info.AdminPhone, info.AdminPattern,
 			map[string]string{"name": firstName, "family": lastName})
 		if err != nil {
 			s.log.Errorf("اطلاع‌رسانی ثبت‌نام جدید به ادمین شکست خورد: %v", err)
