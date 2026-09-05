@@ -171,11 +171,20 @@ if (-not (Docker-On-Path)) {
 }
 
 if (-not (Docker-Ready)) {
-  Say "starting Docker Desktop"
+  Say "starting Docker Desktop (this can take a minute or two the first time, especially right after a restart)"
   $dockerExe = Join-Path $env:ProgramFiles 'Docker\Docker\Docker Desktop.exe'
   if (Test-Path $dockerExe) { Start-Process $dockerExe }
   $tries = 0
-  while (-not (Docker-Ready) -and $tries -lt 60) { Start-Sleep -Seconds 3; $tries++ }
+  $maxTries = 60
+  # Silent for up to 3 minutes with nothing printed looked exactly like a
+  # frozen script (a real report: "why is it stuck on starting Docker
+  # Desktop") - a periodic heartbeat makes clear this is still alive and
+  # actively retrying, not hung.
+  while (-not (Docker-Ready) -and $tries -lt $maxTries) {
+    Start-Sleep -Seconds 3
+    $tries++
+    if ($tries % 5 -eq 0) { Say "still waiting for Docker Desktop... ($($tries * 3)s / $($maxTries * 3)s)" }
+  }
   if (-not (Docker-Ready)) {
     Die @"
 Docker Desktop did not become ready in time.
