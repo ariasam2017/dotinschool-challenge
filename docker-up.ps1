@@ -33,7 +33,12 @@ function Warn($m) { Write-Host "[!] $m" -ForegroundColor Yellow }
 function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; throw $m }
 
 # ---- 1. Go: locate it, or install it from the official zip ----
-$GoVersion = '1.27.1'
+# No version is hardcoded: go.dev sometimes lists a release as stable in its
+# metadata a little before every platform's archive has finished uploading
+# (this is what actually happened - go1.27.1's own metadata was there, but
+# its windows-amd64.zip 404'd). Ask go.dev for its real release list instead
+# and try the few most recent stable ones in order, oldest fallback last.
+$GoVersionFallback = '1.27.1'
 $GoRoot = Join-Path $env:LOCALAPPDATA 'dotinschool\go'
 
 function Find-Go {
@@ -59,20 +64,35 @@ function Install-Go {
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls13
   } catch {}
 
-  $zipName = "go$GoVersion.windows-amd64.zip"
-  $mirrors = @("https://go.dev/dl/$zipName", "https://golang.google.cn/dl/$zipName")
-  $tmp = Join-Path $env:TEMP $zipName
-  Say "downloading Go $GoVersion (official zip, no installer/admin rights needed)"
-  $ok = $false
-  foreach ($url in $mirrors) {
-    try {
-      Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing -TimeoutSec 60
-      if ((Test-Path $tmp) -and ((Get-Item $tmp).Length -gt 0)) { $ok = $true; break }
-    } catch {
-      Warn "download from $url failed: $($_.Exception.Message)"
+  $candidates = @()
+  try {
+    $releases = Invoke-RestMethod -Uri 'https://go.dev/dl/?mode=json&include=all' -UseBasicParsing -TimeoutSec 30
+    foreach ($rel in ($releases | Where-Object { $_.stable } | Select-Object -First 5)) {
+      $file = $rel.files | Where-Object { $_.os -eq 'windows' -and $_.arch -eq 'amd64' -and $_.kind -eq 'archive' } | Select-Object -First 1
+      if ($file) { $candidates += $file.filename }
     }
+  } catch {
+    Warn "could not look up Go releases online ($($_.Exception.Message))"
   }
-  if (-not $ok) { Die "Could not download Go from any mirror (see the reason(s) above). Install it manually from https://go.dev/dl/ (grab the Windows zip, not the msi) and re-run this script - it will find an existing install under Go\bin, Programs\go\bin, or C:\Go\bin on PATH." }
+  if ($candidates.Count -eq 0) { $candidates = @("go$GoVersionFallback.windows-amd64.zip") }
+  Say "trying Go release(s): $($candidates -join ', ')"
+
+  $ok = $false
+  $tmp = $null
+  foreach ($zipName in $candidates) {
+    foreach ($mirrorBase in @('https://go.dev/dl', 'https://golang.google.cn/dl')) {
+      $url = "$mirrorBase/$zipName"
+      $tmp = Join-Path $env:TEMP $zipName
+      try {
+        Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing -TimeoutSec 60
+        if ((Test-Path $tmp) -and ((Get-Item $tmp).Length -gt 0)) { $ok = $true; break }
+      } catch {
+        Warn "download from $url failed: $($_.Exception.Message)"
+      }
+    }
+    if ($ok) { break }
+  }
+  if (-not $ok) { Die "Could not download Go from go.dev or its China mirror after trying $($candidates.Count) release(s) (see the reason(s) above). Install it manually from https://go.dev/dl/ (grab the Windows zip, not the msi) and re-run this script - it will find an existing install under Go\bin, Programs\go\bin, or C:\Go\bin on PATH." }
   $dest = Split-Path $GoRoot
   New-Item -ItemType Directory -Force -Path $dest | Out-Null
   if (Test-Path $GoRoot) { Remove-Item $GoRoot -Recurse -Force }

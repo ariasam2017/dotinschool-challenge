@@ -27,7 +27,7 @@ set -euo pipefail
 BRANCH="${DOTINSCHOOL_BRANCH:-main}"
 INSTALL_DIR="/opt/dotinschool"
 CLI_PATH="/usr/local/bin/dotinschool"
-GO_VERSION="1.27.1"
+GO_VERSION="1.27.1"  # last-resort fallback only; see resolve_go_tarballs
 GO_ROOT="/usr/local/go"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -87,15 +87,37 @@ install_docker(){
 
 arch_tag(){ case "$(uname -m)" in x86_64|amd64) echo amd64 ;; aarch64|arm64) echo arm64 ;; *) die "Unsupported architecture: $(uname -m)";; esac; }
 
+# No version is hardcoded as the primary source: go.dev sometimes lists a
+# release as stable in its metadata a little before every platform's archive
+# has finished uploading, so a pinned version can 404. Ask go.dev's JSON
+# endpoint for the actual current release names instead; GO_VERSION is only
+# the last-resort fallback if that lookup itself fails.
+resolve_go_tarballs(){
+  local arch="$1" json
+  json=$(curl -fsSL --connect-timeout 15 "https://go.dev/dl/?mode=json" 2>/dev/null) || true
+  [[ -n "$json" ]] && echo "$json" | grep -o "\"go[0-9.]*\.linux-${arch}\.tar\.gz\"" | tr -d '"' | awk '!seen[$0]++'
+}
+
 install_go(){
-  if [[ -x "${GO_ROOT}/bin/go" ]] && "${GO_ROOT}/bin/go" version 2>/dev/null | grep -q "go${GO_VERSION%.*}"; then ok "Go is already installed."; return; fi
-  local arch tgz tmp url; arch=$(arch_tag); tgz="go${GO_VERSION}.linux-${arch}.tar.gz"
-  info "Downloading Go ${GO_VERSION}..."
-  tmp=$(mktemp)
-  for url in "https://go.dev/dl/${tgz}" "https://mirrors.aliyun.com/golang/${tgz}" "https://golang.google.cn/dl/${tgz}"; do
-    curl -fsSL --connect-timeout 15 "$url" -o "$tmp" && break || { tmp=$(mktemp); }
+  if [[ -x "${GO_ROOT}/bin/go" ]] && "${GO_ROOT}/bin/go" version >/dev/null 2>&1; then ok "Go is already installed."; return; fi
+  local arch; arch=$(arch_tag)
+  info "Looking up the latest Go release..."
+  local candidates=() c
+  while IFS= read -r c; do [[ -n "$c" ]] && candidates+=("$c"); done < <(resolve_go_tarballs "$arch" | head -5)
+  if [[ ${#candidates[@]} -eq 0 ]]; then
+    warn "Could not look up Go releases online — falling back to a pinned version (${GO_VERSION})."
+    candidates=("go${GO_VERSION}.linux-${arch}.tar.gz")
+  fi
+  info "Trying Go release(s): ${candidates[*]}"
+  local tmp="" tgz base found=0
+  for tgz in "${candidates[@]}"; do
+    for base in "https://go.dev/dl" "https://mirrors.aliyun.com/golang" "https://golang.google.cn/dl"; do
+      tmp=$(mktemp)
+      if curl -fsSL --connect-timeout 15 "${base}/${tgz}" -o "$tmp" && [[ -s "$tmp" ]]; then found=1; break 2; fi
+      rm -f "$tmp"; tmp=""
+    done
   done
-  [[ -s "$tmp" ]] || die "Failed to download Go."
+  [[ $found -eq 1 ]] || die "Failed to download Go from any mirror/release."
   rm -rf "$GO_ROOT"; tar -C /usr/local -xzf "$tmp"; rm -f "$tmp"
   export PATH="${GO_ROOT}/bin:$PATH"
   ok "Go $("${GO_ROOT}/bin/go" version | awk '{print $3}') installed."
