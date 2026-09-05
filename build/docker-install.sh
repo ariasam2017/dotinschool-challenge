@@ -251,6 +251,12 @@ show_ports(){
   fi
 }
 
+server_ip(){
+  local ip; ip=$(curl -fsSL -4 --connect-timeout 8 https://api.ipify.org 2>/dev/null) || true
+  [[ -n "$ip" ]] || ip=$(hostname -I 2>/dev/null | awk '{print $1}') || true
+  echo "${ip:-<this-server-IP>}"
+}
+
 run_action(){
   case "$1" in
     up)      "${C[@]}" up -d ;;
@@ -266,7 +272,10 @@ run_action(){
                && "${C[@]}" up -d ;;
     admin)
       e=.env
-      echo "Admin panel:  http://<server-ip>:$(grep -E '^APP_PORT=' $e | cut -d= -f2)/$(grep -E '^ADMIN_PATH=' $e | cut -d= -f2)/"
+      ip=$(server_ip)
+      port=$(grep -E '^APP_PORT=' $e | cut -d= -f2)
+      echo "User panel:   http://${ip}:${port}/"
+      echo "Admin panel:  http://${ip}:${port}/$(grep -E '^ADMIN_PATH=' $e | cut -d= -f2)/"
       echo "Username:     $(grep -E '^ADMIN_USERNAME=' $e | cut -d= -f2)"
       echo "Password:     $(grep -E '^ADMIN_PASSWORD=' $e | cut -d= -f2)"
       ;;
