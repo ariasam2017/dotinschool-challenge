@@ -53,7 +53,29 @@ function Find-Go {
   return $null
 }
 
+function Expand-GoZip($zipPath) {
+  $dest = Split-Path $GoRoot
+  New-Item -ItemType Directory -Force -Path $dest | Out-Null
+  if (Test-Path $GoRoot) { Remove-Item $GoRoot -Recurse -Force }
+  Expand-Archive -Path $zipPath -DestinationPath $dest -Force
+}
+
 function Install-Go {
+  # Already downloaded by hand (e.g. via a browser, when this network blocks
+  # dl.google.com for PowerShell but not for the browser)? Use that instead
+  # of touching the network at all.
+  $manual = @(Join-Path $PSScriptRoot 'go-windows-amd64.zip')
+  if (Test-Path (Join-Path $env:USERPROFILE 'Downloads')) {
+    $manual += Get-ChildItem (Join-Path $env:USERPROFILE 'Downloads') -Filter 'go*.windows-amd64.zip' -ErrorAction SilentlyContinue |
+      Sort-Object LastWriteTime -Descending | ForEach-Object { $_.FullName }
+  }
+  $manual = $manual | Where-Object { Test-Path $_ } | Select-Object -First 1
+  if ($manual) {
+    Say "found a manually-downloaded Go zip: $manual"
+    Expand-GoZip $manual
+    return
+  }
+
   # Windows PowerShell 5.1 sometimes defaults to an older TLS version than
   # go.dev/dl.google.com require, which fails silently as a generic
   # connection error - force TLS 1.2 (and 1.3 where supported) up front.
@@ -92,11 +114,14 @@ function Install-Go {
     }
     if ($ok) { break }
   }
-  if (-not $ok) { Die "Could not download Go from go.dev or its China mirror after trying $($candidates.Count) release(s) (see the reason(s) above). Install it manually from https://go.dev/dl/ (grab the Windows zip, not the msi) and re-run this script - it will find an existing install under Go\bin, Programs\go\bin, or C:\Go\bin on PATH." }
-  $dest = Split-Path $GoRoot
-  New-Item -ItemType Directory -Force -Path $dest | Out-Null
-  if (Test-Path $GoRoot) { Remove-Item $GoRoot -Recurse -Force }
-  Expand-Archive -Path $tmp -DestinationPath $dest -Force
+  if (-not $ok) {
+    Die @"
+Could not download Go from go.dev or its China mirror after trying $($candidates.Count) release(s) (see the reason(s) above - repeated 404/403 on every version usually means this network blocks Google's download servers, the same way it may have blocked GitHub before). Two ways around it:
+  1) Cloudflare WARP for Windows (free, same fix that unblocked GitHub on the Linux server): install from https://1.1.1.1/, turn it on, then re-run this script.
+  2) Download the zip by hand (a browser sometimes gets through when PowerShell doesn't): https://go.dev/dl/ -> grab the "Windows" .zip (not the .msi) -> save it into your Downloads folder -> re-run this script, it will find and use it automatically.
+"@
+  }
+  Expand-GoZip $tmp
   Remove-Item $tmp -Force
 }
 
