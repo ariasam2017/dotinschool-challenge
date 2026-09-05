@@ -151,7 +151,18 @@ Say "using Go: $go"
 function Docker-On-Path { [bool](Get-Command docker -ErrorAction SilentlyContinue) }
 function Docker-Ready {
   if (-not (Docker-On-Path)) { return $false }
-  docker info *> $null
+  # try/catch, not a bare call: under $ErrorActionPreference = 'Stop', a native
+  # command's stderr output getting redirected (even to $null via *>) is
+  # wrapped in a NativeCommandError and THROWS instead of just setting
+  # $LASTEXITCODE - which was crashing this whole script with a raw exception
+  # on the very first check instead of ever reaching the retry loop below,
+  # any time the Docker Desktop engine answered with an actual error (not just
+  # "still starting up").
+  try {
+    docker info *> $null
+  } catch {
+    return $false
+  }
   return ($LASTEXITCODE -eq 0)
 }
 
@@ -166,7 +177,11 @@ if (-not (Docker-Ready)) {
   $tries = 0
   while (-not (Docker-Ready) -and $tries -lt 60) { Start-Sleep -Seconds 3; $tries++ }
   if (-not (Docker-Ready)) {
-    Die "Docker Desktop did not become ready in time. Open it manually, wait for the whale icon to say it's running, then re-run this script."
+    Die @"
+Docker Desktop did not become ready in time.
+  - If you saw a "500 Internal Server Error ... check if the server supports the requested API version" message, Docker Desktop's engine is unresponsive (not just slow to start) - a wait/retry will not fix that on its own. Quit Docker Desktop completely (right-click its System Tray icon -> Quit Docker Desktop, not just close the window), then start it again and wait for the whale icon to say it's running. If that does not help, restart Windows.
+  - Otherwise: open Docker Desktop manually, wait for the whale icon to say it's running, then re-run this script.
+"@
   }
 }
 Say "Docker is ready"
