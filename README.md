@@ -210,7 +210,7 @@ $s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Mar
 
 <div dir="rtl" align="right">
 
-اگر سورس از قبل روی سیستم کلون شده، همان مسیر را با اجرای مستقیم `.\docker-up.ps1` از داخل پوشهٔ پروژه هم می‌شود تکرار کرد (بدون گرفتن نسخهٔ تازه از گیت‌هاب).
+اگر سورس از قبل روی سیستم کلون شده، همان مسیر را با اجرای مستقیم `.\docker-up.ps1` از داخل پوشهٔ پروژه هم می‌شود تکرار کرد (بدون گرفتن نسخهٔ تازه از گیت‌هاب). اگر PowerShell با خطای «running scripts is disabled on this system» جواب داد (پیش‌فرضِ رایج ویندوز)، به‌جایش این را بزنید: `powershell -ExecutionPolicy Bypass -File .\docker-up.ps1`
 
 ### روی لینوکس / مک، از داخل سورس کلون‌شده
 
