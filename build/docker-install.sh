@@ -268,6 +268,7 @@ run_action(){
     rebuild) PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" && "${C[@]}" up -d ;;
     update)  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git fetch --depth 1 origin main \
                && GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git reset --hard origin/main \
+               && bash build/docker-install.sh --reinstall-cli \
                && PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
                && "${C[@]}" up -d ;;
     admin)
@@ -341,4 +342,15 @@ main(){
   warn "For HTTPS with a domain: set DOMAIN in ${INSTALL_DIR}/.env and run:"
   echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.prod.yml up -d"
 }
+# Lets the installed CLI's own "update" action refresh /usr/local/bin/
+# dotinschool from whatever this file's install_cli() currently contains,
+# right after pulling the latest source - without this, "dotinschool
+# update" updated the app but never itself, so a new CLI feature (a menu
+# item, a new subcommand) only ever showed up after re-running the whole
+# one-line installer again from scratch.
+if [[ "${1:-}" == "--reinstall-cli" ]]; then
+  require_root
+  install_cli
+  exit 0
+fi
 main "$@"
