@@ -234,10 +234,15 @@ function confirmExit() {
         <AuthPanel @authed="onAuthed" />
       </section>
 
-      <!-- signed in — the screen always follows the live event state -->
+      <!-- signed in — the screen always follows the live event state. Wrapped in
+           a fade so the switch between screens (esp. countdown -> live arena
+           the instant it starts) is a soft cross-fade instead of a hard cut;
+           each branch needs its own :key or Vue reuses the <section> in place
+           and no transition fires. -->
       <template v-else>
+      <Transition name="fade" mode="out-in">
         <!-- 1) scheduled, more than an hour away: no challenge, no timer -->
-        <section v-if="userView === 'notStarted'" class="wait-card card card-pad">
+        <section v-if="userView === 'notStarted'" key="notStarted" class="wait-card card card-pad">
           <span class="wait-ico neutral"><AppIcon name="calendar" :size="26" /></span>
           <h2>رویداد هنوز شروع نشده است</h2>
           <p class="faint wait-lead">
@@ -256,20 +261,17 @@ function confirmExit() {
         </section>
 
         <!-- 2) final hour before the scheduled start: countdown, still no challenge -->
-        <section v-else-if="userView === 'countdown'" class="wait-card card card-pad">
+        <section v-else-if="userView === 'countdown'" key="countdown" class="wait-card card card-pad">
           <span class="wait-ico info"><AppIcon name="clock" :size="26" /></span>
           <h2>رویداد به‌زودی شروع می‌شود</h2>
           <CountdownClock :ms="startsInMs" state="waiting" size="xl" label="زمان باقی‌مانده تا شروع" />
           <p v-if="eStore.config?.eventStartsAt" class="faint">
             شروع خودکار: <span class="num">{{ fmtJalaliDateTime(eStore.config.eventStartsAt) }}</span>
           </p>
-          <p class="faint wait-lead">
-            وقتی شمارش معکوس به پایان برسد، سوال چالش خودکار همین‌جا نمایش داده می‌شود.
-          </p>
         </section>
 
         <!-- 3) admin paused a live event: hide challenge + editor immediately -->
-        <section v-else-if="userView === 'paused'" class="wait-card card card-pad">
+        <section v-else-if="userView === 'paused'" key="paused" class="wait-card card card-pad">
           <span class="wait-ico warning"><AppIcon name="pause" :size="26" /></span>
           <h2>رویداد متوقف شده است</h2>
           <p class="faint wait-lead">
@@ -280,7 +282,7 @@ function confirmExit() {
         </section>
 
         <!-- 4) event finished: dedicated end screen, no challenge, no editor -->
-        <section v-else-if="userView === 'ended'" class="wait-card card card-pad">
+        <section v-else-if="userView === 'ended'" key="ended" class="wait-card card card-pad">
           <span class="wait-ico danger"><AppIcon name="clock" :size="26" /></span>
           <h2>زمان رویداد به پایان رسید</h2>
           <p class="faint wait-lead">مهلت ارسال کد تمام شده است.</p>
@@ -297,7 +299,7 @@ function confirmExit() {
         </section>
 
         <!-- 5) event live: arena (challenge + editor) — no start button -->
-        <section v-else-if="challenge" class="arena">
+        <section v-else-if="challenge" key="arena" class="arena">
           <aside class="arena-brief card card-pad">
             <ChallengeCard :challenge="challenge" compact />
             <ul class="rules-list arena-rules">
@@ -380,12 +382,27 @@ function confirmExit() {
             </div>
           </div>
         </section>
+      </Transition>
       </template>
     </main>
   </div>
 </template>
 
 <style scoped>
+/* Soft cross-fade between the event-state screens (esp. countdown -> the
+   live arena the instant it starts) — a small fade + rise reads better than
+   a hard cut for something that switches on its own with no user action. */
+.fade-enter-active,
+.fade-leave-active {
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}
 .user-shell {
   min-height: 100dvh;
   display: flex;
