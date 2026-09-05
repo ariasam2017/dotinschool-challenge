@@ -213,7 +213,14 @@ install_cli(){
 #!/usr/bin/env bash
 set -euo pipefail
 cd /opt/dotinschool
-C=(docker compose -f build/docker-compose.yml)
+# --env-file .env (not relying on compose's own auto-discovery): compose
+# resolves ${APP_PORT:-8080} in build/docker-compose.yml relative to the
+# COMPOSE FILE's directory (build/), not this cd'd-to directory - so without
+# this flag, APP_PORT from ./.env is silently ignored and it always falls
+# back to the literal default 8080, no matter what .env actually says. This
+# is exactly what made the "port" menu option (below) look like it worked
+# (it wrote the new port to .env and said so) while docker still bound 8080.
+C=(docker compose --env-file .env -f build/docker-compose.yml)
 
 port_in_use(){ (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && { exec 3<&- 2>/dev/null; exec 3>&- 2>/dev/null; return 0; }; return 1; }
 find_free_port(){
@@ -315,11 +322,14 @@ main(){
   write_env
   build_image
   install_cli
-  ( cd "$INSTALL_DIR" && docker compose -f build/docker-compose.yml up -d )
+  # Via the installed CLI's own "up" action (not a separate compose call here)
+  # so this always resolves APP_PORT from .env the same, already-correct way
+  # - see the --env-file comment inside install_cli() above.
+  "$CLI_PATH" up
   echo
   ( cd "$INSTALL_DIR" && "$CLI_PATH" admin )
   echo
   warn "For HTTPS with a domain: set DOMAIN in ${INSTALL_DIR}/.env and run:"
-  echo "  cd ${INSTALL_DIR} && docker compose -f build/docker-compose.yml -f build/docker-compose.prod.yml up -d"
+  echo "  cd ${INSTALL_DIR} && docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.prod.yml up -d"
 }
 main "$@"

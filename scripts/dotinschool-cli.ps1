@@ -30,7 +30,14 @@ $ErrorActionPreference = 'Stop'
 $InstallDir = Split-Path -Parent $PSScriptRoot
 Set-Location $InstallDir
 
-$ComposeArgs = @('-f', 'build/docker-compose.yml')
+# --env-file .env (not relying on compose's own auto-discovery): compose
+# resolves ${APP_PORT:-8080} in build/docker-compose.yml relative to the
+# COMPOSE FILE's directory (build/), not $InstallDir - so without this flag,
+# APP_PORT from .env here is silently ignored and it always falls back to
+# the literal default 8080, no matter what .env actually says (docker-up.ps1
+# sidesteps this by exporting $env:APP_PORT directly before its own compose
+# call, which this wrapper does not do).
+$ComposeArgs = @('--env-file', '.env', '-f', 'build/docker-compose.yml')
 
 function Say($m) { Write-Host "==> $m" -ForegroundColor Cyan }
 function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; throw $m }
