@@ -36,7 +36,10 @@ $ErrorActionPreference = 'Stop'
 try { Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force } catch {}
 
 function Say($m) { Write-Host "==> $m" -ForegroundColor Cyan }
-function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; exit 1 }
+# `exit` would close the whole PowerShell window here, since this file runs
+# via `irm | iex` directly in the caller's own session rather than as a
+# separate process - `throw` stops the script but leaves the window open.
+function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; throw $m }
 
 $Branch     = 'main'
 $InstallDir = Join-Path $env:USERPROFILE 'dotinschool'

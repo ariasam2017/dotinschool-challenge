@@ -25,7 +25,12 @@ Set-Location -Path $PSScriptRoot
 
 function Say($m) { Write-Host "==> $m" -ForegroundColor Cyan }
 function Warn($m) { Write-Host "[!] $m" -ForegroundColor Yellow }
-function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; exit 1 }
+# `exit` would close the whole PowerShell window when this script is called
+# with `&` from within another script/session (as windows-install.ps1 does,
+# and as `.\docker-up.ps1` typed directly at a prompt also does) rather than
+# launched as its own process - `throw` stops the script but leaves the
+# window open so the error above stays readable.
+function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; throw $m }
 
 # ---- 1. Go: locate it, or install it from the official zip ----
 $GoVersion = '1.27.1'
