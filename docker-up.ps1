@@ -3,14 +3,18 @@
 #   powershell -ExecutionPolicy Bypass -File .\docker-up.ps1
 #   (or just:  .\docker-up.ps1 )
 #
-# Installs Go via winget if it's missing (no prompts). Docker Desktop is
-# NOT auto-installed - its installer is interactive and can require a
-# reboot for the WSL2 kernel update, so if it's missing this script just
-# prints where to get it and stops; re-run after installing it yourself.
-# Once both are present, compiles the Linux binary on this Windows host
-# (fast, reliable), packages it into a tiny image (a ~5s file copy - NO
-# in-container `go build`, so the "rpc error ... EOF" build failure cannot
-# happen), and starts the stack. Re-run any time to rebuild + recreate.
+# Installs Go via a direct download from go.dev/dl if it's missing (no
+# winget - its GoLang.Go manifest has been known to point at a version
+# whose installer 404s; a plain zip from the official source doesn't have
+# that failure mode and doesn't need an installer/admin rights at all).
+# Docker Desktop is NOT auto-installed - its installer is interactive and
+# can require a reboot for the WSL2 kernel update, so if it's missing this
+# script just prints where to get it and stops; re-run after installing it
+# yourself. Once both are present, compiles the Linux binary on this
+# Windows host (fast, reliable), packages it into a tiny image (a ~5s file
+# copy - NO in-container `go build`, so the "rpc error ... EOF" build
+# failure cannot happen), and starts the stack. Re-run any time to rebuild
+# + recreate.
 #
 # ASCII-only on purpose: Windows PowerShell 5.1 mis-reads non-ASCII script files
 # unless they carry a UTF-8 BOM. Access info (URL + credentials) is printed at
@@ -23,24 +27,15 @@ function Say($m) { Write-Host "==> $m" -ForegroundColor Cyan }
 function Warn($m) { Write-Host "[!] $m" -ForegroundColor Yellow }
 function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; exit 1 }
 
-function Have-Winget { [bool](Get-Command winget -ErrorAction SilentlyContinue) }
+# ---- 1. Go: locate it, or install it from the official zip ----
+$GoVersion = '1.27.1'
+$GoRoot = Join-Path $env:LOCALAPPDATA 'dotinschool\go'
 
-function Winget-Install($id, $label) {
-  if (-not (Have-Winget)) {
-    Die "$label is missing and winget is not available on this system. Install $label manually and re-run this script."
-  }
-  Say "installing $label via winget (id: $id)"
-  winget install -e --id $id --accept-package-agreements --accept-source-agreements --silent
-  if ($LASTEXITCODE -ne 0) {
-    Die "winget could not install $label. Install it manually and re-run this script."
-  }
-}
-
-# ---- 1. Go: locate it, or install it ----
 function Find-Go {
   $cmd = Get-Command go -ErrorAction SilentlyContinue
   if ($cmd) { return $cmd.Source }
   foreach ($p in @(
+    (Join-Path $GoRoot 'bin\go.exe'),
     (Join-Path $env:ProgramFiles 'Go\bin\go.exe'),
     (Join-Path $env:LOCALAPPDATA 'Programs\go\bin\go.exe'),
     'C:\Go\bin\go.exe'
@@ -48,12 +43,32 @@ function Find-Go {
   return $null
 }
 
+function Install-Go {
+  $zipName = "go$GoVersion.windows-amd64.zip"
+  $mirrors = @("https://go.dev/dl/$zipName", "https://golang.google.cn/dl/$zipName")
+  $tmp = Join-Path $env:TEMP $zipName
+  Say "downloading Go $GoVersion (official zip, no installer/admin rights needed)"
+  $ok = $false
+  foreach ($url in $mirrors) {
+    try {
+      Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing -TimeoutSec 60
+      if ((Test-Path $tmp) -and ((Get-Item $tmp).Length -gt 0)) { $ok = $true; break }
+    } catch { }
+  }
+  if (-not $ok) { Die "Could not download Go from any mirror. Install it manually from https://go.dev/dl/ and re-run this script." }
+  $dest = Split-Path $GoRoot
+  New-Item -ItemType Directory -Force -Path $dest | Out-Null
+  if (Test-Path $GoRoot) { Remove-Item $GoRoot -Recurse -Force }
+  Expand-Archive -Path $tmp -DestinationPath $dest -Force
+  Remove-Item $tmp -Force
+}
+
 $go = Find-Go
 if (-not $go) {
   Warn "Go not found"
-  Winget-Install 'GoLang.Go' 'Go'
+  Install-Go
   $go = Find-Go
-  if (-not $go) { Die "Go was installed but could not be located. Open a new terminal (so PATH refreshes) and re-run this script." }
+  if (-not $go) { Die "Go was installed but could not be located." }
 }
 Say "using Go: $go"
 
