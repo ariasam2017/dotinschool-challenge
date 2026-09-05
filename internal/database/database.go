@@ -30,12 +30,31 @@ func Open(cfg *config.Config, log *logrus.Logger) (*gorm.DB, error) {
 		Colorful:                  false,
 	})
 
-	db, err := gorm.Open(sqlite.Open(cfg.DBPath()+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)"), &gorm.Config{
+	// mmap_size(0) + a rollback journal instead of WAL: the pure-Go SQLite
+	// driver memory-maps the database (and WAL mode additionally mmaps a shared
+	// -shm file) - which fails with ENOMEM, surfacing as SQLITE_CANTOPEN
+	// ("unable to open database file: out of memory (14)"), inside some
+	// Docker containers even on a host with plenty of free RAM (the same
+	// binary run directly on that host opens the file fine). Plain
+	// pread/pwrite has none of that dependency; TRUNCATE keeps a fast-ish
+	// journal without needing the -shm mapping. For this single-instance
+	// workload the concurrency tradeoff is irrelevant.
+	dsn := cfg.DBPath() + "?_pragma=busy_timeout(5000)" +
+		"&_pragma=journal_mode(TRUNCATE)" +
+		"&_pragma=foreign_keys(ON)" +
+		"&_pragma=mmap_size(0)"
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger:                 gormLog,
 		SkipDefaultTransaction: true,
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	// One connection: SQLite is single-writer anyway, and with a rollback
+	// journal (not WAL) concurrent connections just contend on SQLITE_BUSY.
+	if sqlDB, derr := db.DB(); derr == nil {
+		sqlDB.SetMaxOpenConns(1)
 	}
 
 	if err := Migrate(db); err != nil {
