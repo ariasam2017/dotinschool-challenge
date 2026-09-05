@@ -49,6 +49,16 @@ function Find-Go {
 }
 
 function Install-Go {
+  # Windows PowerShell 5.1 sometimes defaults to an older TLS version than
+  # go.dev/dl.google.com require, which fails silently as a generic
+  # connection error - force TLS 1.2 (and 1.3 where supported) up front.
+  try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+  } catch {}
+  try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls13
+  } catch {}
+
   $zipName = "go$GoVersion.windows-amd64.zip"
   $mirrors = @("https://go.dev/dl/$zipName", "https://golang.google.cn/dl/$zipName")
   $tmp = Join-Path $env:TEMP $zipName
@@ -58,9 +68,11 @@ function Install-Go {
     try {
       Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing -TimeoutSec 60
       if ((Test-Path $tmp) -and ((Get-Item $tmp).Length -gt 0)) { $ok = $true; break }
-    } catch { }
+    } catch {
+      Warn "download from $url failed: $($_.Exception.Message)"
+    }
   }
-  if (-not $ok) { Die "Could not download Go from any mirror. Install it manually from https://go.dev/dl/ and re-run this script." }
+  if (-not $ok) { Die "Could not download Go from any mirror (see the reason(s) above). Install it manually from https://go.dev/dl/ (grab the Windows zip, not the msi) and re-run this script - it will find an existing install under Go\bin, Programs\go\bin, or C:\Go\bin on PATH." }
   $dest = Split-Path $GoRoot
   New-Item -ItemType Directory -Force -Path $dest | Out-Null
   if (Test-Path $GoRoot) { Remove-Item $GoRoot -Recurse -Force }
