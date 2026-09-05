@@ -247,9 +247,40 @@ try {
 if (-not (Test-Path dist/dotinschool_linux_amd64)) { Die "go build failed." }
 
 # ---- 6. build image + start stack ----
+# This Dockerfile only copies the already-compiled binary in (no `go build`
+# here), so it should never fail on memory - but Docker Desktop's BuildKit
+# backend can still drop its own internal grpc connection mid-build on some
+# machines ("rpc error: code = Unavailable ... EOF"), even on a trivial RUN
+# step. That's a transient BuildKit hiccup, not a problem with this
+# Dockerfile - retry a couple of times, then fall back to the classic
+# (non-BuildKit) builder, which doesn't use that grpc protocol at all and so
+# can't hit this specific failure.
 Say "building the Docker image (packaging - a few seconds)"
-docker build -f build/Dockerfile -t dotinschool:local .
-if ($LASTEXITCODE -ne 0) { Die "docker build failed." }
+function Build-Image([bool]$legacyBuilder) {
+  if ($legacyBuilder) { $env:DOCKER_BUILDKIT = '0' } else { Remove-Item Env:DOCKER_BUILDKIT -ErrorAction SilentlyContinue }
+  # Piped through Out-Host (not left bare): a PowerShell function's return
+  # value is EVERY unsuppressed pipeline object written during it, not just
+  # the explicit `return` - so `docker build`'s own console output would
+  # otherwise get bundled into what this function "returns", and a non-empty
+  # array is always truthy regardless of $ok, silently defeating the retry
+  # check below on the very first (failing) attempt.
+  docker build -f build/Dockerfile -t dotinschool:local . | Out-Host
+  $ok = ($LASTEXITCODE -eq 0)
+  Remove-Item Env:DOCKER_BUILDKIT -ErrorAction SilentlyContinue
+  return $ok
+}
+$maxAttempts = 3
+$built = $false
+for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+  if ($attempt -gt 1) {
+    Warn "docker build failed (attempt $($attempt - 1) of $maxAttempts) - retrying$(if ($attempt -eq $maxAttempts) { ' with the classic (non-BuildKit) builder' })..."
+    Start-Sleep -Seconds 3
+  }
+  if (Build-Image ($attempt -eq $maxAttempts)) { $built = $true; break }
+}
+if (-not $built) {
+  Die "docker build failed after $maxAttempts attempts (BuildKit and the classic builder). This looks like a genuine Docker Desktop problem, not this project's Dockerfile - restart Docker Desktop (or reboot), then re-run this script. If it keeps happening, raise Docker Desktop's memory limit in Settings -> Resources."
+}
 Say "starting the stack"
 docker compose -f build/docker-compose.yml up -d
 if ($LASTEXITCODE -ne 0) { Die "docker compose up failed." }

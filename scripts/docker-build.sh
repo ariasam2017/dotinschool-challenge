@@ -37,7 +37,32 @@ if [ "$(echo "$ARCHS" | wc -w)" -gt 1 ]; then
   docker buildx build --platform "$platforms" -f build/Dockerfile -t "$TAG" --load .
 else
   echo "==> docker build (linux/${ARCHS})"
-  docker build --build-arg "TARGETARCH=${ARCHS}" -f build/Dockerfile -t "$TAG" .
+  # This Dockerfile only copies the already-compiled binary in (no `go build`
+  # here), so it should never fail on memory - but Docker's BuildKit backend
+  # can still drop its own internal grpc connection mid-build on some hosts
+  # ("rpc error: code = Unavailable ... EOF"), even on a trivial RUN step.
+  # That's a transient BuildKit hiccup, not a problem with this Dockerfile -
+  # retry a couple of times, then fall back to the classic (non-BuildKit)
+  # builder, which doesn't use that grpc protocol at all.
+  max_attempts=3
+  built=0
+  for attempt in $(seq 1 "$max_attempts"); do
+    if [ "$attempt" -gt 1 ]; then
+      msg="==> docker build failed (attempt $((attempt - 1)) of $max_attempts) — retrying"
+      [ "$attempt" -eq "$max_attempts" ] && msg="$msg with the classic (non-BuildKit) builder"
+      echo "$msg..."
+      sleep 3
+    fi
+    if [ "$attempt" -eq "$max_attempts" ]; then
+      DOCKER_BUILDKIT=0 docker build --build-arg "TARGETARCH=${ARCHS}" -f build/Dockerfile -t "$TAG" . && { built=1; break; }
+    else
+      docker build --build-arg "TARGETARCH=${ARCHS}" -f build/Dockerfile -t "$TAG" . && { built=1; break; }
+    fi
+  done
+  if [ "$built" -ne 1 ]; then
+    echo "docker build failed after $max_attempts attempts (BuildKit and the classic builder) — this looks like a genuine Docker/BuildKit problem, not this Dockerfile. Restart Docker (or the docker daemon), then re-run." >&2
+    exit 1
+  fi
 fi
 
 echo "==> done: $TAG"
