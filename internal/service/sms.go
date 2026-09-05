@@ -224,6 +224,14 @@ func (p *ippanelProvider) Verbose(phone, patternCode string, params map[string]s
 	res.OK = parsed.succeeded(httpRes.StatusCode)
 	res.Message = parsed.message()
 
+	// A 5xx from ippanel (its edge endpoint sits behind a CDN that answers
+	// 502/503/504 when ippanel's own backend is momentarily down) is not a
+	// configuration problem on our side - say so, so a transient outage
+	// doesn't read as "your API key / pattern is wrong".
+	if !res.OK && httpRes.StatusCode >= 500 && strings.TrimSpace(res.Message) == "" {
+		res.Message = fmt.Sprintf("سرویس ippanel موقتاً در دسترس نیست (کد %d) — چند دقیقه بعد دوباره امتحان کنید. تنظیمات شما درست است.", httpRes.StatusCode)
+	}
+
 	if !res.OK {
 		p.log.WithFields(logrus.Fields{
 			"endpoint": info.Endpoint,
