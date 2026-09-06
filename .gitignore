@@ -9,6 +9,10 @@
 .env
 .env.local
 
+# TLS certs + acme.sh state — created at runtime by `dotinschool cert`
+/certs/
+/.acme.sh/
+
 # build output binaries
 /dist/
 /dotinschool
