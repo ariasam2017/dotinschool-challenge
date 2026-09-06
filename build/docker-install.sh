@@ -383,10 +383,13 @@ server_ip(){
 # HTTP on APP_PORT.
 do_cert(){
   local domain="${1:-}"
+  local BASE="docker compose --env-file .env -f build/docker-compose.yml"
+  local PROD="$BASE -f build/docker-compose.prod.yml"
   if [[ "$domain" == "off" ]]; then
     if grep -qE '^DOMAIN=' .env; then sed -i 's|^DOMAIN=.*|DOMAIN=|' .env; fi
     echo "HTTPS disabled - back to plain HTTP on APP_PORT."
-    docker compose --env-file .env -f build/docker-compose.yml up -d --remove-orphans
+    $PROD down --remove-orphans 2>/dev/null || true
+    $BASE up -d --remove-orphans
     return
   fi
   if [[ -z "$domain" && -t 0 ]]; then
@@ -400,7 +403,11 @@ do_cert(){
   [[ $blocked -eq 0 ]] || return 1
   if grep -qE '^DOMAIN=' .env; then sed -i "s|^DOMAIN=.*|DOMAIN=${domain}|" .env; else echo "DOMAIN=${domain}" >> .env; fi
   echo "Bringing up with Caddy (automatic HTTPS via Let's Encrypt)..."
-  docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.prod.yml up -d
+  # Stop the running plain (HTTP-only) stack first - it holds APP_PORT on
+  # 0.0.0.0, which the prod stack would then fail to rebind (the app moves to
+  # 127.0.0.1 behind Caddy) with "address already in use".
+  $BASE down --remove-orphans 2>/dev/null || true
+  $PROD up -d
   local apath; apath=$(grep -E '^ADMIN_PATH=' .env | cut -d= -f2-)
   echo
   echo "Done. Caddy fetches the certificate on the first HTTPS request (~30s)."
