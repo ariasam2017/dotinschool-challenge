@@ -429,22 +429,39 @@ acme_install(){
     apt-get install -y socat >/dev/null 2>&1 || dnf install -y socat >/dev/null 2>&1 || yum install -y socat >/dev/null 2>&1 || true
   }
   local tmp; tmp=$(mktemp -d)
-  if curl -fsSL --connect-timeout 15 https://get.acme.sh -o "$tmp/get.sh" 2>/dev/null && [[ -s "$tmp/get.sh" ]]; then
-    ( cd "$tmp" && sh get.sh --home "$ACME_HOME" >/dev/null 2>&1 ) || true
-  fi
-  if [[ ! -x "$ACME_HOME/acme.sh" ]]; then
-    local m
-    for m in "https://github.com" "https://gh-proxy.com/https://github.com" \
-             "https://ghproxy.net/https://github.com" "https://ghfast.top/https://github.com"; do
-      if GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
-           git clone --depth 1 "${m}/acmesh-official/acme.sh" "$tmp/acme.sh" >/dev/null 2>&1; then
-        ( cd "$tmp/acme.sh" && ./acme.sh --install --home "$ACME_HOME" >/dev/null 2>&1 ) || true
-        break
-      fi
-    done
-  fi
+  # Full git clone of the repo (brings dnsapi/dns_cf.sh, which a single-file
+  # download would miss). Every attempt is HARD time-boxed - get.acme.sh /
+  # raw.githubusercontent.com are SNI-blocked on some networks and, without a
+  # limit, curl/git just hang there forever (this is the "stuck at Installing
+  # acme.sh" symptom). github.com itself usually still clones; the gh-proxy
+  # mirrors cover the case where it doesn't.
+  local m
+  for m in "https://github.com" \
+           "https://gh-proxy.com/https://github.com" \
+           "https://ghproxy.net/https://github.com" \
+           "https://ghfast.top/https://github.com" \
+           "https://gh.ddlc.top/https://github.com"; do
+    echo "  fetching acme.sh via ${m%%/https*} ..."
+    rm -rf "$tmp/acme.sh"
+    if timeout 100 env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+         git clone --depth 1 "${m}/acmesh-official/acme.sh" "$tmp/acme.sh" >/dev/null 2>&1; then
+      ( cd "$tmp/acme.sh" && timeout 60 ./acme.sh --install --home "$ACME_HOME" --nocron >/dev/null 2>&1 ) || true
+      [[ -x "$ACME_HOME/acme.sh" ]] && break
+    fi
+  done
   rm -rf "$tmp"
-  [[ -x "$ACME_HOME/acme.sh" ]] || { echo "[!] Could not install acme.sh (network?). Install it to $ACME_HOME by hand, then retry."; return 1; }
+  if [[ ! -x "$ACME_HOME/acme.sh" ]]; then
+    echo "[!] Could not download acme.sh - GitHub is unreachable from this server."
+    echo "    Either turn on a tunnel/DNS bypass and retry, or install it by hand:"
+    echo "      git clone --depth 1 https://github.com/acmesh-official/acme.sh /tmp/a \\"
+    echo "        && (cd /tmp/a && ./acme.sh --install --home ${ACME_HOME} --nocron)"
+    echo "    then re-run:  dotinschool cert <domain>"
+    return 1
+  fi
+  # acme.sh's own cron entry can't reload a container (it runs as a bare shell
+  # line); install our own instead so renewals actually take effect.
+  ( crontab -l 2>/dev/null | grep -v "$ACME_HOME/acme.sh --cron"; \
+    echo "17 3 * * * $ACME_HOME/acme.sh --cron --home $ACME_HOME >/dev/null 2>&1" ) | crontab - 2>/dev/null || true
   "$ACME_HOME/acme.sh" --set-default-ca --server letsencrypt >/dev/null 2>&1 || true
 }
 
@@ -466,7 +483,7 @@ acme_issue(){
     [[ -n "${CF_Token:-}" ]] || { echo "No Cloudflare token given."; return 1; }
     export CF_Token
     echo "Issuing via Cloudflare DNS (works even if the record is proxied/orange-cloud) ..."
-    "$ACME_HOME/acme.sh" --issue --dns dns_cf -d "$domain" --home "$ACME_HOME" --keylength ec-256 && ok=1
+    timeout 300 "$ACME_HOME/acme.sh" --issue --dns dns_cf -d "$domain" --home "$ACME_HOME" --keylength ec-256 && ok=1
   else
     echo "Issuing via standalone HTTP - port 80 is needed for ~20s ..."
     local had_caddy=0
@@ -475,9 +492,12 @@ acme_issue(){
       echo "  (pausing Caddy so acme.sh can bind :80)"
       docker stop dotinschool-caddy >/dev/null 2>&1 || true
     fi
-    "$ACME_HOME/acme.sh" --issue --standalone -d "$domain" --home "$ACME_HOME" --keylength ec-256 --httpport 80 && ok=1
+    timeout 180 "$ACME_HOME/acme.sh" --issue --standalone -d "$domain" --home "$ACME_HOME" --keylength ec-256 --httpport 80 && ok=1
     [[ $had_caddy -eq 1 ]] && docker start dotinschool-caddy >/dev/null 2>&1 || true
   fi
+  # acme.sh exits non-zero when the cert already exists and isn't near expiry -
+  # that's still a success for us, the files just need installing.
+  if [[ $ok -ne 1 && -d "$ACME_HOME/${domain}_ecc" ]]; then ok=1; fi
   [[ $ok -eq 1 ]] || { echo "[!] acme.sh could not issue the certificate (see its output above)."; return 1; }
   # Reload whatever is terminating TLS after a renewal: Caddy picks up a new
   # cert with a live reload; the app (HTTPS-only mode) reads its cert once at
