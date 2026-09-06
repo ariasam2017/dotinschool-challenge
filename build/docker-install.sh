@@ -22,8 +22,15 @@
 #
 #   dotinschool                 interactive menu (free-port finder, HTTPS cert, ...)
 #   dotinschool up | down | restart | logs | update | admin | ps | rebuild | port
-#   dotinschool cert <domain>   get + auto-renew an HTTPS cert (Caddy/Let's Encrypt)
-#   dotinschool cert off        turn HTTPS back off (plain HTTP on APP_PORT)
+#   dotinschool cert <domain>   add HTTPS via Caddy/Let's Encrypt (IP + HTTP keep working)
+#   dotinschool cert off        remove HTTPS again (plain HTTP on APP_PORT)
+#   dotinschool heal            recover a stuck / half-brought-up stack
+#
+# The panel is always reachable on http://<server-ip>:<APP_PORT>/ ; adding a
+# domain with `cert` puts HTTPS *in front of* that, it doesn't replace it.
+#
+# Optional one-shot HTTPS at install time (A record must already point here):
+#   DOTINSCHOOL_DOMAIN=panel.example.com  bash build/docker-install.sh
 # =============================================================================
 set -euo pipefail
 
@@ -377,53 +384,90 @@ server_ip(){
 }
 
 # Point a domain's DNS A record at this server first, then: dotinschool cert
-# <domain>. Writes DOMAIN into .env and brings the stack up with the Caddy
-# override - Caddy then fetches and auto-renews a Let's Encrypt certificate
-# on its own, no certbot/acme.sh. "dotinschool cert off" reverts to plain
-# HTTP on APP_PORT.
+# <domain>. Writes DOMAIN into .env and adds the Caddy container in front -
+# Caddy then fetches and auto-renews a Let's Encrypt certificate on its own,
+# no certbot/acme.sh. The app KEEPS its direct http://<ip>:<APP_PORT> binding
+# the whole time, so the panel never goes dark while HTTPS is coming up, and
+# a DNS / ACME problem can't take the site offline. "dotinschool cert off"
+# removes Caddy again.
 do_cert(){
   local domain="${1:-}"
   local BASE="docker compose --env-file .env -f build/docker-compose.yml"
   local PROD="$BASE -f build/docker-compose.prod.yml"
+  local apath; apath=$(grep -E '^ADMIN_PATH=' .env | cut -d= -f2-)
+
   if [[ "$domain" == "off" ]]; then
-    if grep -qE '^DOMAIN=' .env; then sed -i 's|^DOMAIN=.*|DOMAIN=|' .env; fi
-    echo "HTTPS disabled - back to plain HTTP on APP_PORT."
+    if grep -qE '^DOMAIN=' .env; then sed -i 's|^DOMAIN=.*|DOMAIN=|' .env; else echo "DOMAIN=" >> .env; fi
+    echo "Disabling HTTPS - removing Caddy, back to plain HTTP on APP_PORT..."
+    docker rm -f dotinschool-caddy >/dev/null 2>&1 || true
     $PROD down --remove-orphans 2>/dev/null || true
     $BASE up -d --remove-orphans
+    echo "Done. Panel: http://$(server_ip):$(grep -E '^APP_PORT=' .env | cut -d= -f2-)/${apath}/"
     return
   fi
+
   if [[ -z "$domain" && -t 0 ]]; then
     read -rp "Domain (its DNS A record must already point at this server), e.g. panel.example.com: " domain
   fi
   [[ -n "$domain" ]] || { echo "No domain given."; return 1; }
-  local blocked=0 p
+
+  # A stale Caddy from an earlier half-finished attempt (created but never
+  # started) would make this look "already in use" - clear it first. The app
+  # container is left running throughout: its port binding does not change.
+  docker rm -f dotinschool-caddy >/dev/null 2>&1 || true
+
+  local p
   for p in 80 443; do
-    if port_in_use "$p"; then echo "Port $p is already in use (another web server / panel?). Free it first."; blocked=1; fi
+    port_in_use "$p" && echo "  note: something is already listening on port $p - if it isn't ours, Caddy won't be able to bind it."
   done
-  [[ $blocked -eq 0 ]] || return 1
+
   if grep -qE '^DOMAIN=' .env; then sed -i "s|^DOMAIN=.*|DOMAIN=${domain}|" .env; else echo "DOMAIN=${domain}" >> .env; fi
-  echo "Bringing up with Caddy (automatic HTTPS via Let's Encrypt)..."
-  # Stop the running plain (HTTP-only) stack first - it holds APP_PORT on
-  # 0.0.0.0, which the prod stack would then fail to rebind (the app moves to
-  # 127.0.0.1 behind Caddy) with "address already in use".
-  $BASE down --remove-orphans 2>/dev/null || true
-  $PROD up -d
-  local apath; apath=$(grep -E '^ADMIN_PATH=' .env | cut -d= -f2-)
-  echo
-  echo "Done. Caddy fetches the certificate on the first HTTPS request (~30s)."
-  echo "  panel : https://${domain}/${apath}/"
-  echo "  logs  : dotinschool logs   (Caddy prints the cert issuance there)"
+  echo "Bringing up Caddy in front of the app (automatic HTTPS via Let's Encrypt)..."
+  if $PROD up -d --remove-orphans; then
+    echo
+    echo "Done. The app is reachable right now on the IP; HTTPS goes green once"
+    echo "Caddy gets the certificate (needs the A record + ports 80/443 open, ~30s)."
+    echo "  https : https://${domain}/${apath}/"
+    echo "  http  : http://$(server_ip):$(grep -E '^APP_PORT=' .env | cut -d= -f2-)/${apath}/"
+    echo "  watch : dotinschool logs      (Caddy prints the cert issuance / any error there)"
+  else
+    echo
+    echo "[!] Could not start Caddy - reverting to plain HTTP so the panel stays up."
+    sed -i 's|^DOMAIN=.*|DOMAIN=|' .env
+    docker rm -f dotinschool-caddy >/dev/null 2>&1 || true
+    $BASE up -d --remove-orphans || true
+    echo "    Panel still on: http://$(server_ip):$(grep -E '^APP_PORT=' .env | cut -d= -f2-)/${apath}/"
+    echo "    Fix the cause (usually ports 80/443 taken by another web server) and retry:"
+    echo "      dotinschool cert ${domain}"
+    return 1
+  fi
 }
+
+running_count(){ "${C[@]}" ps -q 2>/dev/null | grep -c . || true; }
 
 run_action(){
   case "$1" in
-    up)      "${C[@]}" up -d ;;
-    down)    "${C[@]}" down ;;
-    restart) "${C[@]}" restart ;;
-    logs)    "${C[@]}" logs -f ;;
-    ps)      "${C[@]}" ps ;;
+    up)      "${C[@]}" up -d --remove-orphans ;;
+    down)    "${C[@]}" down --remove-orphans ;;
+    restart) "${C[@]}" up -d --remove-orphans ;;
+    logs)
+      if [[ "$(running_count)" == "0" ]]; then
+        echo "Nothing is running yet - start it with 'dotinschool up' (menu option 1), then check the logs."
+        exit 0
+      fi
+      "${C[@]}" logs -f ;;
+    ps|status)
+      "${C[@]}" ps
+      [[ "$(running_count)" == "0" ]] && echo && echo "(no containers running - 'dotinschool up' / menu option 1 brings the stack up)" ;;
     port)    show_ports ;;
     cert)    do_cert "${2:-}" ;;
+    heal|fix|reset)
+      echo "Recovering the stack..."
+      docker rm -f dotinschool dotinschool-caddy >/dev/null 2>&1 || true
+      docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
+      "${C[@]}" up -d --remove-orphans
+      echo "Done."
+      "${C[@]}" ps ;;
     rebuild) PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" && "${C[@]}" up -d ;;
     update)  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git fetch --depth 1 origin main \
                && GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git reset --hard origin/main \
@@ -433,17 +477,21 @@ run_action(){
     admin)
       e=.env
       apath=$(grep -E '^ADMIN_PATH=' $e | cut -d= -f2-)
+      ipbase="http://$(server_ip):$(grep -E '^APP_PORT=' $e | cut -d= -f2-)"
       if has_domain; then
-        base="https://$(get_domain)"
+        dbase="https://$(get_domain)"
+        echo "User panel:   ${dbase}/            (HTTPS - once the cert is issued)"
+        echo "              ${ipbase}/            (plain HTTP - always available)"
+        echo "Admin panel:  ${dbase}/${apath}/"
+        echo "              ${ipbase}/${apath}/"
       else
-        base="http://$(server_ip):$(grep -E '^APP_PORT=' $e | cut -d= -f2-)"
+        echo "User panel:   ${ipbase}/"
+        echo "Admin panel:  ${ipbase}/${apath}/"
       fi
-      echo "User panel:   ${base}/"
-      echo "Admin panel:  ${base}/${apath}/"
       echo "Username:     $(grep -E '^ADMIN_USERNAME=' $e | cut -d= -f2-)"
       echo "Password:     $(grep -E '^ADMIN_PASSWORD=' $e | cut -d= -f2-)"
       ;;
-    *) echo "usage: dotinschool {up|down|restart|logs|ps|port|cert|rebuild|update|admin}"; exit 1 ;;
+    *) echo "usage: dotinschool {up|down|restart|logs|ps|port|cert|rebuild|update|admin|heal}"; exit 1 ;;
   esac
 }
 
@@ -453,7 +501,7 @@ show_menu(){
   echo "|             dotinschool - management             |"
   echo "+-------------------------------------------------+"
   echo "|   0. Exit                                        |"
-  echo "|   1. Start (up)                                  |"
+  echo "|   1. Start / bring everything up (IP + HTTPS)    |"
   echo "|   2. Stop (down)                                 |"
   echo "|   3. Restart                                     |"
   echo "|   4. Rebuild (recompile + recreate)              |"
@@ -464,8 +512,9 @@ show_menu(){
   echo "|   9. Show admin URL + credentials                |"
   echo "|  10. Get HTTPS certificate (needs a domain)      |"
   echo "|  11. Disable HTTPS (back to plain HTTP)          |"
+  echo "|  12. Recover / fix a stuck stack                 |"
   echo "+-------------------------------------------------+"
-  read -rp "Choice [0-11]: " choice
+  read -rp "Choice [0-12]: " choice
   case "$choice" in
     0) return ;;
     1) run_action up ;;
@@ -479,7 +528,8 @@ show_menu(){
     9) run_action admin ;;
     10) do_cert "" ;;
     11) do_cert off ;;
-    *) echo "Enter a number from 0 to 11." ;;
+    12) run_action heal ;;
+    *) echo "Enter a number from 0 to 12." ;;
   esac
 }
 
@@ -488,6 +538,24 @@ WRAP
   chmod +x "$tmp"
   mv "$tmp" "$CLI_PATH"
   ok "\"dotinschool\" command installed."
+}
+
+# Poll the app's own port until it answers (or give up) - so the installer
+# only prints "done" once the panel is actually serving, and surfaces a
+# crash-loop instead of leaving the user to discover it.
+wait_healthy(){
+  local port; port=$(grep -E '^APP_PORT=' "${INSTALL_DIR}/.env" | cut -d= -f2-)
+  [[ -n "$port" ]] || port=8080
+  local i
+  for i in $(seq 1 30); do
+    if curl -fsS -m 3 "http://127.0.0.1:${port}/api/config" >/dev/null 2>&1; then
+      ok "Panel is up and answering on port ${port}."
+      return 0
+    fi
+    sleep 2
+  done
+  warn "The panel didn't answer on port ${port} within 60s - check:  dotinschool logs"
+  return 1
 }
 
 main(){
@@ -504,10 +572,23 @@ main(){
   # so this always resolves APP_PORT from .env the same, already-correct way
   # - see the --env-file comment inside install_cli() above.
   "$CLI_PATH" up
+  wait_healthy || true
+
+  # Optional one-shot HTTPS: DOTINSCHOOL_DOMAIN=panel.example.com bash docker-install.sh
+  # (the A record must already point here). Safe to skip - HTTP on the IP works
+  # regardless, and `dotinschool cert <domain>` can be run any time later.
+  if [[ -n "${DOTINSCHOOL_DOMAIN:-}" ]]; then
+    echo
+    info "DOTINSCHOOL_DOMAIN set - setting up HTTPS for ${DOTINSCHOOL_DOMAIN}..."
+    ( cd "$INSTALL_DIR" && "$CLI_PATH" cert "$DOTINSCHOOL_DOMAIN" ) || \
+      warn "HTTPS setup didn't complete - the panel is still up on the IP. Retry later with: dotinschool cert ${DOTINSCHOOL_DOMAIN}"
+  fi
+
   echo
   ( cd "$INSTALL_DIR" && "$CLI_PATH" admin )
   echo
-  warn "For HTTPS: point a domain's DNS A record at this server, then run:  dotinschool cert <domain>"
+  warn "For HTTPS later: point a domain's DNS A record at this server, then run:  dotinschool cert <domain>"
+  warn "If anything ever looks stuck:  dotinschool heal"
 }
 # Lets the installed CLI's own "update" action refresh /usr/local/bin/
 # dotinschool from whatever this file's install_cli() currently contains,

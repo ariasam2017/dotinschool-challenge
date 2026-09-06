@@ -1,21 +1,24 @@
 # ── dotinschool ── production override: Caddy in front, automatic HTTPS.
 #
-# Requirements:
+# This override ADDS a Caddy reverse proxy that terminates TLS for $DOMAIN and
+# fetches + auto-renews a Let's Encrypt certificate on its own (no certbot, no
+# acme.sh, no downtime). It deliberately does NOT touch the app's own published
+# port: the app stays reachable directly on http://<server-ip>:<APP_PORT> too,
+# so the panel is up on the IP the whole time HTTPS is being set up — and stays
+# up even if DNS / the ACME challenge isn't ready yet. Caddy reaches the app
+# over the compose network (app:8080), which needs no published port at all.
+#
+# Requirements for the HTTPS side to go green:
 #   1. A DNS A record for $DOMAIN pointing at this server's public IP.
-#   2. Ports 80 and 443 free on the host.
+#   2. Ports 80 and 443 reachable from the internet.
 #   3. DOMAIN set in .env  (e.g. DOMAIN=panel.example.com)
 #
 # Run:
 #   docker compose -f build/docker-compose.yml -f build/docker-compose.prod.yml up -d
 #
-# Caddy fetches + renews the Let's Encrypt certificate on its own — no certbot,
-# no acme.sh, no downtime. With no domain (IP only) just use the base file.
+# With no domain (IP only) just use the base file.
 
 services:
-  app:
-    ports:
-      - "127.0.0.1:8080:8080" # not public; Caddy reaches it on the compose network
-
   caddy:
     image: caddy:2-alpine
     container_name: dotinschool-caddy
