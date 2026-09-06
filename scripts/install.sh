@@ -148,8 +148,11 @@ go_ok(){ [[ -x "${GO_ROOT}/bin/go" ]] && "${GO_ROOT}/bin/go" version >/dev/null 
 # endpoint for the actual current release names instead; GO_VERSION below is
 # only the last-resort fallback if that lookup itself fails.
 resolve_go_tarballs(){
-  local arch="$1" json
-  json=$(curl -fsSL --connect-timeout 15 "https://go.dev/dl/?mode=json" 2>/dev/null) || true
+  local arch="$1" json u
+  for u in "https://go.dev/dl/?mode=json" "https://golang.google.cn/dl/?mode=json"; do
+    json=$(curl -fsSL --connect-timeout 15 "$u" 2>/dev/null) || true
+    [[ -n "$json" ]] && break
+  done
   [[ -n "$json" ]] && echo "$json" | grep -o "\"go[0-9.]*\.linux-${arch}\.tar\.gz\"" | tr -d '"' | awk '!seen[$0]++'
 }
 
@@ -166,13 +169,18 @@ install_go(){
   info "Trying Go release(s): ${candidates[*]}"
   local tmp="" tgz base found=0
   for tgz in "${candidates[@]}"; do
-    for base in "https://go.dev/dl" "https://mirrors.aliyun.com/golang" "https://golang.google.cn/dl"; do
+    for base in \
+      "https://go.dev/dl" \
+      "https://mirrors.aliyun.com/golang" \
+      "https://mirrors.ustc.edu.cn/golang" \
+      "https://mirror.nju.edu.cn/golang" \
+      "https://golang.google.cn/dl"; do
       tmp=$(mktemp)
       if curl -fsSL --connect-timeout 15 "${base}/${tgz}" -o "$tmp" && [[ -s "$tmp" ]]; then found=1; break 2; fi
       rm -f "$tmp"; tmp=""
     done
   done
-  [[ $found -eq 1 ]] || die "Could not download Go from any mirror/release. Install it manually from https://go.dev/dl/ and re-run this script."
+  [[ $found -eq 1 ]] || die "Could not download Go from any mirror. On a filtered server, turn on a tunnel / DNS bypass and re-run, or install Go manually to ${GO_ROOT}."
   rm -rf "$GO_ROOT"
   tar -C /usr/local -xzf "$tmp"
   rm -f "$tmp"
@@ -229,14 +237,36 @@ fetch_app(){
   info "Fetching source from GitHub (${BRANCH})..."
   local url; url=$(repo_url)
   [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
-  rm -rf "$INSTALL_DIR"
-  git_nc clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null || { github_unreachable_hint; exit 1; }
-  ok "Source ready at ${INSTALL_DIR}."
+
+  # timeout + inline env so a filtered network fails fast instead of hanging.
+  clone_try(){ rm -rf "$INSTALL_DIR"; timeout "${1}" env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+      git clone --depth 1 --branch "$BRANCH" "${2}" "$INSTALL_DIR" >/dev/null 2>&1; }
+
+  if clone_try 90 "$url"; then ok "Source ready at ${INSTALL_DIR}."; return; fi
+  warn "Direct clone from GitHub failed/timed out - trying public git mirrors..."
+  local m
+  for m in "https://gh-proxy.com" "https://ghproxy.net" "https://ghfast.top" "https://gh.ddlc.top"; do
+    info "  via ${m}"
+    if clone_try 120 "${m}/${url}"; then
+      git_nc -C "$INSTALL_DIR" remote set-url origin "$url"
+      ok "Source ready at ${INSTALL_DIR} (via ${m})."
+      return
+    fi
+  done
+  github_unreachable_hint
+  err "Or: 'git clone' the repo yourself into a folder (with a tunnel/DNS bypass) and run 'sudo bash scripts/install.sh' from INSIDE it - it reuses a local checkout without touching the network."
+  exit 1
 }
 
 build_binary(){
   info "Compiling binary (CGO off, frontend already built and committed)..."
-  ( cd "$INSTALL_DIR" && CGO_ENABLED=0 "${GO_ROOT}/bin/go" build -trimpath -ldflags="-s -w" -o "${BIN_NAME}.new" ./cmd/server )
+  # goproxy.cn mirrors both the module proxy and the Go toolchain and stays
+  # reachable where proxy.golang.org / sum.golang.org don't - so the compile
+  # resolves dependencies on a filtered network too. Harmless on an open one.
+  ( cd "$INSTALL_DIR" && CGO_ENABLED=0 \
+      GOPROXY="https://goproxy.cn,https://goproxy.io,direct" \
+      GOSUMDB="sum.golang.google.cn" GOTOOLCHAIN="auto" \
+      "${GO_ROOT}/bin/go" build -trimpath -ldflags="-s -w" -o "${BIN_NAME}.new" ./cmd/server )
   mv "${INSTALL_DIR}/${BIN_NAME}.new" "${INSTALL_DIR}/${BIN_NAME}"
   chmod +x "${INSTALL_DIR}/${BIN_NAME}"
   ok "Binary built: ${INSTALL_DIR}/${BIN_NAME}"

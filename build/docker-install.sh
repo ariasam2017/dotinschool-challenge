@@ -90,10 +90,59 @@ install_prereqs(){
 install_docker(){
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then ok "Docker is already installed."; return; fi
   info "Installing Docker..."
-  curl -fsSL https://get.docker.com | sh >/dev/null
+  # get.docker.com first; if it (or download.docker.com behind it) is
+  # unreachable - common on filtered networks - fall back to the distro's own
+  # docker.io + compose plugin, which come from the already-reachable OS repo.
+  if ! curl -fsSL --connect-timeout 20 https://get.docker.com 2>/dev/null | sh >/dev/null 2>&1 \
+     || ! command -v docker >/dev/null 2>&1; then
+    warn "get.docker.com did not work - installing docker from the OS package repo instead."
+    if command -v apt-get >/dev/null 2>&1; then
+      apt-get update -y >/dev/null 2>&1 || true
+      apt-get install -y docker.io docker-compose-v2 >/dev/null 2>&1 \
+        || apt-get install -y docker.io docker-compose-plugin >/dev/null 2>&1 || true
+    elif command -v dnf >/dev/null 2>&1; then
+      dnf install -y docker docker-compose-plugin >/dev/null 2>&1 || true
+    elif command -v yum >/dev/null 2>&1; then
+      yum install -y docker docker-compose-plugin >/dev/null 2>&1 || true
+    fi
+  fi
   systemctl enable --now docker >/dev/null 2>&1 || true
-  docker compose version >/dev/null 2>&1 || die "The docker compose plugin is not available."
+  command -v docker >/dev/null 2>&1 || die "Could not install Docker (neither get.docker.com nor the OS package worked)."
+  docker compose version >/dev/null 2>&1 || die "Docker is installed but the 'docker compose' plugin is missing."
   ok "Docker installed."
+  configure_docker_registry_mirror
+}
+
+# On a network that can't reach Docker Hub (registry-1.docker.io), every
+# image pull - including the alpine base this project builds on - fails. If a
+# reachability probe confirms that, point Docker at public mirrors so pulls
+# work without any per-command proxy. Only touches daemon.json if it does not
+# already exist (so an existing custom config is never clobbered).
+configure_docker_registry_mirror(){
+  local code
+  code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' https://registry-1.docker.io/v2/ 2>/dev/null || echo 000)
+  if [[ "$code" != "000" ]]; then
+    return  # Docker Hub is reachable - nothing to do
+  fi
+  if [[ -s /etc/docker/daemon.json ]]; then
+    warn "Docker Hub looks unreachable and /etc/docker/daemon.json already exists - add a"
+    warn "\"registry-mirrors\" entry to it yourself if image pulls fail (e.g. https://docker.arvancloud.ir)."
+    return
+  fi
+  warn "Docker Hub (registry-1.docker.io) is unreachable - configuring registry mirrors."
+  mkdir -p /etc/docker
+  cat > /etc/docker/daemon.json <<'JSON'
+{
+  "registry-mirrors": [
+    "https://docker.arvancloud.ir",
+    "https://docker.iranserver.com",
+    "https://registry.docker.ir",
+    "https://docker.mobinhost.com"
+  ]
+}
+JSON
+  systemctl restart docker >/dev/null 2>&1 || true
+  ok "Registry mirrors configured in /etc/docker/daemon.json."
 }
 
 arch_tag(){ case "$(uname -m)" in x86_64|amd64) echo amd64 ;; aarch64|arm64) echo arm64 ;; *) die "Unsupported architecture: $(uname -m)";; esac; }
@@ -104,8 +153,11 @@ arch_tag(){ case "$(uname -m)" in x86_64|amd64) echo amd64 ;; aarch64|arm64) ech
 # endpoint for the actual current release names instead; GO_VERSION is only
 # the last-resort fallback if that lookup itself fails.
 resolve_go_tarballs(){
-  local arch="$1" json
-  json=$(curl -fsSL --connect-timeout 15 "https://go.dev/dl/?mode=json" 2>/dev/null) || true
+  local arch="$1" json u
+  for u in "https://go.dev/dl/?mode=json" "https://golang.google.cn/dl/?mode=json"; do
+    json=$(curl -fsSL --connect-timeout 15 "$u" 2>/dev/null) || true
+    [[ -n "$json" ]] && break
+  done
   [[ -n "$json" ]] && echo "$json" | grep -o "\"go[0-9.]*\.linux-${arch}\.tar\.gz\"" | tr -d '"' | awk '!seen[$0]++'
 }
 
@@ -120,15 +172,22 @@ install_go(){
     candidates=("go${GO_VERSION}.linux-${arch}.tar.gz")
   fi
   info "Trying Go release(s): ${candidates[*]}"
+  # aliyun / ustc / nju mirrors are the ones that tend to still work on
+  # filtered networks where go.dev and dl.google.com don't.
   local tmp="" tgz base found=0
   for tgz in "${candidates[@]}"; do
-    for base in "https://go.dev/dl" "https://mirrors.aliyun.com/golang" "https://golang.google.cn/dl"; do
+    for base in \
+      "https://go.dev/dl" \
+      "https://mirrors.aliyun.com/golang" \
+      "https://mirrors.ustc.edu.cn/golang" \
+      "https://mirror.nju.edu.cn/golang" \
+      "https://golang.google.cn/dl"; do
       tmp=$(mktemp)
       if curl -fsSL --connect-timeout 15 "${base}/${tgz}" -o "$tmp" && [[ -s "$tmp" ]]; then found=1; break 2; fi
       rm -f "$tmp"; tmp=""
     done
   done
-  [[ $found -eq 1 ]] || die "Failed to download Go from any mirror/release."
+  [[ $found -eq 1 ]] || die "Could not download Go from any mirror. On a filtered server, turn on a tunnel/DNS bypass and re-run, or install Go manually to ${GO_ROOT}."
   rm -rf "$GO_ROOT"; tar -C /usr/local -xzf "$tmp"; rm -f "$tmp"
   export PATH="${GO_ROOT}/bin:$PATH"
   ok "Go $("${GO_ROOT}/bin/go" version | awk '{print $3}') installed."
@@ -174,9 +233,26 @@ fetch_repo(){
 
   local url; url=$(repo_url)
   [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
-  rm -rf "$INSTALL_DIR"
-  git_nc clone --depth 1 --branch "$BRANCH" "$url" "$INSTALL_DIR" >/dev/null
-  ok "Source ready at ${INSTALL_DIR}."
+
+  # `timeout` + inline env so a filtered network fails fast instead of hanging;
+  # git_nc is a shell function so `timeout` can't call it directly.
+  clone_try(){ rm -rf "$INSTALL_DIR"; timeout "${1}" env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+      git clone --depth 1 --branch "$BRANCH" "${2}" "$INSTALL_DIR" >/dev/null 2>&1; }
+
+  if clone_try 90 "$url"; then ok "Source ready at ${INSTALL_DIR}."; return; fi
+
+  warn "Direct clone from GitHub failed/timed out - trying public git mirrors..."
+  local m
+  for m in "https://gh-proxy.com" "https://ghproxy.net" "https://ghfast.top" "https://gh.ddlc.top"; do
+    info "  via ${m}"
+    if clone_try 120 "${m}/${url}"; then
+      git_nc -C "$INSTALL_DIR" remote set-url origin "$url"
+      ok "Source ready at ${INSTALL_DIR} (via ${m})."
+      return
+    fi
+  done
+
+  die "Could not fetch the source from GitHub or any mirror. On a filtered server: turn on a tunnel / DNS bypass, 'git clone' the repo yourself into a folder, then run 'bash build/docker-install.sh' from INSIDE that folder - it reuses a local checkout without touching the network for the source."
 }
 
 write_env(){
@@ -206,7 +282,16 @@ EOF
 
 build_image(){
   info "Compiling the binary on the host + building the image (no go build inside the container)..."
-  ( cd "$INSTALL_DIR" && PATH="${GO_ROOT}/bin:$PATH" bash scripts/docker-build.sh "$(arch_tag)" )
+  # goproxy.cn mirrors the module proxy AND the Go toolchain, and stays
+  # reachable where proxy.golang.org / sum.golang.org don't - so the compile
+  # step resolves dependencies (and any auto toolchain) on a filtered network
+  # too. Harmless on an open one.
+  ( cd "$INSTALL_DIR" \
+    && PATH="${GO_ROOT}/bin:$PATH" \
+       GOPROXY="https://goproxy.cn,https://goproxy.io,direct" \
+       GOSUMDB="sum.golang.google.cn" \
+       GOTOOLCHAIN="auto" \
+       bash scripts/docker-build.sh "$(arch_tag)" )
   ok "Image dotinschool:local built."
 }
 
