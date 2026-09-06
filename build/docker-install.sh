@@ -383,6 +383,17 @@ set_env_kv(){ # key value  -- upsert into .env
   if grep -qE "^$1=" .env 2>/dev/null; then sed -i "s|^$1=.*|$1=$2|" .env; else echo "$1=$2" >> .env; fi
 }
 
+# Keep PUBLIC_HOST in .env pointed at this server's real address, so the
+# container's start-up log shows a reachable URL instead of 127.0.0.1. When a
+# DOMAIN is set (every HTTPS setup) the app prefers that, so this only matters
+# for the plain-IP case.
+sync_public_host(){
+  has_domain && return 0
+  local ip; ip=$(server_ip 2>/dev/null || true)
+  case "$ip" in ""|"<this-server-IP>") return 0 ;; esac
+  set_env_kv PUBLIC_HOST "$ip"
+}
+
 port_in_use(){ (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && { exec 3<&- 2>/dev/null; exec 3>&- 2>/dev/null; return 0; }; return 1; }
 find_free_port(){
   local port="${1:-8080}" tries=0
@@ -674,6 +685,17 @@ _cert_rollback(){ # domain ip appport apath
 running_count(){ "${C[@]}" ps -q 2>/dev/null | grep -c . || true; }
 
 run_action(){
+  # update/rebuild write /opt/dotinschool and /usr/local/bin and drive Docker —
+  # all root-owned. Without this a non-root run dies half-way (a failed step in
+  # an && chain) and the panel looks "not updated". Re-exec via sudo instead.
+  case "$1" in
+    update|rebuild|up|restart|cert|heal|fix|reset)
+      if [ "$(id -u)" -ne 0 ]; then
+        if command -v sudo >/dev/null 2>&1; then exec sudo -- "$0" "$@"; fi
+        echo "[x] '$1' needs root — re-run as:  sudo dotinschool $1"; exit 1
+      fi ;;
+  esac
+  case "$1" in up|restart|update|rebuild) sync_public_host ;; esac
   case "$1" in
     up)      "${C[@]}" up -d --remove-orphans ;;
     down)    "${C[@]}" down --remove-orphans ;;
@@ -706,12 +728,43 @@ run_action(){
       fi
       echo "Done."
       "${C[@]}" ps ;;
-    rebuild) PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" && "${C[@]}" up -d ;;
-    update)  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git fetch --depth 1 origin main \
-               && GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git reset --hard origin/main \
-               && bash build/docker-install.sh --reinstall-cli \
-               && PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
-               && "${C[@]}" up -d ;;
+    rebuild)
+      arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+      PATH="/usr/local/go/bin:/usr/lib/go/bin:$HOME/go/bin:$PATH" \
+        bash scripts/docker-build.sh "$arch" \
+        || { echo "[x] build failed — the running panel was left as it was. Fix the error above and re-run."; exit 1; }
+      "${C[@]}" up -d --force-recreate --remove-orphans
+      echo "== rebuilt & restarted. Hard-refresh the browser (Ctrl+Shift+R)." ;;
+    update)
+      arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+      before="$(git rev-parse --short HEAD 2>/dev/null || echo '?')"
+      echo "==> [1/5] fetching the latest source from GitHub"
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git fetch --depth 1 origin main \
+        || { echo "[x] git fetch failed — check this server's internet/DNS, then re-run 'dotinschool update'."; exit 1; }
+      echo "==> [2/5] applying it (git reset --hard origin/main)"
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git reset --hard origin/main \
+        || { echo "[x] git reset failed."; exit 1; }
+      after="$(git rev-parse --short HEAD 2>/dev/null || echo '?')"
+      echo "    $before -> $after"
+      echo "==> [3/5] refreshing the 'dotinschool' command"
+      bash build/docker-install.sh --reinstall-cli || echo "[!] CLI refresh failed (carrying on)"
+      echo "==> [4/5] compiling the binary + packaging the image"
+      PATH="/usr/local/go/bin:/usr/lib/go/bin:$HOME/go/bin:$PATH" \
+        bash scripts/docker-build.sh "$arch" \
+        || { echo "[x] build failed — the running panel was NOT touched, it is still up on the old version. Fix the error above and re-run 'dotinschool update'."; exit 1; }
+      echo "==> [5/5] recreating the container with the new image"
+      "${C[@]}" up -d --force-recreate --remove-orphans \
+        || { echo "[x] 'compose up' failed — run 'dotinschool logs' to see why."; exit 1; }
+      sleep 2
+      running="$({ "${C[@]}" logs --since 60s app 2>/dev/null || true; } | sed -n 's/.*dotinschool version \([^"]*\).*/\1/p' | tail -n1 || true)"
+      echo
+      if [ "$before" = "$after" ]; then
+        echo "== Already on the latest commit ($after). Image rebuilt & container recreated anyway."
+      else
+        echo "== Updated $before -> $after."
+      fi
+      [ -n "$running" ] && echo "== Container is now running build: $running"
+      echo "== Now hard-refresh the browser: Ctrl+Shift+R (or open a private window)." ;;
     admin)
       e=.env
       apath=$(grep -E '^ADMIN_PATH=' $e | cut -d= -f2-)

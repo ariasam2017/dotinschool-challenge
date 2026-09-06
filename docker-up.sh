@@ -46,6 +46,21 @@ for p in 8080 8090 8091 8092 3000 9000; do if port_free "$p"; then PORT="$p"; br
 export APP_PORT="${PORT:-8080}"
 say "host port: $APP_PORT"
 
+# Tell the container which address to advertise in its start-up log (otherwise
+# it can only guess and prints 127.0.0.1). A DOMAIN in .env wins over this.
+if ! grep -qE '^DOMAIN=[^[:space:]]' .env 2>/dev/null; then
+  PUBHOST=$(curl -fsSL -4 --connect-timeout 8 https://api.ipify.org 2>/dev/null \
+            || hostname -I 2>/dev/null | awk '{print $1}')
+  if [ -n "${PUBHOST:-}" ]; then
+    if grep -qE '^PUBLIC_HOST=' .env 2>/dev/null; then
+      sed -i "s|^PUBLIC_HOST=.*|PUBLIC_HOST=${PUBHOST}|" .env
+    else
+      echo "PUBLIC_HOST=${PUBHOST}" >> .env
+    fi
+    say "public host: $PUBHOST"
+  fi
+fi
+
 say "compiling the linux binary on the host (first run may take ~1 min)"
 mkdir -p dist
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 "$GO" build -trimpath -ldflags="-s -w" \
@@ -62,9 +77,10 @@ PASS=$(grep -E '^ADMIN_PASSWORD=' .env | cut -d= -f2-)
 APATH=$(grep -E '^ADMIN_PATH=' .env | cut -d= -f2-)
 USER=$(grep -E '^ADMIN_USERNAME=' .env | cut -d= -f2-)
 echo
+HOST=$(grep -E '^PUBLIC_HOST=' .env 2>/dev/null | cut -d= -f2-); HOST="${HOST:-localhost}"
 echo "──────────────────────────────────────────────"
-echo " user panel :  http://localhost:$APP_PORT/"
-echo " admin panel:  http://localhost:$APP_PORT/$APATH/"
+echo " user panel :  http://$HOST:$APP_PORT/"
+echo " admin panel:  http://$HOST:$APP_PORT/$APATH/"
 echo " username   :  $USER"
 echo " password   :  $PASS"
 echo "──────────────────────────────────────────────"

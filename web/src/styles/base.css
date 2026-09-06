@@ -78,10 +78,17 @@ code,
 kbd,
 samp,
 pre,
-.num,
 .mono {
   font-family: var(--font-mono);
   font-feature-settings: 'tnum' on, 'zero' on;
+}
+
+/* .num is for IDs / phones / scores / timers — digits are rendered in Persian
+   (see lib/fa-digits), so it stays on the UI font (IRANYekanX) and only keeps
+   the tabular alignment. */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' on;
 }
 
 /* Tabular figures everywhere numbers matter, so timers/tables never jitter. */

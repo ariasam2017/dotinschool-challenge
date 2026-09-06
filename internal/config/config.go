@@ -5,6 +5,7 @@ package config
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,6 +24,14 @@ type Config struct {
 	UseTLS   bool
 	CertPath string
 	KeyPath  string
+
+	// How the panel is reached from outside — used only for the addresses
+	// printed at start-up (the server itself always binds every interface on
+	// Port). Priority: PublicURL > Domain > PublicHost > auto-detected IP.
+	Domain     string // DOMAIN — the public (sub)domain, no scheme, no port
+	PublicHost string // PUBLIC_HOST — explicit host/IP when there is no domain
+	PublicPort string // PUBLIC_PORT — the port published to the outside world
+	PublicURL  string // PUBLIC_URL — a full "scheme://host[:port]" override
 
 	InDocker bool
 
@@ -115,6 +124,23 @@ func Load(root string, log *logrus.Logger) *Config {
 	}
 	c.AdminSubdomain = sub
 
+	c.Domain = strings.TrimSpace(os.Getenv("DOMAIN"))
+	c.PublicHost = strings.TrimSpace(os.Getenv("PUBLIC_HOST"))
+	c.PublicURL = strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_URL")), "/")
+	// The outside port: an explicit override, else the host-published port the
+	// Docker stacks pass through (APP_PORT for plain HTTP, HTTPS_PORT for the
+	// 3x-ui-style direct-TLS mode), else the port we listen on.
+	c.PublicPort = firstNonEmpty(
+		strings.TrimSpace(os.Getenv("PUBLIC_PORT")),
+		strings.TrimSpace(os.Getenv("APP_PORT")),
+	)
+	if c.UseTLS {
+		c.PublicPort = firstNonEmpty(
+			strings.TrimSpace(os.Getenv("PUBLIC_PORT")),
+			strings.TrimSpace(os.Getenv("HTTPS_PORT")),
+		)
+	}
+
 	// No fixed password baked into the binary. Generate a strong one, persist it
 	// to .env so it stays stable across restarts, and print it once.
 	if c.AdminPassword == "" {
@@ -136,6 +162,63 @@ func (c *Config) SMSConfigPath() string { return filepath.Join(c.DataDir, "sms-c
 
 // DBPath is the single SQLite file that holds all state.
 func (c *Config) DBPath() string { return filepath.Join(c.DataDir, "arena.db") }
+
+// PublicBaseURL is the "scheme://host[:port]" the panel is reached on from
+// outside — for the addresses printed at start-up. It never ends with "/".
+// It falls back to the machine's LAN IP, and only to "localhost" when even
+// that cannot be determined (a local dev run, typically).
+func (c *Config) PublicBaseURL() string {
+	if c.PublicURL != "" {
+		return c.PublicURL
+	}
+
+	scheme := "http"
+	if c.UseTLS {
+		scheme = "https"
+	}
+
+	standardPort := func(p string) bool {
+		return (scheme == "http" && (p == "" || p == "80")) ||
+			(scheme == "https" && (p == "" || p == "443"))
+	}
+
+	// A real domain is the clearest label; keep the port off it unless it is
+	// non-standard (e.g. HTTPS on :8443 because :443 was taken).
+	if c.Domain != "" {
+		host := c.Domain
+		if !standardPort(c.PublicPort) {
+			host += ":" + c.PublicPort
+		}
+		return scheme + "://" + host
+	}
+
+	host := firstNonEmpty(c.PublicHost, outboundIP(c.InDocker), "localhost")
+	port := firstNonEmpty(c.PublicPort, c.Port)
+	if !standardPort(port) {
+		host += ":" + port
+	}
+	return scheme + "://" + host
+}
+
+// outboundIP returns the primary non-loopback IPv4 address of this host by
+// asking the kernel which local address a UDP socket to a public IP would use
+// (no packet is actually sent). Inside a bridged container this is the
+// container's own address, which is useless to a browser, so it is skipped
+// there — PUBLIC_HOST or DOMAIN is expected instead. Returns "" on failure.
+func outboundIP(inDocker bool) string {
+	if inDocker {
+		return ""
+	}
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return ""
+	}
+	defer conn.Close()
+	if a, ok := conn.LocalAddr().(*net.UDPAddr); ok && a.IP != nil && !a.IP.IsLoopback() {
+		return a.IP.String()
+	}
+	return ""
+}
 
 func firstNonEmpty(vs ...string) string {
 	for _, v := range vs {

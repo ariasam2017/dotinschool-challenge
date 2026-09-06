@@ -225,11 +225,7 @@ function confirmExit() {
       <!-- not signed in -->
       <section v-if="!user" class="hero">
         <div class="hero-copy">
-          <h1>به چالش برنامه‌نویسی خوش آمدید</h1>
-          <p>
-            کد جاوای خود را در یک ادیتور حرفه‌ای بنویسید و تا پایان مهلت ارسال کنید.
-            هویت شما بر اساس شماره موبایل احراز می‌شود.
-          </p>
+          <h1>به چالش برنامه‌نویسی مدرسه داتین خوش آمدید</h1>
         </div>
         <AuthPanel @authed="onAuthed" />
       </section>
@@ -510,10 +506,6 @@ function confirmExit() {
 .hero > * {
   min-width: 0;
 }
-.hero-copy h1,
-.hero-copy p {
-  overflow-wrap: anywhere;
-}
 @media (min-width: 900px) {
   .hero {
     grid-template-columns: 1fr 1fr;
@@ -522,13 +514,9 @@ function confirmExit() {
   }
 }
 .hero-copy h1 {
-  font-size: clamp(1.6rem, 4vw, 2.4rem);
-  line-height: 1.3;
-}
-.hero-copy p {
-  font-size: 1rem;
-  color: var(--text-dim);
-  line-height: 2;
+  font-size: clamp(0.95rem, 3.4vw, 1.7rem);
+  line-height: 1.4;
+  white-space: nowrap;
 }
 .event-banner {
   display: flex;

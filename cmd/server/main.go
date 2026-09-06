@@ -20,8 +20,14 @@ import (
 	"github.com/dotinschool/dotinschool/internal/web"
 )
 
+// version is stamped at build time via -ldflags "-X main.version=...".
+// scripts/docker-build.sh sets it from `git describe`. Logged once at start-up
+// so `dotinschool update` can prove which build the container is running.
+var version = "dev"
+
 func main() {
 	log := newLogger()
+	log.Infof("dotinschool version %s", version)
 
 	wd, err := os.Getwd()
 	if err != nil {
@@ -70,9 +76,11 @@ func main() {
 		if cfg.UseTLS {
 			scheme = "https"
 		}
+		base := cfg.PublicBaseURL()
 		log.Infof("dotinschool server running (%s):", scheme)
-		log.Infof("  User panel:  %s://127.0.0.1:%s/", scheme, cfg.Port)
-		log.Infof("  Admin panel: %s://127.0.0.1:%s%s/", scheme, cfg.Port, cfg.AdminPath)
+		log.Infof("  User panel:  %s/", base)
+		log.Infof("  Admin panel: %s%s/", base, cfg.AdminPath)
+		log.Infof("  (bound to 0.0.0.0:%s)", cfg.Port)
 
 		var listenErr error
 		if cfg.UseTLS {
