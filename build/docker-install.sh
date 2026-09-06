@@ -23,20 +23,23 @@
 #   dotinschool                 interactive menu (free-port finder, HTTPS cert, ...)
 #   dotinschool up | down | restart | logs | update | admin | ps | rebuild | port
 #   dotinschool cert <domain>   set up HTTPS - pick a method interactively:
-#                                 1) Caddy / Let's Encrypt automatic
-#                                 2) Cloudflare DNS API via acme.sh  (works behind
-#                                    the Cloudflare proxy - same engine as 3x-ui)
-#                                 3) standalone HTTP via acme.sh
-#   dotinschool cert <domain> 2  skip the prompt, use method 2 (or 1 / 3)
+#                                 1) HTTPS-only :443, cert via Cloudflare DNS  }  the
+#                                 2) HTTPS-only :443, cert via standalone HTTP  }  3x-ui
+#                                    (app terminates TLS itself, no HTTP)       }  shape
+#                                 3) Caddy in front + keep HTTP, auto Let's Encrypt
+#                                 4) Caddy in front + keep HTTP, Cloudflare DNS
+#   dotinschool cert <domain> 1  skip the prompt, use method 1 (or 2 / 3 / 4)
 #   dotinschool cert off        remove HTTPS again (plain HTTP on APP_PORT)
 #   dotinschool heal            recover a stuck / half-brought-up stack
 #
-# The panel is always reachable on http://<server-ip>:<APP_PORT>/ ; adding a
-# domain with `cert` puts HTTPS *in front of* that, it doesn't replace it.
+# acme.sh (the same engine 3x-ui uses) is the certificate tool for methods
+# 1/2/4; it auto-renews via its own cron. Methods 1/2 are HTTPS-only on :443
+# (set HTTPS_PORT in .env to use another port). Methods 3/4 keep plain
+# http://<ip>:<APP_PORT> alongside HTTPS.
 #
 # Optional one-shot HTTPS at install time:
 #   DOTINSCHOOL_DOMAIN=panel.example.com  bash build/docker-install.sh
-#   ( + CF_Token=<cloudflare-api-token>   to use the Cloudflare-DNS method )
+#   ( + CF_Token=<cloudflare-api-token>   to issue via Cloudflare DNS )
 # =============================================================================
 set -euo pipefail
 
@@ -276,9 +279,12 @@ write_env(){
   cat > "$env" <<EOF
 APP_PORT=${port}
 DOMAIN=
-# CERT_MODE: blank = plain HTTP or Caddy-auto HTTPS; "acme" = cert from acme.sh
-# (Cloudflare-DNS / standalone). Set by 'dotinschool cert', don't edit by hand.
+# CERT_MODE (set by 'dotinschool cert', don't edit by hand):
+#   blank  = plain HTTP, or Caddy-auto HTTPS when DOMAIN is set
+#   acme   = Caddy in front serving an acme.sh cert file
+#   direct = HTTPS-only, app terminates TLS itself on HTTPS_PORT (3x-ui style)
 CERT_MODE=
+HTTPS_PORT=443
 ADMIN_USERNAME=administrator
 ADMIN_PASSWORD=$(random_password)
 ADMIN_PATH=$(random_admin_path)
@@ -345,22 +351,25 @@ chown -R 10001:10001 data 2>/dev/null || true
 # back to the literal default 8080, no matter what .env actually says. This
 # is exactly what made the "port" menu option (below) look like it worked
 # (it wrote the new port to .env and said so) while docker still bound 8080.
-# When DOMAIN is set in .env, every action needs a Caddy override too - which
-# one depends on how the cert is obtained:
-#   CERT_MODE unset / "auto"  -> docker-compose.prod.yml  (Caddy runs its own
-#                                Let's Encrypt ACME; needs 80+443 reachable and
-#                                the domain NOT proxied through Cloudflare)
-#   CERT_MODE = "acme"        -> docker-compose.acme.yml  (Caddy serves a cert
-#                                file that acme.sh issued via Cloudflare-DNS or
-#                                standalone-HTTP; the only path that works
-#                                behind the Cloudflare proxy)
-# Without an override a plain "restart" would silently drop to HTTP-only.
-COMPOSE_FILES=(-f build/docker-compose.yml)
-if grep -qE '^DOMAIN=[^[:space:]]' .env 2>/dev/null; then
-  if grep -qE '^CERT_MODE=acme' .env 2>/dev/null; then
-    COMPOSE_FILES+=(-f build/docker-compose.acme.yml)
-  else
-    COMPOSE_FILES+=(-f build/docker-compose.prod.yml)
+# Which compose file(s) every action uses depends on CERT_MODE in .env:
+#   direct  -> docker-compose.tls.yml  ALONE.  HTTPS-only, the app terminates
+#              TLS itself on :443 from an acme.sh cert - the 3x-ui model. No
+#              plain-HTTP port at all.
+#   acme    -> base + docker-compose.acme.yml.  Caddy in front, serving an
+#              acme.sh cert file; plain HTTP on the IP kept.
+#   (unset) -> base [+ docker-compose.prod.yml when DOMAIN is set].  Caddy with
+#              its own automatic Let's Encrypt ACME; plain HTTP on the IP kept.
+# Without the right file a plain "restart" would silently drop the HTTPS setup.
+if grep -qE '^CERT_MODE=direct' .env 2>/dev/null; then
+  COMPOSE_FILES=(-f build/docker-compose.tls.yml)
+else
+  COMPOSE_FILES=(-f build/docker-compose.yml)
+  if grep -qE '^DOMAIN=[^[:space:]]' .env 2>/dev/null; then
+    if grep -qE '^CERT_MODE=acme' .env 2>/dev/null; then
+      COMPOSE_FILES+=(-f build/docker-compose.acme.yml)
+    else
+      COMPOSE_FILES+=(-f build/docker-compose.prod.yml)
+    fi
   fi
 fi
 C=(docker compose --env-file .env "${COMPOSE_FILES[@]}")
@@ -461,51 +470,64 @@ acme_issue(){
   else
     echo "Issuing via standalone HTTP - port 80 is needed for ~20s ..."
     local had_caddy=0
-    docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dotinschool-caddy && had_caddy=1
-    [[ $had_caddy -eq 1 ]] && { echo "  (pausing Caddy so acme.sh can bind :80)"; docker stop dotinschool-caddy >/dev/null 2>&1 || true; }
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dotinschool-caddy; then
+      had_caddy=1
+      echo "  (pausing Caddy so acme.sh can bind :80)"
+      docker stop dotinschool-caddy >/dev/null 2>&1 || true
+    fi
     "$ACME_HOME/acme.sh" --issue --standalone -d "$domain" --home "$ACME_HOME" --keylength ec-256 --httpport 80 && ok=1
     [[ $had_caddy -eq 1 ]] && docker start dotinschool-caddy >/dev/null 2>&1 || true
   fi
   [[ $ok -eq 1 ]] || { echo "[!] acme.sh could not issue the certificate (see its output above)."; return 1; }
+  # Reload whatever is terminating TLS after a renewal: Caddy picks up a new
+  # cert with a live reload; the app (HTTPS-only mode) reads its cert once at
+  # startup, so it needs a quick restart. Run both, ignore the one absent.
   "$ACME_HOME/acme.sh" --install-cert -d "$domain" --home "$ACME_HOME" --ecc \
     --fullchain-file "$CERT_DIR/$domain/fullchain.pem" \
     --key-file "$CERT_DIR/$domain/privkey.pem" \
-    --reloadcmd "docker exec dotinschool-caddy caddy reload --config /etc/caddy/Caddyfile --force >/dev/null 2>&1 || docker restart dotinschool-caddy >/dev/null 2>&1 || true" \
+    --reloadcmd "docker exec dotinschool-caddy caddy reload --config /etc/caddy/Caddyfile --force >/dev/null 2>&1; docker restart dotinschool >/dev/null 2>&1; true" \
     >/dev/null 2>&1
   [[ -s "$CERT_DIR/$domain/fullchain.pem" && -s "$CERT_DIR/$domain/privkey.pem" ]] || { echo "[!] Certificate files were not written."; return 1; }
   chmod 644 "$CERT_DIR/$domain/fullchain.pem"; chmod 640 "$CERT_DIR/$domain/privkey.pem"
   echo "[ok] Certificate saved to $CERT_DIR/$domain/ (acme.sh will auto-renew it)."
 }
 
-# `dotinschool cert <domain>` — set up HTTPS. Same certificate engine as the
-# 3x-ui panel: Caddy stays in front for the proxying, but the certificate can
-# be obtained three ways. Whichever method is chosen, the app KEEPS its plain
-# http://<ip>:<APP_PORT> binding, so the panel never goes dark and a DNS/ACME
-# problem can't take the site offline. `dotinschool cert off` removes HTTPS.
+# `dotinschool cert <domain>` — set up HTTPS. acme.sh is the certificate
+# engine (the same one the 3x-ui / sanaei panel uses). Two shapes:
+#
+#   direct (default) — the 3x-ui model. The app terminates TLS itself on :443,
+#     HTTPS ONLY, no reverse proxy, no plain-HTTP port. Reached as
+#     https://<domain>/<admin-path>/.
+#   caddy — Caddy sits in front and plain http://<ip>:<APP_PORT> is kept too
+#     (handy while DNS is still propagating).
+#
+# `dotinschool cert off` tears HTTPS down and goes back to plain HTTP.
 do_cert(){
   local domain="${1:-}"
   local method="${2:-}"
   local BASE="docker compose --env-file .env -f build/docker-compose.yml"
   local PROD="$BASE -f build/docker-compose.prod.yml"
   local ACME="$BASE -f build/docker-compose.acme.yml"
+  local TLS="docker compose --env-file .env -f build/docker-compose.tls.yml"
   local apath; apath=$(grep -E '^ADMIN_PATH=' .env | cut -d= -f2-)
   local ip; ip=$(server_ip)
   local appport; appport=$(grep -E '^APP_PORT=' .env | cut -d= -f2-)
 
   if [[ "$domain" == "off" ]]; then
-    set_env_kv DOMAIN ""
-    set_env_kv CERT_MODE ""
-    echo "Disabling HTTPS - removing Caddy, back to plain HTTP on APP_PORT ..."
+    echo "Disabling HTTPS - back to plain HTTP on APP_PORT ..."
     docker rm -f dotinschool-caddy >/dev/null 2>&1 || true
     $PROD down --remove-orphans 2>/dev/null || true
     $ACME down --remove-orphans 2>/dev/null || true
+    $TLS  down --remove-orphans 2>/dev/null || true
+    set_env_kv DOMAIN ""
+    set_env_kv CERT_MODE ""
     $BASE up -d --remove-orphans
     echo "Done. Panel: http://${ip}:${appport}/${apath}/"
     return
   fi
 
   if [[ -z "$domain" && -t 0 ]]; then
-    read -rp "Domain (must be a name you control), e.g. panel.example.com: " domain
+    read -rp "Domain (a (sub)domain you control, its DNS pointing at this server), e.g. panel.example.com: " domain
   fi
   [[ -n "$domain" ]] || { echo "No domain given."; return 1; }
   case "$domain" in
@@ -515,46 +537,89 @@ do_cert(){
 
   if [[ -z "$method" && -t 0 ]]; then
     echo
-    echo "How should the certificate be obtained?"
-    echo "  1) Automatic  - Caddy / Let's Encrypt.  Needs ports 80 AND 443 reachable"
-    echo "                  from the internet and the DNS record NOT proxied through"
-    echo "                  Cloudflare (grey cloud / 'DNS only')."
-    echo "  2) Cloudflare DNS API (acme.sh).  Works even with the orange cloud on."
-    echo "                  Needs a Cloudflare API token (Zone.DNS: Edit)."
-    echo "  3) Standalone HTTP (acme.sh).  Needs port 80 free for ~20s. No token."
-    read -rp "Choice [1-3]: " method
+    echo "How do you want HTTPS set up for ${domain}?"
+    echo "  1) HTTPS-only on :443, cert via Cloudflare DNS   (like 3x-ui; needs a CF API token;"
+    echo "                                                    works even behind the Cloudflare proxy)"
+    echo "  2) HTTPS-only on :443, cert via standalone HTTP  (like 3x-ui; needs :80 free for ~20s)"
+    echo "  3) Caddy in front, keep plain HTTP too, automatic Let's Encrypt"
+    echo "  4) Caddy in front, keep plain HTTP too, cert via Cloudflare DNS"
+    read -rp "Choice [1-4]: " method
   fi
   [[ -n "$method" ]] || method=1
 
-  # Clear a stale Caddy from an earlier half-finished attempt - the app
-  # container keeps running throughout (its port binding never changes).
   docker rm -f dotinschool-caddy >/dev/null 2>&1 || true
-
   set_env_kv DOMAIN "$domain"
 
   case "$method" in
-    2|cf|cloudflare)
-      set_env_kv CERT_MODE acme
-      if acme_issue "$domain" cf && $ACME up -d --remove-orphans; then
-        _cert_ok "$domain" "$apath" "$ip" "$appport"
-      else _cert_rollback "$domain" "$ip" "$appport" "$apath"; return 1; fi ;;
-    3|standalone|http)
-      set_env_kv CERT_MODE acme
-      if acme_issue "$domain" standalone && $ACME up -d --remove-orphans; then
-        _cert_ok "$domain" "$apath" "$ip" "$appport"
-      else _cert_rollback "$domain" "$ip" "$appport" "$apath"; return 1; fi ;;
-    *)
-      set_env_kv CERT_MODE ""
-      local p
-      for p in 80 443; do
-        port_in_use "$p" && echo "  note: something already listens on :$p - if it isn't ours, Caddy can't bind it."
-      done
-      echo "Bringing up Caddy with automatic Let's Encrypt ..."
-      if $PROD up -d --remove-orphans; then
-        _cert_ok "$domain" "$apath" "$ip" "$appport"
-        echo "  (HTTPS goes green once Caddy completes the ACME challenge, ~30s - watch: dotinschool logs)"
-      else _cert_rollback "$domain" "$ip" "$appport" "$apath"; return 1; fi ;;
+    1|cf|cloudflare|direct)          _cert_direct "$domain" cf         "$apath" "$ip" "$appport" ;;
+    2|standalone|http)               _cert_direct "$domain" standalone "$apath" "$ip" "$appport" ;;
+    4|caddy-cf)                      _cert_caddy  "$domain" cf         "$apath" "$ip" "$appport" ;;
+    *)                               _cert_caddy  "$domain" auto       "$apath" "$ip" "$appport" ;;
   esac
+}
+
+# HTTPS-only, app-terminated TLS on :443 (the 3x-ui shape).
+_cert_direct(){ # domain issuemethod apath ip appport
+  local domain="$1" im="$2" apath="$3" ip="$4" appport="$5"
+  local TLS="docker compose --env-file .env -f build/docker-compose.tls.yml"
+  grep -qE '^HTTPS_PORT=' .env || set_env_kv HTTPS_PORT 443
+  local hp; hp=$(grep -E '^HTTPS_PORT=' .env | cut -d= -f2-); hp=${hp:-443}
+
+  if port_in_use "$hp" && ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dotinschool; then
+    echo "[!] Port ${hp} is already in use by something else. Free it (or set HTTPS_PORT in .env) and retry."
+    return 1
+  fi
+  # Stop any Caddy stack (frees :80 for the standalone challenge, and clears
+  # the old shape before we switch to HTTPS-only).
+  docker rm -f dotinschool-caddy >/dev/null 2>&1 || true
+  docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
+  docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.acme.yml down --remove-orphans 2>/dev/null || true
+
+  if ! acme_issue "$domain" "$im"; then _cert_rollback "$domain" "$ip" "$appport" "$apath"; return 1; fi
+
+  set_env_kv CERT_MODE direct
+  echo "Starting the panel in HTTPS-only mode on :${hp} ..."
+  if $TLS up -d --remove-orphans; then
+    local shown=":${hp}"; [[ "$hp" == "443" ]] && shown=""
+    echo
+    echo "Done - HTTPS only, no plain HTTP (exactly like the 3x-ui panel)."
+    echo "  panel : https://${domain}${shown}/${apath}/"
+    echo "  user  : https://${domain}${shown}/"
+    echo "  logs  : dotinschool logs"
+    echo "  cert auto-renews (acme.sh cron); turn it off with:  dotinschool cert off"
+  else
+    _cert_rollback "$domain" "$ip" "$appport" "$apath"; return 1
+  fi
+}
+
+# Caddy in front, plain HTTP on the IP kept alongside HTTPS.
+_cert_caddy(){ # domain issuemethod apath ip appport   (issuemethod: auto|cf)
+  local domain="$1" im="$2" apath="$3" ip="$4" appport="$5"
+  local BASE="docker compose --env-file .env -f build/docker-compose.yml"
+  local PROD="$BASE -f build/docker-compose.prod.yml"
+  local ACME="$BASE -f build/docker-compose.acme.yml"
+  local p
+  for p in 80 443; do
+    if port_in_use "$p" && ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dotinschool-caddy; then
+      echo "  note: something already listens on :$p - if it isn't ours, Caddy can't bind it."
+    fi
+  done
+  # Leave HTTPS-only mode if we were in it.
+  docker compose --env-file .env -f build/docker-compose.tls.yml down --remove-orphans 2>/dev/null || true
+
+  if [[ "$im" == "cf" ]]; then
+    set_env_kv CERT_MODE acme
+    if acme_issue "$domain" cf && $ACME up -d --remove-orphans; then
+      _cert_ok "$domain" "$apath" "$ip" "$appport"
+    else _cert_rollback "$domain" "$ip" "$appport" "$apath"; return 1; fi
+  else
+    set_env_kv CERT_MODE ""
+    echo "Bringing up Caddy with automatic Let's Encrypt ..."
+    if $PROD up -d --remove-orphans; then
+      _cert_ok "$domain" "$apath" "$ip" "$appport"
+      echo "  (HTTPS goes green once Caddy finishes the ACME challenge, ~30s - watch: dotinschool logs)"
+    else _cert_rollback "$domain" "$ip" "$appport" "$apath"; return 1; fi
+  fi
 }
 
 _cert_ok(){ # domain apath ip appport
@@ -598,17 +663,18 @@ run_action(){
       docker rm -f dotinschool dotinschool-caddy >/dev/null 2>&1 || true
       docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
       docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.acme.yml down --remove-orphans 2>/dev/null || true
-      # If .env still says acme-HTTPS but the cert file is gone (a half-finished
-      # issue), don't crash-loop Caddy - drop back to plain HTTP.
-      if grep -qE '^CERT_MODE=acme' .env 2>/dev/null && [[ ! -s "${CERT_DIR}/$(get_domain)/fullchain.pem" ]]; then
-        echo "  (acme cert missing - falling back to plain HTTP; re-run 'dotinschool cert <domain>' to retry)"
+      docker compose --env-file .env -f build/docker-compose.tls.yml down --remove-orphans 2>/dev/null || true
+      # If .env says an HTTPS mode but the cert file is gone (a half-finished
+      # issue), don't crash-loop - drop back to plain HTTP.
+      if grep -qE '^CERT_MODE=(acme|direct)' .env 2>/dev/null && [[ ! -s "${CERT_DIR}/$(get_domain)/fullchain.pem" ]]; then
+        echo "  (cert file missing - falling back to plain HTTP; re-run 'dotinschool cert <domain>' to retry)"
         set_env_kv DOMAIN ""; set_env_kv CERT_MODE ""
         docker compose --env-file .env -f build/docker-compose.yml up -d --remove-orphans
       else
         "${C[@]}" up -d --remove-orphans
       fi
       echo "Done."
-      docker compose --env-file .env -f build/docker-compose.yml ps ;;
+      "${C[@]}" ps ;;
     rebuild) PATH="/usr/local/go/bin:$PATH" bash scripts/docker-build.sh "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" && "${C[@]}" up -d ;;
     update)  GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git fetch --depth 1 origin main \
                && GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git reset --hard origin/main \
@@ -619,7 +685,14 @@ run_action(){
       e=.env
       apath=$(grep -E '^ADMIN_PATH=' $e | cut -d= -f2-)
       ipbase="http://$(server_ip):$(grep -E '^APP_PORT=' $e | cut -d= -f2-)"
-      if has_domain; then
+      if grep -qE '^CERT_MODE=direct' $e 2>/dev/null; then
+        hp=$(grep -E '^HTTPS_PORT=' $e | cut -d= -f2-); hp=${hp:-443}
+        sfx=":${hp}"; [[ "$hp" == "443" ]] && sfx=""
+        dbase="https://$(get_domain)${sfx}"
+        echo "User panel:   ${dbase}/"
+        echo "Admin panel:  ${dbase}/${apath}/"
+        echo "              (HTTPS only - no plain HTTP)"
+      elif has_domain; then
         dbase="https://$(get_domain)"
         echo "User panel:   ${dbase}/            (HTTPS - once the cert is issued)"
         echo "              ${ipbase}/            (plain HTTP - always available)"
@@ -651,7 +724,7 @@ show_menu(){
   echo "|   7. Show container status                       |"
   echo "|   8. Find a free port                            |"
   echo "|   9. Show admin URL + credentials                |"
-  echo "|  10. HTTPS certificate  (auto / Cloudflare / acme)|"
+  echo "|  10. Set up HTTPS  (3x-ui style :443, or Caddy)  |"
   echo "|  11. Disable HTTPS (back to plain HTTP)          |"
   echo "|  12. Recover / fix a stuck stack                 |"
   echo "+-------------------------------------------------+"
@@ -720,10 +793,10 @@ main(){
   # regardless, and `dotinschool cert <domain>` can be run any time later.
   if [[ -n "${DOTINSCHOOL_DOMAIN:-}" ]]; then
     echo
-    # CF_Token in the environment -> use the Cloudflare-DNS method (2), which
-    # works behind the Cloudflare proxy; otherwise Caddy-auto (1).
-    local m=1; [[ -n "${CF_Token:-}" ]] && m=2
-    info "DOTINSCHOOL_DOMAIN set - setting up HTTPS for ${DOTINSCHOOL_DOMAIN} (method ${m})..."
+    # HTTPS-only (3x-ui style). CF_Token in the env -> Cloudflare-DNS (method 1,
+    # works behind the Cloudflare proxy); otherwise standalone HTTP (method 2).
+    local m=2; [[ -n "${CF_Token:-}" ]] && m=1
+    info "DOTINSCHOOL_DOMAIN set - setting up HTTPS-only for ${DOTINSCHOOL_DOMAIN} (method ${m})..."
     ( cd "$INSTALL_DIR" && CF_Token="${CF_Token:-}" "$CLI_PATH" cert "$DOTINSCHOOL_DOMAIN" "$m" ) || \
       warn "HTTPS setup didn't complete - the panel is still up on the IP. Retry later with: dotinschool cert ${DOTINSCHOOL_DOMAIN}"
   fi
