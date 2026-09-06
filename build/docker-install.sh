@@ -506,16 +506,20 @@ acme_issue(){
   # that's still a success for us, the files just need installing.
   if [[ $ok -ne 1 && -d "$ACME_HOME/${domain}_ecc" ]]; then ok=1; fi
   [[ $ok -eq 1 ]] || { echo "[!] acme.sh could not issue the certificate (see its output above)."; return 1; }
-  # Reload whatever is terminating TLS after a renewal: Caddy picks up a new
-  # cert with a live reload; the app (HTTPS-only mode) reads its cert once at
-  # startup, so it needs a quick restart. Run both, ignore the one absent.
+  # On renewal, reload whatever is terminating TLS AND re-fix the file
+  # ownership/mode: acme.sh re-writes the pems as root:root 600, but the
+  # container app runs as uid 10001 and must be able to read them (a 600
+  # root-owned key = "permission denied" inside the container = the TLS
+  # listener never comes up). chown to 10001, then reload.
+  local fixperms="chown -R 10001:10001 '$CERT_DIR/$domain' 2>/dev/null; chmod 644 '$CERT_DIR/$domain'/*.pem 2>/dev/null"
   "$ACME_HOME/acme.sh" --install-cert -d "$domain" --home "$ACME_HOME" --ecc \
     --fullchain-file "$CERT_DIR/$domain/fullchain.pem" \
     --key-file "$CERT_DIR/$domain/privkey.pem" \
-    --reloadcmd "docker exec dotinschool-caddy caddy reload --config /etc/caddy/Caddyfile --force >/dev/null 2>&1; docker restart dotinschool >/dev/null 2>&1; true" \
+    --reloadcmd "${fixperms}; docker exec dotinschool-caddy caddy reload --config /etc/caddy/Caddyfile --force >/dev/null 2>&1; docker restart dotinschool >/dev/null 2>&1; true" \
     >/dev/null 2>&1
   [[ -s "$CERT_DIR/$domain/fullchain.pem" && -s "$CERT_DIR/$domain/privkey.pem" ]] || { echo "[!] Certificate files were not written."; return 1; }
-  chmod 644 "$CERT_DIR/$domain/fullchain.pem"; chmod 640 "$CERT_DIR/$domain/privkey.pem"
+  chown -R 10001:10001 "$CERT_DIR/$domain" 2>/dev/null || true
+  chmod 644 "$CERT_DIR/$domain"/*.pem 2>/dev/null || true
   echo "[ok] Certificate saved to $CERT_DIR/$domain/ (acme.sh will auto-renew it)."
 }
 
