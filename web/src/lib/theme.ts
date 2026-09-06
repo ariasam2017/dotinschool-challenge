@@ -84,7 +84,7 @@ export const antdTheme = computed(() => {
       colorError: dark ? '#ef4444' : '#dc2626',
       borderRadius: 10,
       wireframe: false,
-      fontFamily: "'Vazirmatn', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
+      fontFamily: "'IRANYekanX', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
       colorBgBase: dark ? '#0b1220' : '#ffffff',
       colorBgLayout: dark ? '#0b1220' : '#f8fafc',
       colorTextBase: dark ? '#f8fafc' : '#0f172a',

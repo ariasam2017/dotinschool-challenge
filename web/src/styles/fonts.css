@@ -1,38 +1,38 @@
 /* Self-hosted fonts — no CDN, works fully offline and under a strict CSP. */
 
 @font-face {
-  font-family: 'Vazirmatn';
-  src: url('@/assets/fonts/Vazirmatn-Regular.woff2') format('woff2');
+  font-family: 'IRANYekanX';
+  src: url('@/assets/fonts/IRANYekanX-Regular.woff2') format('woff2');
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Vazirmatn';
-  src: url('@/assets/fonts/Vazirmatn-Medium.woff2') format('woff2');
+  font-family: 'IRANYekanX';
+  src: url('@/assets/fonts/IRANYekanX-Medium.woff2') format('woff2');
   font-weight: 500;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Vazirmatn';
-  src: url('@/assets/fonts/Vazirmatn-SemiBold.woff2') format('woff2');
+  font-family: 'IRANYekanX';
+  src: url('@/assets/fonts/IRANYekanX-DemiBold.woff2') format('woff2');
   font-weight: 600;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Vazirmatn';
-  src: url('@/assets/fonts/Vazirmatn-Bold.woff2') format('woff2');
+  font-family: 'IRANYekanX';
+  src: url('@/assets/fonts/IRANYekanX-Bold.woff2') format('woff2');
   font-weight: 700;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Vazirmatn';
-  src: url('@/assets/fonts/Vazirmatn-ExtraBold.woff2') format('woff2');
+  font-family: 'IRANYekanX';
+  src: url('@/assets/fonts/IRANYekanX-ExtraBold.woff2') format('woff2');
   font-weight: 800;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Vazirmatn';
-  src: url('@/assets/fonts/Vazirmatn-Black.woff2') format('woff2');
+  font-family: 'IRANYekanX';
+  src: url('@/assets/fonts/IRANYekanX-Black.woff2') format('woff2');
   font-weight: 900;
   font-display: swap;
 }
