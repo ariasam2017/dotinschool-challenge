@@ -472,7 +472,14 @@ acme_issue(){
   local domain="$1" method="$2"
   acme_install || return 1
   mkdir -p "$CERT_DIR/$domain"
+  # Force Let's Encrypt. acme.sh ships with ZeroSSL as the default CA, which
+  # refuses to issue until you register an account email ("Please update your
+  # account with an email address first") - Let's Encrypt needs none. Set it
+  # here every run (not just at install) since an acme.sh left over from an
+  # earlier attempt keeps whatever default it had.
+  "$ACME_HOME/acme.sh" --set-default-ca --server letsencrypt >/dev/null 2>&1 || true
   local ok=0
+  local CA=(--server letsencrypt)
   if [[ "$method" == "cf" ]]; then
     if [[ -z "${CF_Token:-}" && -t 0 ]]; then
       echo "Create a Cloudflare API token (Permissions: Zone > DNS > Edit,"
@@ -483,7 +490,7 @@ acme_issue(){
     [[ -n "${CF_Token:-}" ]] || { echo "No Cloudflare token given."; return 1; }
     export CF_Token
     echo "Issuing via Cloudflare DNS (works even if the record is proxied/orange-cloud) ..."
-    timeout 300 "$ACME_HOME/acme.sh" --issue --dns dns_cf -d "$domain" --home "$ACME_HOME" --keylength ec-256 && ok=1
+    timeout 300 "$ACME_HOME/acme.sh" --issue "${CA[@]}" --dns dns_cf -d "$domain" --home "$ACME_HOME" --keylength ec-256 && ok=1
   else
     echo "Issuing via standalone HTTP - port 80 is needed for ~20s ..."
     local had_caddy=0
@@ -492,7 +499,7 @@ acme_issue(){
       echo "  (pausing Caddy so acme.sh can bind :80)"
       docker stop dotinschool-caddy >/dev/null 2>&1 || true
     fi
-    timeout 180 "$ACME_HOME/acme.sh" --issue --standalone -d "$domain" --home "$ACME_HOME" --keylength ec-256 --httpport 80 && ok=1
+    timeout 180 "$ACME_HOME/acme.sh" --issue "${CA[@]}" --standalone -d "$domain" --home "$ACME_HOME" --keylength ec-256 --httpport 80 && ok=1
     [[ $had_caddy -eq 1 ]] && docker start dotinschool-caddy >/dev/null 2>&1 || true
   fi
   # acme.sh exits non-zero when the cert already exists and isn't near expiry -
