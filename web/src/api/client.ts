@@ -7,6 +7,7 @@ import type {
   AiSettings,
   AiStatus,
   AiProviderInput,
+  Appearance,
   ClientErrorList,
   EventConfig,
   Participant,
@@ -180,6 +181,20 @@ export const smsTest = (payload: { phone: string; purpose?: 'register' | 'login'
 export const getSmsSettings = () => apiFetch<SmsSettings>('/api/admin/sms-settings')
 export const saveSmsSettings = (payload: SmsSettingsInput) =>
   apiFetch<SmsSettings>('/api/admin/sms-settings', { method: 'PUT', body: payload })
+
+/* ---- Design Studio / appearance (admin) ---- */
+export const getAppearance = () =>
+  apiFetch<{ draft: Appearance; published: Appearance }>('/api/admin/appearance')
+export const saveAppearanceDraft = (a: Appearance) =>
+  apiFetch<{ draft: Appearance }>('/api/admin/appearance', { method: 'PUT', body: a })
+export const publishAppearance = () =>
+  apiFetch<{ published: Appearance }>('/api/admin/appearance/publish', { method: 'POST' })
+export const revertAppearance = () =>
+  apiFetch<{ draft: Appearance }>('/api/admin/appearance/revert', { method: 'POST' })
+export const resetAppearance = () =>
+  apiFetch<{ draft: Appearance; published: Appearance }>('/api/admin/appearance/reset', {
+    method: 'POST',
+  })
 
 /* ---- AI assistant (admin) ---- */
 export const aiStatus = () => apiFetch<AiStatus>('/api/admin/ai-status')

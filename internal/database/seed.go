@@ -1,9 +1,11 @@
 package database
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,6 +13,13 @@ import (
 
 	"github.com/dotinschool/dotinschool/internal/model"
 )
+
+// defaultAppearance ships the project's baseline Design Studio layer. It is
+// "{}" by default; replace its contents with a panel «خروجی» export to make a
+// tuned design the shipped default for fresh installs.
+//
+//go:embed appearance.default.json
+var defaultAppearance []byte
 
 // nowMs is the current time in epoch milliseconds.
 func nowMs() int64 { return time.Now().UnixMilli() }
@@ -50,6 +59,20 @@ func EnsureDefaults(db *gorm.DB) error {
 	}
 	if err := set(model.KeyEventStartsAt, nil); err != nil {
 		return err
+	}
+
+	// Ship a tuned Design Studio layer as the default for a fresh install
+	// (no-op while appearance.default.json is just "{}").
+	if trimmed := strings.TrimSpace(string(defaultAppearance)); len(trimmed) > 2 {
+		var a model.Appearance
+		if json.Unmarshal(defaultAppearance, &a) == nil {
+			if err := set(model.KeyAppearancePublished, a); err != nil {
+				return err
+			}
+			if err := set(model.KeyAppearanceDraft, a); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

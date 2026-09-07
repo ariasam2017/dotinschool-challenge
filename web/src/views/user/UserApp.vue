@@ -8,6 +8,7 @@ import { ApiError } from '@/api/client'
 import { installErrorQueueFlusher, submitClientError } from '@/lib/errorQueue'
 import { estimateExecution, performanceScore, countErrors, STARTER_CODE } from '@/lib/estimate'
 import { fmtJalaliDateTime } from '@/lib/fa'
+import { appearanceText } from '@/lib/appearance'
 
 import AuthPanel from './AuthPanel.vue'
 import ChallengeCard from '@/components/ChallengeCard.vue'
@@ -205,7 +206,7 @@ function confirmExit() {
     <header class="u-header">
       <div class="brand">
         <span class="brand-mark"><AppIcon name="code" :size="18" /></span>
-        <span class="brand-name">dotinschool</span>
+        <span class="brand-name">{{ appearanceText.brand || 'dotinschool' }}</span>
       </div>
       <div class="grow" />
       <div v-if="user" class="identity">
@@ -225,7 +226,10 @@ function confirmExit() {
       <!-- not signed in -->
       <section v-if="!user" class="hero">
         <div class="hero-copy">
-          <h1>به چالش برنامه‌نویسی مدرسه داتین خوش آمدید</h1>
+          <h1>{{ appearanceText.heroTitle || 'به چالش برنامه‌نویسی مدرسه داتین خوش آمدید' }}</h1>
+          <p v-if="appearanceText.heroSubtitle && appearanceText.heroShowSubtitle" class="hero-sub">
+            {{ appearanceText.heroSubtitle }}
+          </p>
         </div>
         <AuthPanel @authed="onAuthed" />
       </section>
@@ -517,6 +521,12 @@ function confirmExit() {
   font-size: clamp(0.95rem, 3.4vw, 1.7rem);
   line-height: 1.4;
   white-space: nowrap;
+}
+.hero-sub {
+  margin: var(--space-3) 0 0;
+  color: var(--text-dim);
+  font-size: 1rem;
+  line-height: 2;
 }
 .event-banner {
   display: flex;

@@ -126,6 +126,8 @@ type ConfigDTO struct {
 	EventPaused    bool            `json:"eventPaused"`
 	PausedRemainMs *int64          `json:"pausedRemainMs"`
 	Challenge      json.RawMessage `json:"challenge"`
+	// Appearance is the published Design Studio layer ("{}" when untouched).
+	Appearance json.RawMessage `json:"appearance"`
 }
 
 // CurrentConfig assembles the public event/challenge snapshot.
@@ -141,6 +143,7 @@ func (s *SettingService) CurrentConfig() ConfigDTO {
 		EventPaused:    s.EventPaused(),
 		PausedRemainMs: s.PausedRemainMs(),
 		Challenge:      ch,
+		Appearance:     s.AppearancePublishedRaw(),
 	}
 }
 

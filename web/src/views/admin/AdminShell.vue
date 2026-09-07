@@ -25,6 +25,7 @@ const NAV: NavItem[] = [
   { name: 'admin-participants', label: 'شرکت‌کنندگان', icon: 'users' },
   { name: 'admin-ai', label: 'بررسی هوشمند', icon: 'wand' },
   { name: 'admin-assistant', label: 'دستیار کد', icon: 'code' },
+  { name: 'admin-appearance', label: 'ظاهر و طراحی', icon: 'palette' },
   { name: 'admin-errors', label: 'خطاهای کاربران', icon: 'alert-triangle', badge: true },
 ]
 

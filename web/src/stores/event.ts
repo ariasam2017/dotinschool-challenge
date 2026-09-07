@@ -6,6 +6,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getConfig } from '@/api/client'
 import type { EventConfig } from '@/api/types'
+import { IS_USER } from '@/lib/mode'
+import { applyAppearance, isPreviewLive } from '@/lib/appearance'
 
 export type EventState = 'waiting' | 'running' | 'paused' | 'ended'
 
@@ -23,6 +25,9 @@ export const useEventStore = defineStore('event', () => {
       config.value = await getConfig()
       lastError.value = null
       loaded.value = true
+      // Live Design Studio layer — user panel only, and never while an admin
+      // preview iframe is driving the styles over postMessage.
+      if (IS_USER && !isPreviewLive()) applyAppearance(config.value.appearance)
     } catch (e) {
       lastError.value = e instanceof Error ? e.message : 'خطا در دریافت وضعیت رویداد'
     }

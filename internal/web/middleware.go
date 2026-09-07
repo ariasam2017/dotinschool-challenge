@@ -21,14 +21,18 @@ func (s *server) securityHeaders() gin.HandlerFunc {
 		"img-src 'self' data: blob:; " +
 		"font-src 'self' data:; " +
 		"connect-src 'self'; " +
-		"frame-ancestors 'none'; " +
+		// 'self' (not 'none') so the admin Design Studio can embed the user
+		// panel in a same-origin live-preview <iframe>. Cross-origin framing
+		// stays blocked.
+		"frame-ancestors 'self'; " +
 		"base-uri 'self'; " +
 		"form-action 'self'"
 
 	return func(c *gin.Context) {
 		h := c.Writer.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("X-Frame-Options", "DENY")
+		// SAMEORIGIN (not DENY) for the Design Studio live-preview iframe.
+		h.Set("X-Frame-Options", "SAMEORIGIN")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
 		h.Set("Content-Security-Policy", csp)

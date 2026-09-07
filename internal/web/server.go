@@ -88,6 +88,12 @@ func (s *server) mountAPI(r *gin.Engine) {
 		admin.POST("/admin/backup/restore", bodyLimit(restoreBodyLimit), s.handleRestore)
 		admin.POST("/admin/update", s.handleUpdate)
 
+		admin.GET("/admin/appearance", s.handleGetAppearance)
+		admin.PUT("/admin/appearance", s.handlePutAppearanceDraft)
+		admin.POST("/admin/appearance/publish", s.handlePublishAppearance)
+		admin.POST("/admin/appearance/revert", s.handleRevertAppearance)
+		admin.POST("/admin/appearance/reset", s.handleResetAppearance)
+
 		admin.GET("/admin/ai-status", s.handleAIStatus)
 		admin.GET("/admin/ai-settings", s.handleGetAISettings)
 		admin.PUT("/admin/ai-settings", s.handlePutAISettings)

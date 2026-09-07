@@ -34,12 +34,58 @@ export interface Challenge {
   submitMessage: string
 }
 
+export interface HeroAppearance {
+  title?: string
+  subtitle?: string
+  showSubtitle?: boolean
+  align?: '' | 'start' | 'center' | 'end'
+  background?: string
+  image?: string
+  minHeight?: string
+}
+export interface HeaderAppearance {
+  brand?: string
+  background?: string
+}
+
+export interface TextReplacement {
+  find: string
+  replace: string
+  mode?: 'exact' | 'contains'
+}
+
+export interface ElementOverride {
+  selector: string
+  text?: string
+  setText?: boolean
+  hidden?: boolean
+  fontSize?: string
+  fontWeight?: string
+  textAlign?: string
+  label?: string
+}
+
+/** The admin Design Studio layer applied to the user panel at runtime. */
+export interface Appearance {
+  tokens?: Record<string, string>
+  dark?: Record<string, string>
+  sections?: {
+    hero?: HeroAppearance
+    header?: HeaderAppearance
+  }
+  customCss?: string
+  texts?: TextReplacement[]
+  overrides?: ElementOverride[]
+  updatedAt?: number
+}
+
 export interface EventConfig {
   eventEndsAt: number | null
   eventStartsAt: number | null
   eventPaused: boolean
   pausedRemainMs: number | null
   challenge: Challenge
+  appearance?: Appearance
 }
 
 export interface AiStatus {
