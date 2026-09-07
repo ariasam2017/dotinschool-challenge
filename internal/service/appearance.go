@@ -185,27 +185,27 @@ func cleanOverrides(in []model.ElementOverride) []model.ElementOverride {
 		o.Text = clipRunes(o.Text, appearanceMaxReplace)
 		o.Label = clipRunes(strings.TrimSpace(o.Label), 120)
 
-		o.FontSize = strings.TrimSpace(o.FontSize)
-		if o.FontSize != "" && !overrideFontSizeRe.MatchString(o.FontSize) {
-			o.FontSize = ""
+		// Fold legacy flat style fields into the All layer, then drop them.
+		if bagEmpty(o.All) {
+			o.All = model.StyleBag{
+				FontSize: o.FontSize, FontWeight: o.FontWeight, TextAlign: o.TextAlign,
+				Color: o.Color, Background: o.Background, Padding: o.Padding, Margin: o.Margin,
+				BorderWidth: o.BorderWidth, BorderColor: o.BorderColor,
+				BorderRadius: o.BorderRadius, Width: o.Width, MaxWidth: o.MaxWidth,
+			}
 		}
-		if !overrideFontWeights[o.FontWeight] {
-			o.FontWeight = ""
-		}
-		if !overrideTextAligns[o.TextAlign] {
-			o.TextAlign = ""
-		}
-		o.Color = safeCSSVal(o.Color)
-		o.Background = safeCSSVal(o.Background)
-		o.Padding = safeCSSVal(o.Padding)
-		o.Margin = safeCSSVal(o.Margin)
-		o.BorderWidth = safeCSSVal(o.BorderWidth)
-		o.BorderColor = safeCSSVal(o.BorderColor)
-		o.BorderRadius = safeCSSVal(o.BorderRadius)
-		o.Width = safeCSSVal(o.Width)
-		o.MaxWidth = safeCSSVal(o.MaxWidth)
+		o.FontSize, o.FontWeight, o.TextAlign = "", "", ""
+		o.Color, o.Background, o.Padding, o.Margin = "", "", "", ""
+		o.BorderWidth, o.BorderColor, o.BorderRadius = "", "", ""
+		o.Width, o.MaxWidth = "", ""
 
-		if !o.SetText && !o.Hidden && o.Text == "" && !overrideHasStyle(o) {
+		o.All = cleanStyleBag(o.All)
+		o.Mobile = cleanStyleBag(o.Mobile)
+		o.Desktop = cleanStyleBag(o.Desktop)
+
+		anyHidden := o.Hidden || o.HiddenMobile || o.HiddenDesktop
+		if !o.SetText && !anyHidden && o.Text == "" &&
+			bagEmpty(o.All) && bagEmpty(o.Mobile) && bagEmpty(o.Desktop) {
 			continue // nothing to do
 		}
 		out = append(out, o)
@@ -282,11 +282,32 @@ func safeCSSVal(v string) string {
 	return v
 }
 
-func overrideHasStyle(o model.ElementOverride) bool {
-	return o.FontSize != "" || o.FontWeight != "" || o.TextAlign != "" ||
-		o.Color != "" || o.Background != "" || o.Padding != "" || o.Margin != "" ||
-		o.BorderWidth != "" || o.BorderColor != "" || o.BorderRadius != "" ||
-		o.Width != "" || o.MaxWidth != ""
+func bagEmpty(b model.StyleBag) bool {
+	return b == (model.StyleBag{})
+}
+
+// cleanStyleBag validates each declaration, dropping anything invalid.
+func cleanStyleBag(b model.StyleBag) model.StyleBag {
+	b.FontSize = strings.TrimSpace(b.FontSize)
+	if b.FontSize != "" && !overrideFontSizeRe.MatchString(b.FontSize) {
+		b.FontSize = ""
+	}
+	if !overrideFontWeights[b.FontWeight] {
+		b.FontWeight = ""
+	}
+	if !overrideTextAligns[b.TextAlign] {
+		b.TextAlign = ""
+	}
+	b.Color = safeCSSVal(b.Color)
+	b.Background = safeCSSVal(b.Background)
+	b.Padding = safeCSSVal(b.Padding)
+	b.Margin = safeCSSVal(b.Margin)
+	b.BorderWidth = safeCSSVal(b.BorderWidth)
+	b.BorderColor = safeCSSVal(b.BorderColor)
+	b.BorderRadius = safeCSSVal(b.BorderRadius)
+	b.Width = safeCSSVal(b.Width)
+	b.MaxWidth = safeCSSVal(b.MaxWidth)
+	return b
 }
 
 func checkCSSValue(field, v string) error {

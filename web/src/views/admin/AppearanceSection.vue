@@ -72,51 +72,86 @@ const form = reactive({
   overrides: [] as Override[],
 })
 
+type BagKey =
+  | 'fontSize' | 'fontWeight' | 'textAlign' | 'color' | 'background' | 'padding'
+  | 'margin' | 'borderWidth' | 'borderColor' | 'borderRadius' | 'width' | 'maxWidth'
+type Bag = Record<BagKey, string>
+const BAG_KEYS: BagKey[] = [
+  'fontSize', 'fontWeight', 'textAlign', 'color', 'background', 'padding',
+  'margin', 'borderWidth', 'borderColor', 'borderRadius', 'width', 'maxWidth',
+]
+function blankBag(): Bag {
+  return Object.fromEntries(BAG_KEYS.map((k) => [k, ''])) as Bag
+}
+function fillBag(raw?: unknown): Bag {
+  const b = blankBag()
+  const src = (raw || {}) as Record<string, unknown>
+  for (const k of BAG_KEYS) if (src[k]) b[k] = String(src[k])
+  return b
+}
+function prunedBag(b: Bag): Bag {
+  const r = {} as Bag
+  for (const k of BAG_KEYS) if (b[k] && b[k].trim()) r[k] = b[k].trim()
+  return r
+}
+function bagHas(b?: Bag): boolean {
+  return !!b && BAG_KEYS.some((k) => b[k])
+}
+
 interface Override {
   selector: string
+  label: string
   text: string
   setText: boolean
   hidden: boolean
-  fontSize: string
-  fontWeight: string
-  textAlign: string
-  color: string
-  background: string
-  padding: string
-  margin: string
-  borderWidth: string
-  borderColor: string
-  borderRadius: string
-  width: string
-  maxWidth: string
-  label: string
+  hiddenMobile: boolean
+  hiddenDesktop: boolean
+  all: Bag
+  mobile: Bag
+  desktop: Bag
   isLeaf: boolean
   baseFontSize: string
 }
 
 function blankOverride(partial: Partial<Override>): Override {
   return {
-    selector: '', text: '', setText: false, hidden: false,
-    fontSize: '', fontWeight: '', textAlign: '',
-    color: '', background: '', padding: '', margin: '',
-    borderWidth: '', borderColor: '', borderRadius: '',
-    width: '', maxWidth: '',
-    label: '', isLeaf: true, baseFontSize: '',
+    selector: '', label: '', text: '', setText: false,
+    hidden: false, hiddenMobile: false, hiddenDesktop: false,
+    all: blankBag(), mobile: blankBag(), desktop: blankBag(),
+    isLeaf: true, baseFontSize: '',
     ...partial,
   }
 }
 
-const STYLE_KEYS: (keyof Override)[] = [
-  'fontSize', 'fontWeight', 'textAlign', 'color', 'background', 'padding',
-  'margin', 'borderWidth', 'borderColor', 'borderRadius', 'width', 'maxWidth',
-]
-function hasStyle(o: Override): boolean {
-  return STYLE_KEYS.some((k) => o[k])
-}
+/* which viewport layer the style fields edit for the open element */
+const styleScope = ref<'all' | 'mobile' | 'desktop'>('all')
+const currentOverride = computed<Override | null>(() => form.overrides[selectedOverride.value] ?? null)
+const activeBag = computed<Bag>(() => currentOverride.value?.[styleScope.value] ?? blankBag())
 
-/** Bump a picked element's font-size by `dir` px (seeds from its real size). */
-function nudgeFont(o: (typeof form.overrides)[number], dir: number): void {
-  const raw = (o.fontSize || o.baseFontSize || '16px').trim()
+/** show / hide-scope as one value */
+const hideMode = computed<'show' | 'all' | 'mobile' | 'desktop'>({
+  get() {
+    const o = currentOverride.value
+    if (!o) return 'show'
+    if (o.hidden) return 'all'
+    if (o.hiddenMobile) return 'mobile'
+    if (o.hiddenDesktop) return 'desktop'
+    return 'show'
+  },
+  set(v) {
+    const o = currentOverride.value
+    if (!o) return
+    o.hidden = v === 'all'
+    o.hiddenMobile = v === 'mobile'
+    o.hiddenDesktop = v === 'desktop'
+  },
+})
+
+/** Bump the active layer's font-size by `dir` px (seeds from the real size). */
+function nudgeFont(dir: number): void {
+  const b = activeBag.value
+  const seed = styleScope.value === 'all' ? currentOverride.value?.baseFontSize : ''
+  const raw = (b.fontSize || seed || '16px').trim()
   const m = /^([0-9.]+)(px|rem|em|%)$/.exec(raw)
   let px = 16
   if (m) {
@@ -124,7 +159,7 @@ function nudgeFont(o: (typeof form.overrides)[number], dir: number): void {
     px = m[2] === 'px' ? n : m[2] === '%' ? (n / 100) * 16 : n * 16
   }
   px = Math.min(96, Math.max(8, Math.round((px + dir) * 10) / 10))
-  o.fontSize = px + 'px'
+  b.fontSize = px + 'px'
 }
 
 const WEIGHT_OPTIONS = [
@@ -236,25 +271,29 @@ function toAppearance(): Appearance {
   if (texts.length) a.texts = texts
 
   const overrides: ElementOverride[] = form.overrides
-    .filter((o) => o.selector && (o.setText || o.hidden || o.text || hasStyle(o)))
+    .filter(
+      (o) =>
+        o.selector &&
+        (o.setText ||
+          o.text ||
+          o.hidden ||
+          o.hiddenMobile ||
+          o.hiddenDesktop ||
+          bagHas(o.all) ||
+          bagHas(o.mobile) ||
+          bagHas(o.desktop)),
+    )
     .map((o) => ({
       selector: o.selector,
+      label: o.label,
       text: o.text,
       setText: o.setText,
       hidden: o.hidden,
-      fontSize: o.fontSize,
-      fontWeight: o.fontWeight,
-      textAlign: o.textAlign,
-      color: o.color,
-      background: o.background,
-      padding: o.padding,
-      margin: o.margin,
-      borderWidth: o.borderWidth,
-      borderColor: o.borderColor,
-      borderRadius: o.borderRadius,
-      width: o.width,
-      maxWidth: o.maxWidth,
-      label: o.label,
+      hiddenMobile: o.hiddenMobile,
+      hiddenDesktop: o.hiddenDesktop,
+      all: prunedBag(o.all),
+      mobile: prunedBag(o.mobile),
+      desktop: prunedBag(o.desktop),
     }))
   if (overrides.length) a.overrides = overrides
 
@@ -292,27 +331,27 @@ function fromAppearance(a?: Appearance): void {
     mode: t.mode === 'contains' ? 'contains' : 'exact',
   }))
 
-  form.overrides = (a?.overrides || []).map((o) =>
-    blankOverride({
+  form.overrides = (a?.overrides || []).map((o) => {
+    const legacy = {
+      fontSize: o.fontSize, fontWeight: o.fontWeight, textAlign: o.textAlign,
+      color: o.color, background: o.background, padding: o.padding, margin: o.margin,
+      borderWidth: o.borderWidth, borderColor: o.borderColor, borderRadius: o.borderRadius,
+      width: o.width, maxWidth: o.maxWidth,
+    }
+    const allSrc = o.all && Object.keys(o.all).length ? o.all : legacy
+    return blankOverride({
       selector: o.selector || '',
+      label: o.label || '',
       text: o.text || '',
       setText: !!o.setText,
       hidden: !!o.hidden,
-      fontSize: o.fontSize || '',
-      fontWeight: o.fontWeight || '',
-      textAlign: o.textAlign || '',
-      color: o.color || '',
-      background: o.background || '',
-      padding: o.padding || '',
-      margin: o.margin || '',
-      borderWidth: o.borderWidth || '',
-      borderColor: o.borderColor || '',
-      borderRadius: o.borderRadius || '',
-      width: o.width || '',
-      maxWidth: o.maxWidth || '',
-      label: o.label || '',
-    }),
-  )
+      hiddenMobile: !!o.hiddenMobile,
+      hiddenDesktop: !!o.hiddenDesktop,
+      all: fillBag(allSrc),
+      mobile: fillBag(o.mobile),
+      desktop: fillBag(o.desktop),
+    })
+  })
   selectedOverride.value = -1
 }
 
@@ -374,6 +413,7 @@ function onPreviewMessage(e: MessageEvent): void {
 
   if (d.__dotin === 'picked') {
     sendPick(false) // one element at a time
+    styleScope.value = 'all'
     const existing = form.overrides.findIndex((o) => o.selector === d.selector)
     if (existing >= 0) {
       selectedOverride.value = existing
@@ -766,37 +806,56 @@ onBeforeUnmount(() => {
                   </a-button>
                 </div>
 
+                <div class="el-field" @click.stop>
+                  <span class="el-flbl">نمایش / مخفی</span>
+                  <a-radio-group v-model:value="hideMode" size="small" button-style="solid">
+                    <a-radio-button value="show">نمایش</a-radio-button>
+                    <a-radio-button value="all">مخفی همه‌جا</a-radio-button>
+                    <a-radio-button value="mobile">مخفی موبایل</a-radio-button>
+                    <a-radio-button value="desktop">مخفی دسکتاپ</a-radio-button>
+                  </a-radio-group>
+                </div>
+
                 <label class="el-toggle">
-                  <a-switch v-model:checked="o.hidden" size="small" />
-                  <span>مخفی کردن این بخش</span>
-                </label>
-                <label class="el-toggle">
-                  <a-switch v-model:checked="o.setText" size="small" :disabled="!o.isLeaf || o.hidden" />
+                  <a-switch v-model:checked="o.setText" size="small"
+                    :disabled="!o.isLeaf || hideMode === 'all'" />
                   <span>تغییر متن</span>
                 </label>
-                <a-textarea v-if="o.setText && o.isLeaf && !o.hidden" v-model:value="o.text"
+                <a-textarea v-if="o.setText && o.isLeaf && hideMode !== 'all'" v-model:value="o.text"
                   :rows="2" size="small" placeholder="متن جدید" @click.stop />
                 <p v-if="!o.isLeaf" class="faint tiny">
                   این عنصر زیرالمان دارد — فقط استایل و مخفی/نمایش ممکن است.
                 </p>
 
-                <template v-if="!o.hidden">
+                <template v-if="hideMode !== 'all'">
+                  <div class="el-scopebar" @click.stop>
+                    <span class="el-flbl">استایل‌ها برای:</span>
+                    <a-radio-group v-model:value="styleScope" size="small" button-style="solid">
+                      <a-radio-button value="all">همه</a-radio-button>
+                      <a-radio-button value="mobile">موبایل</a-radio-button>
+                      <a-radio-button value="desktop">دسکتاپ</a-radio-button>
+                    </a-radio-group>
+                  </div>
+                  <p v-if="styleScope !== 'all'" class="faint tiny">
+                    فیلدهای خالی در این حالت، از «همه» ارث می‌برند.
+                  </p>
+
                   <div class="el-field" @click.stop>
                     <span class="el-flbl">اندازه فونت</span>
                     <div class="fs-row">
-                      <a-button size="small" title="کوچک‌تر" @click="nudgeFont(o, -1)">
+                      <a-button size="small" title="کوچک‌تر" @click="nudgeFont(-1)">
                         <AppIcon name="chevron-down" :size="14" />
                       </a-button>
-                      <a-input v-model:value="o.fontSize" size="small" placeholder="خودکار — مثلاً ۱۶px"
-                        allow-clear />
-                      <a-button size="small" title="بزرگ‌تر" @click="nudgeFont(o, 1)">
+                      <a-input v-model:value="activeBag.fontSize" size="small"
+                        placeholder="خودکار — مثلاً ۱۶px" allow-clear />
+                      <a-button size="small" title="بزرگ‌تر" @click="nudgeFont(1)">
                         <AppIcon name="plus" :size="14" />
                       </a-button>
                     </div>
                   </div>
                   <div class="el-field" @click.stop>
                     <span class="el-flbl">ضخامت فونت</span>
-                    <a-select v-model:value="o.fontWeight" size="small" style="width: 100%">
+                    <a-select v-model:value="activeBag.fontWeight" size="small" style="width: 100%">
                       <a-select-option v-for="w in WEIGHT_OPTIONS" :key="w.value" :value="w.value">
                         {{ w.label }}
                       </a-select-option>
@@ -804,7 +863,7 @@ onBeforeUnmount(() => {
                   </div>
                   <div class="el-field" @click.stop>
                     <span class="el-flbl">تراز متن</span>
-                    <a-radio-group v-model:value="o.textAlign" size="small" button-style="solid">
+                    <a-radio-group v-model:value="activeBag.textAlign" size="small" button-style="solid">
                       <a-radio-button value="">پیش‌فرض</a-radio-button>
                       <a-radio-button value="right">راست</a-radio-button>
                       <a-radio-button value="center">وسط</a-radio-button>
@@ -815,43 +874,45 @@ onBeforeUnmount(() => {
                   <div class="el-field" @click.stop>
                     <span class="el-flbl">رنگ متن / پس‌زمینه</span>
                     <div class="fs-row">
-                      <input type="color" :value="o.color || '#000000'"
-                        @input="o.color = ($event.target as HTMLInputElement).value" />
-                      <a-input v-model:value="o.color" size="small" placeholder="رنگ متن" allow-clear />
+                      <input type="color" :value="activeBag.color || '#000000'"
+                        @input="activeBag.color = ($event.target as HTMLInputElement).value" />
+                      <a-input v-model:value="activeBag.color" size="small" placeholder="رنگ متن"
+                        allow-clear />
                     </div>
                     <div class="fs-row">
-                      <input type="color" :value="o.background || '#ffffff'"
-                        @input="o.background = ($event.target as HTMLInputElement).value" />
-                      <a-input v-model:value="o.background" size="small" placeholder="پس‌زمینه" allow-clear />
+                      <input type="color" :value="activeBag.background || '#ffffff'"
+                        @input="activeBag.background = ($event.target as HTMLInputElement).value" />
+                      <a-input v-model:value="activeBag.background" size="small" placeholder="پس‌زمینه"
+                        allow-clear />
                     </div>
                   </div>
 
                   <div class="el-field" @click.stop>
                     <span class="el-flbl">فاصله داخلی / بیرونی (padding / margin)</span>
-                    <a-input v-model:value="o.padding" size="small" placeholder="padding — مثلاً 8px 16px"
-                      allow-clear />
-                    <a-input v-model:value="o.margin" size="small" placeholder="margin — مثلاً 0 auto"
+                    <a-input v-model:value="activeBag.padding" size="small"
+                      placeholder="padding — مثلاً 8px 16px" allow-clear />
+                    <a-input v-model:value="activeBag.margin" size="small" placeholder="margin — مثلاً 0 auto"
                       allow-clear />
                   </div>
 
                   <div class="el-field" @click.stop>
                     <span class="el-flbl">حاشیه</span>
                     <div class="fs-row">
-                      <a-input v-model:value="o.borderWidth" size="small" placeholder="ضخامت — 1px"
+                      <a-input v-model:value="activeBag.borderWidth" size="small" placeholder="ضخامت — 1px"
                         allow-clear />
-                      <input type="color" :value="o.borderColor || '#000000'"
-                        @input="o.borderColor = ($event.target as HTMLInputElement).value" />
+                      <input type="color" :value="activeBag.borderColor || '#000000'"
+                        @input="activeBag.borderColor = ($event.target as HTMLInputElement).value" />
                     </div>
-                    <a-input v-model:value="o.borderRadius" size="small" placeholder="گِردی گوشه — 12px"
-                      allow-clear />
+                    <a-input v-model:value="activeBag.borderRadius" size="small"
+                      placeholder="گِردی گوشه — 12px" allow-clear />
                   </div>
 
                   <div class="el-field" @click.stop>
                     <span class="el-flbl">اندازه</span>
-                    <a-input v-model:value="o.width" size="small" placeholder="width — مثلاً 320px یا 100%"
-                      allow-clear />
-                    <a-input v-model:value="o.maxWidth" size="small" placeholder="max-width — مثلاً 480px"
-                      allow-clear />
+                    <a-input v-model:value="activeBag.width" size="small"
+                      placeholder="width — مثلاً 320px یا 100%" allow-clear />
+                    <a-input v-model:value="activeBag.maxWidth" size="small"
+                      placeholder="max-width — مثلاً 480px" allow-clear />
                   </div>
                 </template>
 
@@ -1125,6 +1186,16 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 4px;
   margin-top: 8px;
+}
+.el-scopebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
 }
 .fs-row {
   display: flex;

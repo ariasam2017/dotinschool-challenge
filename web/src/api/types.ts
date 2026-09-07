@@ -54,11 +54,7 @@ export interface TextReplacement {
   mode?: 'exact' | 'contains'
 }
 
-export interface ElementOverride {
-  selector: string
-  text?: string
-  setText?: boolean
-  hidden?: boolean
+export interface StyleBag {
   fontSize?: string
   fontWeight?: string
   textAlign?: string
@@ -71,7 +67,32 @@ export interface ElementOverride {
   borderRadius?: string
   width?: string
   maxWidth?: string
+}
+
+export interface ElementOverride {
+  selector: string
   label?: string
+  text?: string
+  setText?: boolean
+  hidden?: boolean
+  hiddenMobile?: boolean
+  hiddenDesktop?: boolean
+  all?: StyleBag
+  mobile?: StyleBag
+  desktop?: StyleBag
+  // legacy flat fields (read-only, folded into `all` server-side)
+  fontSize?: string
+  fontWeight?: string
+  textAlign?: string
+  color?: string
+  background?: string
+  padding?: string
+  margin?: string
+  borderWidth?: string
+  borderColor?: string
+  borderRadius?: string
+  width?: string
+  maxWidth?: string
 }
 
 /** The admin Design Studio layer applied to the user panel at runtime. */

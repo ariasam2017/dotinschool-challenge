@@ -61,6 +61,33 @@ function tokenBlock(selector: string, map?: Record<string, string>): string {
   return decls.length ? `${selector}{${decls.join(';')}}` : ''
 }
 
+const FS_RE = /^[0-9]{1,3}(\.[0-9]{1,2})?(px|rem|em|%)$/
+const FW_RE = /^(300|400|500|600|700|800|900|normal|bold)$/
+const TA_RE = /^(right|left|center|justify)$/
+
+/** CSS declarations for one style bag (unvalidated keys are dropped). */
+function bagDecls(raw?: unknown): string[] {
+  const b = (raw || {}) as Record<string, string | undefined>
+  const d: string[] = []
+  if (b.fontSize && FS_RE.test(b.fontSize)) d.push(`font-size:${b.fontSize}`)
+  if (b.fontWeight && FW_RE.test(String(b.fontWeight))) d.push(`font-weight:${b.fontWeight}`)
+  if (b.textAlign && TA_RE.test(b.textAlign)) d.push(`text-align:${b.textAlign}`)
+  const push = (prop: string, v?: string) => {
+    const s = safeValue(v)
+    if (s) d.push(`${prop}:${s}`)
+  }
+  push('color', b.color)
+  push('background', b.background)
+  push('padding', b.padding)
+  push('margin', b.margin)
+  if (safeValue(b.borderWidth)) d.push(`border-width:${safeValue(b.borderWidth)}`, 'border-style:solid')
+  push('border-color', b.borderColor)
+  push('border-radius', b.borderRadius)
+  push('width', b.width)
+  push('max-width', b.maxWidth)
+  return d
+}
+
 /** Assemble the full stylesheet text for an Appearance. */
 export function buildCss(a: Appearance | null | undefined): string {
   if (!a) return ''
@@ -99,41 +126,30 @@ export function buildCss(a: Appearance | null | undefined): string {
   const hbg = safeValue(header?.background)
   if (hbg) out.push(`.u-header{background:${hbg}}`)
 
+  const MOBILE_Q = '(max-width: 767.98px)'
+  const DESKTOP_Q = '(min-width: 768px)'
   for (const o of a.overrides || []) {
     if (!o.selector || o.selector.length > 400 || !SELECTOR_RE.test(o.selector)) continue
-    const d: string[] = []
-    if (o.hidden) {
-      d.push('display:none')
-    } else {
-      if (o.fontSize && /^[0-9]{1,3}(\.[0-9]{1,2})?(px|rem|em|%)$/.test(o.fontSize)) {
-        d.push(`font-size:${o.fontSize}`)
-      }
-      if (o.fontWeight && /^(300|400|500|600|700|800|900|normal|bold)$/.test(String(o.fontWeight))) {
-        d.push(`font-weight:${o.fontWeight}`)
-      }
-      if (o.textAlign && /^(right|left|center|justify)$/.test(o.textAlign)) {
-        d.push(`text-align:${o.textAlign}`)
-      }
-      const css = safeValue(o.color)
-      if (css) d.push(`color:${css}`)
-      const bg = safeValue(o.background)
-      if (bg) d.push(`background:${bg}`)
-      const pad = safeValue(o.padding)
-      if (pad) d.push(`padding:${pad}`)
-      const mar = safeValue(o.margin)
-      if (mar) d.push(`margin:${mar}`)
-      const bw = safeValue(o.borderWidth)
-      if (bw) d.push(`border-width:${bw}`, 'border-style:solid')
-      const bc = safeValue(o.borderColor)
-      if (bc) d.push(`border-color:${bc}`)
-      const br = safeValue(o.borderRadius)
-      if (br) d.push(`border-radius:${br}`)
-      const w = safeValue(o.width)
-      if (w) d.push(`width:${w}`)
-      const mw = safeValue(o.maxWidth)
-      if (mw) d.push(`max-width:${mw}`)
+    const sel = o.selector
+
+    const legacyAll: Record<string, string | undefined> = {
+      fontSize: o.fontSize, fontWeight: o.fontWeight, textAlign: o.textAlign,
+      color: o.color, background: o.background, padding: o.padding, margin: o.margin,
+      borderWidth: o.borderWidth, borderColor: o.borderColor, borderRadius: o.borderRadius,
+      width: o.width, maxWidth: o.maxWidth,
     }
-    if (d.length) out.push(`${o.selector}{${d.map((x) => x + ' !important').join(';')}}`)
+    const all = o.all && Object.keys(o.all).length ? o.all : legacyAll
+    const rule = (decls: string[]) =>
+      decls.length ? `${sel}{${decls.map((x) => x + ' !important').join(';')}}` : ''
+    const wrap = (q: string, css: string) => (css ? `@media ${q}{${css}}` : '')
+
+    out.push(rule(bagDecls(all)))
+    out.push(wrap(MOBILE_Q, rule(bagDecls(o.mobile))))
+    out.push(wrap(DESKTOP_Q, rule(bagDecls(o.desktop))))
+
+    if (o.hidden) out.push(`${sel}{display:none !important}`)
+    if (o.hiddenMobile) out.push(`@media ${MOBILE_Q}{${sel}{display:none !important}}`)
+    if (o.hiddenDesktop) out.push(`@media ${DESKTOP_Q}{${sel}{display:none !important}}`)
   }
 
   const custom = String(a.customCss ?? '').trim()

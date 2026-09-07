@@ -31,32 +31,60 @@ type Appearance struct {
 	UpdatedAt int64 `json:"updatedAt,omitempty"`
 }
 
-// ElementOverride is one picked element and what to do with it. Every non-empty
-// style field becomes a `selector { prop: value !important }` declaration.
+// StyleBag is a set of CSS declarations for one element. Each non-empty field
+// becomes `prop: value !important`.
+type StyleBag struct {
+	FontSize     string `json:"fontSize,omitempty"`
+	FontWeight   string `json:"fontWeight,omitempty"`
+	TextAlign    string `json:"textAlign,omitempty"`
+	Color        string `json:"color,omitempty"`
+	Background   string `json:"background,omitempty"`
+	Padding      string `json:"padding,omitempty"`
+	Margin       string `json:"margin,omitempty"`
+	BorderWidth  string `json:"borderWidth,omitempty"`
+	BorderColor  string `json:"borderColor,omitempty"`
+	BorderRadius string `json:"borderRadius,omitempty"`
+	Width        string `json:"width,omitempty"`
+	MaxWidth     string `json:"maxWidth,omitempty"`
+}
+
+// ElementOverride is one picked element and what to do with it. Styles live in
+// three layers: All (every viewport), plus Mobile and Desktop which override
+// All inside their media query. Hidden flags are scoped the same way.
 type ElementOverride struct {
 	Selector string `json:"selector"`
+	Label    string `json:"label,omitempty"`
 	Text     string `json:"text,omitempty"`
-	SetText  bool   `json:"setText,omitempty"` // apply Text (even when empty)
-	Hidden   bool   `json:"hidden,omitempty"`
+	SetText  bool   `json:"setText,omitempty"`
 
-	FontSize   string `json:"fontSize,omitempty"`   // e.g. "1.1rem", "18px"
-	FontWeight string `json:"fontWeight,omitempty"` // "300".."900" | normal | bold
-	TextAlign  string `json:"textAlign,omitempty"`  // right | left | center | justify
-	Color      string `json:"color,omitempty"`      // text colour
-	Background string `json:"background,omitempty"` // background colour / gradient
+	Hidden        bool `json:"hidden,omitempty"` // hide on every viewport
+	HiddenMobile  bool `json:"hiddenMobile,omitempty"`
+	HiddenDesktop bool `json:"hiddenDesktop,omitempty"`
 
-	Padding string `json:"padding,omitempty"` // CSS length shorthand
-	Margin  string `json:"margin,omitempty"`
+	All     StyleBag `json:"all"`
+	Mobile  StyleBag `json:"mobile"`
+	Desktop StyleBag `json:"desktop"`
 
-	BorderWidth  string `json:"borderWidth,omitempty"` // e.g. "1px"
+	// Legacy pre-responsive flat fields — folded into All on the next save.
+	FontSize     string `json:"fontSize,omitempty"`
+	FontWeight   string `json:"fontWeight,omitempty"`
+	TextAlign    string `json:"textAlign,omitempty"`
+	Color        string `json:"color,omitempty"`
+	Background   string `json:"background,omitempty"`
+	Padding      string `json:"padding,omitempty"`
+	Margin       string `json:"margin,omitempty"`
+	BorderWidth  string `json:"borderWidth,omitempty"`
 	BorderColor  string `json:"borderColor,omitempty"`
-	BorderRadius string `json:"borderRadius,omitempty"` // e.g. "12px"
-
-	Width    string `json:"width,omitempty"`
-	MaxWidth string `json:"maxWidth,omitempty"`
-
-	Label string `json:"label,omitempty"` // human hint for the admin list
+	BorderRadius string `json:"borderRadius,omitempty"`
+	Width        string `json:"width,omitempty"`
+	MaxWidth     string `json:"maxWidth,omitempty"`
 }
+
+// The breakpoint the studio scopes Mobile / Desktop layers to.
+const (
+	MediaMobileMax  = "(max-width: 767.98px)"
+	MediaDesktopMin = "(min-width: 768px)"
+)
 
 // TextReplacement swaps a piece of user-panel copy for another. Rendered as
 // plain text (never HTML). Mode "exact" (default) replaces a text node whose
