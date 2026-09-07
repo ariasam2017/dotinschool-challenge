@@ -262,9 +262,10 @@ Say "host port: $port"
 # ---- 5. compile the Linux binary on the host ----
 Say "compiling the linux binary on the host (first run may take ~1 min)"
 New-Item -ItemType Directory -Force -Path dist | Out-Null
+$ver = (& git describe --tags --always --dirty 2>$null); if (-not $ver) { $ver = 'dev' }
 $env:GOOS = 'linux'; $env:GOARCH = 'amd64'; $env:CGO_ENABLED = '0'
 try {
-  & $go build -trimpath -ldflags='-s -w' -o dist/dotinschool_linux_amd64 ./cmd/server
+  & $go build -trimpath -ldflags="-s -w -X main.version=$ver" -o dist/dotinschool_linux_amd64 ./cmd/server
 } finally {
   Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
 }
@@ -306,8 +307,11 @@ if (-not $built) {
   Die "docker build failed after $maxAttempts attempts (BuildKit and the classic builder). This looks like a genuine Docker Desktop problem, not this project's Dockerfile - restart Docker Desktop (or reboot), then re-run this script. If it keeps happening, raise Docker Desktop's memory limit in Settings -> Resources."
 }
 Say "starting the stack"
-docker compose -f build/docker-compose.yml up -d
+# --force-recreate so the container always swaps to the just-built image,
+# even if Docker Compose thinks nothing changed.
+docker compose -f build/docker-compose.yml up -d --force-recreate --remove-orphans
 if ($LASTEXITCODE -ne 0) { Die "docker compose up failed." }
+Say "deployed build: $ver  (Ctrl+Shift+R in the browser to drop cached assets)"
 
 # ---- 7. access info ----
 $cfg = @{}
