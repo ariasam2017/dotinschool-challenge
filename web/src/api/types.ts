@@ -62,6 +62,15 @@ export interface ElementOverride {
   fontSize?: string
   fontWeight?: string
   textAlign?: string
+  color?: string
+  background?: string
+  padding?: string
+  margin?: string
+  borderWidth?: string
+  borderColor?: string
+  borderRadius?: string
+  width?: string
+  maxWidth?: string
   label?: string
 }
 

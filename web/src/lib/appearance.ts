@@ -114,6 +114,24 @@ export function buildCss(a: Appearance | null | undefined): string {
       if (o.textAlign && /^(right|left|center|justify)$/.test(o.textAlign)) {
         d.push(`text-align:${o.textAlign}`)
       }
+      const css = safeValue(o.color)
+      if (css) d.push(`color:${css}`)
+      const bg = safeValue(o.background)
+      if (bg) d.push(`background:${bg}`)
+      const pad = safeValue(o.padding)
+      if (pad) d.push(`padding:${pad}`)
+      const mar = safeValue(o.margin)
+      if (mar) d.push(`margin:${mar}`)
+      const bw = safeValue(o.borderWidth)
+      if (bw) d.push(`border-width:${bw}`, 'border-style:solid')
+      const bc = safeValue(o.borderColor)
+      if (bc) d.push(`border-color:${bc}`)
+      const br = safeValue(o.borderRadius)
+      if (br) d.push(`border-radius:${br}`)
+      const w = safeValue(o.width)
+      if (w) d.push(`width:${w}`)
+      const mw = safeValue(o.maxWidth)
+      if (mw) d.push(`max-width:${mw}`)
     }
     if (d.length) out.push(`${o.selector}{${d.map((x) => x + ' !important').join(';')}}`)
   }

@@ -31,16 +31,31 @@ type Appearance struct {
 	UpdatedAt int64 `json:"updatedAt,omitempty"`
 }
 
-// ElementOverride is one picked element and what to do with it.
+// ElementOverride is one picked element and what to do with it. Every non-empty
+// style field becomes a `selector { prop: value !important }` declaration.
 type ElementOverride struct {
-	Selector   string `json:"selector"`
-	Text       string `json:"text,omitempty"`
-	SetText    bool   `json:"setText,omitempty"` // apply Text (even when empty)
-	Hidden     bool   `json:"hidden,omitempty"`
+	Selector string `json:"selector"`
+	Text     string `json:"text,omitempty"`
+	SetText  bool   `json:"setText,omitempty"` // apply Text (even when empty)
+	Hidden   bool   `json:"hidden,omitempty"`
+
 	FontSize   string `json:"fontSize,omitempty"`   // e.g. "1.1rem", "18px"
 	FontWeight string `json:"fontWeight,omitempty"` // "300".."900" | normal | bold
 	TextAlign  string `json:"textAlign,omitempty"`  // right | left | center | justify
-	Label      string `json:"label,omitempty"`      // human hint for the admin list
+	Color      string `json:"color,omitempty"`      // text colour
+	Background string `json:"background,omitempty"` // background colour / gradient
+
+	Padding string `json:"padding,omitempty"` // CSS length shorthand
+	Margin  string `json:"margin,omitempty"`
+
+	BorderWidth  string `json:"borderWidth,omitempty"` // e.g. "1px"
+	BorderColor  string `json:"borderColor,omitempty"`
+	BorderRadius string `json:"borderRadius,omitempty"` // e.g. "12px"
+
+	Width    string `json:"width,omitempty"`
+	MaxWidth string `json:"maxWidth,omitempty"`
+
+	Label string `json:"label,omitempty"` // human hint for the admin list
 }
 
 // TextReplacement swaps a piece of user-panel copy for another. Rendered as

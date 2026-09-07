@@ -8,7 +8,13 @@ import {
   revertAppearance,
   resetAppearance,
 } from '@/api/client'
-import type { Appearance, HeroAppearance, HeaderAppearance, TextReplacement } from '@/api/types'
+import type {
+  Appearance,
+  HeroAppearance,
+  HeaderAppearance,
+  TextReplacement,
+  ElementOverride,
+} from '@/api/types'
 import AppIcon from '@/components/AppIcon.vue'
 
 /* ---------------------------------------------------------------- model -- */
@@ -63,19 +69,50 @@ const form = reactive({
   header: { brand: '', background: '' },
   customCss: '',
   texts: [] as { find: string; replace: string; mode: 'exact' | 'contains' }[],
-  overrides: [] as {
-    selector: string
-    text: string
-    setText: boolean
-    hidden: boolean
-    fontSize: string
-    fontWeight: string
-    textAlign: string
-    label: string
-    isLeaf: boolean
-    baseFontSize: string
-  }[],
+  overrides: [] as Override[],
 })
+
+interface Override {
+  selector: string
+  text: string
+  setText: boolean
+  hidden: boolean
+  fontSize: string
+  fontWeight: string
+  textAlign: string
+  color: string
+  background: string
+  padding: string
+  margin: string
+  borderWidth: string
+  borderColor: string
+  borderRadius: string
+  width: string
+  maxWidth: string
+  label: string
+  isLeaf: boolean
+  baseFontSize: string
+}
+
+function blankOverride(partial: Partial<Override>): Override {
+  return {
+    selector: '', text: '', setText: false, hidden: false,
+    fontSize: '', fontWeight: '', textAlign: '',
+    color: '', background: '', padding: '', margin: '',
+    borderWidth: '', borderColor: '', borderRadius: '',
+    width: '', maxWidth: '',
+    label: '', isLeaf: true, baseFontSize: '',
+    ...partial,
+  }
+}
+
+const STYLE_KEYS: (keyof Override)[] = [
+  'fontSize', 'fontWeight', 'textAlign', 'color', 'background', 'padding',
+  'margin', 'borderWidth', 'borderColor', 'borderRadius', 'width', 'maxWidth',
+]
+function hasStyle(o: Override): boolean {
+  return STYLE_KEYS.some((k) => o[k])
+}
 
 /** Bump a picked element's font-size by `dir` px (seeds from its real size). */
 function nudgeFont(o: (typeof form.overrides)[number], dir: number): void {
@@ -169,11 +206,8 @@ function toAppearance(): Appearance {
     .map((t) => ({ find: t.find.trim(), replace: t.replace, mode: t.mode }))
   if (texts.length) a.texts = texts
 
-  const overrides = form.overrides
-    .filter(
-      (o) =>
-        o.selector && (o.setText || o.hidden || o.fontSize || o.fontWeight || o.textAlign),
-    )
+  const overrides: ElementOverride[] = form.overrides
+    .filter((o) => o.selector && (o.setText || o.hidden || o.text || hasStyle(o)))
     .map((o) => ({
       selector: o.selector,
       text: o.text,
@@ -182,6 +216,15 @@ function toAppearance(): Appearance {
       fontSize: o.fontSize,
       fontWeight: o.fontWeight,
       textAlign: o.textAlign,
+      color: o.color,
+      background: o.background,
+      padding: o.padding,
+      margin: o.margin,
+      borderWidth: o.borderWidth,
+      borderColor: o.borderColor,
+      borderRadius: o.borderRadius,
+      width: o.width,
+      maxWidth: o.maxWidth,
       label: o.label,
     }))
   if (overrides.length) a.overrides = overrides
@@ -220,18 +263,27 @@ function fromAppearance(a?: Appearance): void {
     mode: t.mode === 'contains' ? 'contains' : 'exact',
   }))
 
-  form.overrides = (a?.overrides || []).map((o) => ({
-    selector: o.selector || '',
-    text: o.text || '',
-    setText: !!o.setText,
-    hidden: !!o.hidden,
-    fontSize: o.fontSize || '',
-    fontWeight: o.fontWeight || '',
-    textAlign: o.textAlign || '',
-    label: o.label || '',
-    isLeaf: true,
-    baseFontSize: '',
-  }))
+  form.overrides = (a?.overrides || []).map((o) =>
+    blankOverride({
+      selector: o.selector || '',
+      text: o.text || '',
+      setText: !!o.setText,
+      hidden: !!o.hidden,
+      fontSize: o.fontSize || '',
+      fontWeight: o.fontWeight || '',
+      textAlign: o.textAlign || '',
+      color: o.color || '',
+      background: o.background || '',
+      padding: o.padding || '',
+      margin: o.margin || '',
+      borderWidth: o.borderWidth || '',
+      borderColor: o.borderColor || '',
+      borderRadius: o.borderRadius || '',
+      width: o.width || '',
+      maxWidth: o.maxWidth || '',
+      label: o.label || '',
+    }),
+  )
   selectedOverride.value = -1
 }
 
@@ -286,18 +338,15 @@ function onPreviewMessage(e: MessageEvent): void {
     if (existing >= 0) {
       selectedOverride.value = existing
     } else {
-      form.overrides.push({
-        selector: String(d.selector || ''),
-        text: String(d.text || ''),
-        setText: false,
-        hidden: false,
-        fontSize: '',
-        fontWeight: '',
-        textAlign: '',
-        label: String(d.label || ''),
-        isLeaf: d.isLeaf !== false,
-        baseFontSize: String(d.baseFontSize || ''),
-      })
+      form.overrides.push(
+        blankOverride({
+          selector: String(d.selector || ''),
+          text: String(d.text || ''),
+          label: String(d.label || ''),
+          isLeaf: d.isLeaf !== false,
+          baseFontSize: String(d.baseFontSize || ''),
+        }),
+      )
       selectedOverride.value = form.overrides.length - 1
     }
     activeTab.value = 'elements'
@@ -707,6 +756,48 @@ onBeforeUnmount(() => {
                       <a-radio-button value="left">چپ</a-radio-button>
                     </a-radio-group>
                   </div>
+
+                  <div class="el-field" @click.stop>
+                    <span class="el-flbl">رنگ متن / پس‌زمینه</span>
+                    <div class="fs-row">
+                      <input type="color" :value="o.color || '#000000'"
+                        @input="o.color = ($event.target as HTMLInputElement).value" />
+                      <a-input v-model:value="o.color" size="small" placeholder="رنگ متن" allow-clear />
+                    </div>
+                    <div class="fs-row">
+                      <input type="color" :value="o.background || '#ffffff'"
+                        @input="o.background = ($event.target as HTMLInputElement).value" />
+                      <a-input v-model:value="o.background" size="small" placeholder="پس‌زمینه" allow-clear />
+                    </div>
+                  </div>
+
+                  <div class="el-field" @click.stop>
+                    <span class="el-flbl">فاصله داخلی / بیرونی (padding / margin)</span>
+                    <a-input v-model:value="o.padding" size="small" placeholder="padding — مثلاً 8px 16px"
+                      allow-clear />
+                    <a-input v-model:value="o.margin" size="small" placeholder="margin — مثلاً 0 auto"
+                      allow-clear />
+                  </div>
+
+                  <div class="el-field" @click.stop>
+                    <span class="el-flbl">حاشیه</span>
+                    <div class="fs-row">
+                      <a-input v-model:value="o.borderWidth" size="small" placeholder="ضخامت — 1px"
+                        allow-clear />
+                      <input type="color" :value="o.borderColor || '#000000'"
+                        @input="o.borderColor = ($event.target as HTMLInputElement).value" />
+                    </div>
+                    <a-input v-model:value="o.borderRadius" size="small" placeholder="گِردی گوشه — 12px"
+                      allow-clear />
+                  </div>
+
+                  <div class="el-field" @click.stop>
+                    <span class="el-flbl">اندازه</span>
+                    <a-input v-model:value="o.width" size="small" placeholder="width — مثلاً 320px یا 100%"
+                      allow-clear />
+                    <a-input v-model:value="o.maxWidth" size="small" placeholder="max-width — مثلاً 480px"
+                      allow-clear />
+                  </div>
                 </template>
               </template>
             </div>
@@ -895,7 +986,16 @@ onBeforeUnmount(() => {
 .fs-row > .ant-input {
   flex: 1;
   min-width: 0;
-  text-align: center;
+}
+.fs-row input[type='color'] {
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  flex: none;
+  cursor: pointer;
 }
 .el-flbl {
   font-size: 0.76rem;

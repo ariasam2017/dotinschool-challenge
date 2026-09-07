@@ -195,9 +195,17 @@ func cleanOverrides(in []model.ElementOverride) []model.ElementOverride {
 		if !overrideTextAligns[o.TextAlign] {
 			o.TextAlign = ""
 		}
+		o.Color = safeCSSVal(o.Color)
+		o.Background = safeCSSVal(o.Background)
+		o.Padding = safeCSSVal(o.Padding)
+		o.Margin = safeCSSVal(o.Margin)
+		o.BorderWidth = safeCSSVal(o.BorderWidth)
+		o.BorderColor = safeCSSVal(o.BorderColor)
+		o.BorderRadius = safeCSSVal(o.BorderRadius)
+		o.Width = safeCSSVal(o.Width)
+		o.MaxWidth = safeCSSVal(o.MaxWidth)
 
-		if !o.SetText && !o.Hidden && o.Text == "" &&
-			o.FontSize == "" && o.FontWeight == "" && o.TextAlign == "" {
+		if !o.SetText && !o.Hidden && o.Text == "" && !overrideHasStyle(o) {
 			continue // nothing to do
 		}
 		out = append(out, o)
@@ -260,6 +268,25 @@ func cleanTokenMap(in map[string]string) map[string]string {
 		return nil
 	}
 	return out
+}
+
+// safeCSSVal returns a trimmed CSS value, or "" if it fails the charset /
+// length / no-external-url checks. Used for the per-element style overrides,
+// where an invalid value is simply dropped rather than failing the save.
+func safeCSSVal(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" || len(v) > appearanceMaxTokenVal ||
+		!appearanceValueRe.MatchString(v) || appearanceBadURLRe.MatchString(v) {
+		return ""
+	}
+	return v
+}
+
+func overrideHasStyle(o model.ElementOverride) bool {
+	return o.FontSize != "" || o.FontWeight != "" || o.TextAlign != "" ||
+		o.Color != "" || o.Background != "" || o.Padding != "" || o.Margin != "" ||
+		o.BorderWidth != "" || o.BorderColor != "" || o.BorderRadius != "" ||
+		o.Width != "" || o.MaxWidth != ""
 }
 
 func checkCSSValue(field, v string) error {
