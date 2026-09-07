@@ -583,6 +583,19 @@ function applyImport(): void {
 
 watch(form, schedulePush, { deep: true })
 
+// Keep the preview on the viewport you're editing for: choosing the موبایل or
+// دسکتاپ layer (or a scoped hide) snaps the preview to that width so scoped
+// edits are actually visible. The «همه» layer leaves the preview alone.
+watch([styleScope, hideMode], ([scope, hide]) => {
+  const target =
+    scope === 'mobile' || hide === 'mobile'
+      ? 'mobile'
+      : scope === 'desktop' || hide === 'desktop'
+        ? 'desktop'
+        : null
+  if (target) device.value = target
+})
+
 onMounted(() => {
   window.addEventListener('message', onPreviewMessage)
   void load()
