@@ -171,12 +171,6 @@ function undoDelete(): void {
   lastDeleted.value = null
 }
 
-/** Open the editor for card i, or close it if already open — the override
- *  itself (and everything applied) stays either way. */
-function toggleOverride(i: number): void {
-  selectedOverride.value = selectedOverride.value === i ? -1 : i
-}
-
 function removeOverride(i: number): void {
   const o = form.overrides[i]
   if (!o) return
@@ -749,24 +743,23 @@ onBeforeUnmount(() => {
               <a-button size="small" type="link" @click="undoDelete">بازگرداندن</a-button>
             </div>
 
-            <div v-if="!form.overrides.length" class="faint empty-els">هنوز عنصری انتخاب نشده.</div>
+            <div v-if="!form.overrides.length" class="faint empty-els">
+              هنوز عنصری ویرایش نشده — از دکمه‌ی بالا یک بخش را از پیش‌نمایش انتخاب کن.
+            </div>
 
-            <div v-if="form.overrides.length" class="el-listhead faint">
-              عناصر ویرایش‌شده ({{ form.overrides.length }}) — برای ویرایش، روی هرکدام بزن
+            <div v-else-if="selectedOverride === -1" class="faint empty-els">
+              {{ form.overrides.length }} عنصر ویرایش‌شده و اعمال‌شده است. برای ویرایش دوباره‌ی هرکدام،
+              روی همان بخش در پیش‌نمایش کلیک کن.
             </div>
 
             <div class="el-list">
-              <div v-for="(o, i) in form.overrides" :key="i" class="el-card"
-                :class="{ active: selectedOverride === i }">
-                <div class="el-head" @click="toggleOverride(i)">
-                  <AppIcon :name="selectedOverride === i ? 'chevron-down' : 'chevron-left'" :size="13"
-                    class="el-chev" />
-                  <span class="el-dot" :class="publishedSelectors.has(o.selector) ? 'live' : 'draft'"
-                    :title="publishedSelectors.has(o.selector) ? 'منتشرشده' : 'پیش‌نویس'" />
+              <template v-for="(o, i) in form.overrides" :key="i">
+              <div v-if="selectedOverride === i" class="el-card active">
+                <div class="el-head">
+                  <span class="el-dot" :class="publishedSelectors.has(o.selector) ? 'live' : 'draft'" />
                   <span class="el-label">{{ o.label || o.selector }}</span>
                 </div>
 
-                <template v-if="selectedOverride === i">
                 <code class="el-sel">{{ shortSel(o.selector) }}</code>
                 <button type="button" class="el-close" @click="selectedOverride = -1">
                   ↑ بستن ویرایشگر (تغییرات می‌ماند)
@@ -864,8 +857,8 @@ onBeforeUnmount(() => {
                   <AppIcon name="trash" :size="13" />
                   حذف کامل این سفارشی‌سازی و بازگرداندن عنصر به پیش‌فرض
                 </button>
-                </template>
               </div>
+              </template>
             </div>
           </a-tab-pane>
 
