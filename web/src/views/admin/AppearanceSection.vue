@@ -153,9 +153,26 @@ function sendPick(on: boolean): void {
 function togglePick(): void {
   sendPick(!picking.value)
 }
-function removeOverride(i: number): void {
+function dropOverride(i: number): void {
   form.overrides.splice(i, 1)
   if (selectedOverride.value === i) selectedOverride.value = -1
+  else if (selectedOverride.value > i) selectedOverride.value -= 1
+}
+
+function removeOverride(i: number): void {
+  const o = form.overrides[i]
+  if (!o) return
+  const live = publishedSelectors.value.has(o.selector)
+  Modal.confirm({
+    title: 'حذف این سفارشی‌سازی؟',
+    content: live
+      ? `«${o.label || o.selector}» الان روی پنل کاربر منتشر شده. با حذف، این عنصر به حالت پیش‌فرض برمی‌گردد و با «انتشار» بعدی روی پنل کاربر هم اعمال می‌شود.`
+      : `«${o.label || o.selector}» از فهرست حذف می‌شود و عنصر به حالت پیش‌فرض برمی‌گردد.`,
+    okText: 'حذف',
+    cancelText: 'انصراف',
+    okType: 'danger',
+    onOk: () => dropOverride(i),
+  })
 }
 function shortSel(s: string): string {
   return s.length > 46 ? '…' + s.slice(-45) : s
@@ -297,12 +314,23 @@ const activeTab = ref('settings')
 const previewSrc = ref('/?preview=1')
 const iframeEl = ref<HTMLIFrameElement | null>(null)
 
-let savedDraftJson = '{}'
-let publishedJson = '{}'
+const savedDraftJson = ref('{}')
+const publishedJson = ref('{}')
 
 const currentJson = computed(() => JSON.stringify(toAppearance()))
-const dirty = computed(() => currentJson.value !== savedDraftJson)
-const unpublished = computed(() => dirty.value || savedDraftJson !== publishedJson)
+const dirty = computed(() => currentJson.value !== savedDraftJson.value)
+const unpublished = computed(() => dirty.value || savedDraftJson.value !== publishedJson.value)
+
+/** Selectors already live in the published design — deleting these actually
+ *  changes what visitors see (after the next publish). */
+const publishedSelectors = computed<Set<string>>(() => {
+  try {
+    const p = JSON.parse(publishedJson.value) as Appearance
+    return new Set((p.overrides || []).map((o) => o.selector))
+  } catch {
+    return new Set()
+  }
+})
 
 /* --------------------------------------------------------- live preview -- */
 
@@ -365,8 +393,8 @@ async function load(): Promise<void> {
   try {
     const { draft, published } = await getAppearance()
     fromAppearance(draft && Object.keys(draft).length ? draft : published)
-    savedDraftJson = currentJson.value
-    publishedJson = JSON.stringify(published || {})
+    savedDraftJson.value = currentJson.value
+    publishedJson.value = JSON.stringify(published || {})
   } catch (e) {
     message.error(e instanceof Error ? e.message : 'دریافت تنظیمات ظاهر ناموفق بود')
   } finally {
@@ -378,7 +406,7 @@ async function saveDraft(): Promise<void> {
   saving.value = true
   try {
     await saveAppearanceDraft(toAppearance())
-    savedDraftJson = currentJson.value
+    savedDraftJson.value = currentJson.value
     message.success('پیش‌نویس ذخیره شد — روی پنل کاربر هنوز اعمال نشده')
   } catch (e) {
     message.error(e instanceof Error ? e.message : 'ذخیره‌ی پیش‌نویس ناموفق بود')
@@ -398,8 +426,8 @@ function doPublish(): void {
       try {
         await saveAppearanceDraft(toAppearance())
         await publishAppearance()
-        savedDraftJson = currentJson.value
-        publishedJson = savedDraftJson
+        savedDraftJson.value = currentJson.value
+        publishedJson.value = savedDraftJson.value
         message.success('منتشر شد — کاربران تا چند ثانیه‌ی دیگر تغییر را می‌بینند')
       } catch (e) {
         message.error(e instanceof Error ? e.message : 'انتشار ناموفق بود')
@@ -421,8 +449,8 @@ function doRevert(): void {
       try {
         const { draft } = await revertAppearance()
         fromAppearance(draft)
-        savedDraftJson = currentJson.value
-        publishedJson = savedDraftJson
+        savedDraftJson.value = currentJson.value
+        publishedJson.value = savedDraftJson.value
         schedulePush()
         message.success('به نسخه‌ی منتشرشده برگشت')
       } catch (e) {
@@ -443,8 +471,8 @@ function doReset(): void {
       try {
         await resetAppearance()
         fromAppearance({})
-        savedDraftJson = currentJson.value
-        publishedJson = '{}'
+        savedDraftJson.value = currentJson.value
+        publishedJson.value = "{}"
         schedulePush()
         message.success('به طراحی پیش‌فرض بازگشت')
       } catch (e) {
@@ -489,7 +517,7 @@ function applyImport(): void {
     const parsed = JSON.parse(importText.value)
     if (!parsed || typeof parsed !== 'object') throw new Error('bad')
     fromAppearance(parsed as Appearance)
-    savedDraftJson = '' // force "unpublished" until saved
+    savedDraftJson.value = "" // force "unpublished" until saved
     schedulePush()
     importOpen.value = false
     importText.value = ''
@@ -704,7 +732,14 @@ onBeforeUnmount(() => {
               :class="{ active: selectedOverride === i }" @click="selectedOverride = i">
               <div class="el-head">
                 <span class="el-label">{{ o.label || o.selector }}</span>
-                <a-button size="small" type="text" danger @click.stop="removeOverride(i)">
+                <span
+                  class="el-state"
+                  :class="publishedSelectors.has(o.selector) ? 'live' : 'draft'"
+                >
+                  {{ publishedSelectors.has(o.selector) ? 'منتشرشده' : 'پیش‌نویس' }}
+                </span>
+                <a-button size="small" type="text" danger title="حذف سفارشی‌سازی"
+                  @click.stop="removeOverride(i)">
                   <AppIcon name="trash" :size="13" />
                 </a-button>
               </div>
@@ -956,6 +991,21 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.el-state {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+.el-state.live {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.el-state.draft {
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 .el-sel {
   display: block;
