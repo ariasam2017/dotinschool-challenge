@@ -159,6 +159,12 @@ function dropOverride(i: number): void {
   else if (selectedOverride.value > i) selectedOverride.value -= 1
 }
 
+/** Open the editor for card i, or close it if already open — the override
+ *  itself (and everything applied) stays either way. */
+function toggleOverride(i: number): void {
+  selectedOverride.value = selectedOverride.value === i ? -1 : i
+}
+
 function removeOverride(i: number): void {
   const o = form.overrides[i]
   if (!o) return
@@ -729,8 +735,10 @@ onBeforeUnmount(() => {
             <div v-if="!form.overrides.length" class="faint empty-els">هنوز عنصری انتخاب نشده.</div>
 
             <div v-for="(o, i) in form.overrides" :key="i" class="el-card"
-              :class="{ active: selectedOverride === i }" @click="selectedOverride = i">
-              <div class="el-head">
+              :class="{ active: selectedOverride === i }">
+              <div class="el-head" @click="toggleOverride(i)">
+                <AppIcon :name="selectedOverride === i ? 'chevron-down' : 'chevron-right'" :size="14"
+                  class="el-chev" />
                 <span class="el-label">{{ o.label || o.selector }}</span>
                 <span
                   class="el-state"
@@ -738,7 +746,7 @@ onBeforeUnmount(() => {
                 >
                   {{ publishedSelectors.has(o.selector) ? 'منتشرشده' : 'پیش‌نویس' }}
                 </span>
-                <a-button size="small" type="text" danger title="حذف سفارشی‌سازی"
+                <a-button size="small" type="text" danger title="حذف کامل سفارشی‌سازی"
                   @click.stop="removeOverride(i)">
                   <AppIcon name="trash" :size="13" />
                 </a-button>
@@ -746,6 +754,9 @@ onBeforeUnmount(() => {
               <code class="el-sel">{{ shortSel(o.selector) }}</code>
 
               <template v-if="selectedOverride === i">
+                <button type="button" class="el-close" @click="selectedOverride = -1">
+                  بستن این ویرایشگر (تغییرات می‌ماند)
+                </button>
                 <label class="el-toggle">
                   <a-switch v-model:checked="o.hidden" size="small" />
                   <span>مخفی کردن این بخش</span>
@@ -972,7 +983,6 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-sm);
   padding: 8px 10px;
   margin-top: 8px;
-  cursor: pointer;
 }
 .el-card.active {
   border-color: var(--primary);
@@ -982,6 +992,26 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+  cursor: pointer;
+}
+.el-chev {
+  flex: none;
+  color: var(--text-faint);
+}
+.el-close {
+  width: 100%;
+  margin-top: 8px;
+  padding: 5px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.el-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
 }
 .el-label {
   flex: 1;
