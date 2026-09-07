@@ -430,6 +430,37 @@ function onPreviewMessage(e: MessageEvent): void {
       selectedOverride.value = form.overrides.length - 1
     }
     activeTab.value = 'elements'
+    return
+  }
+
+  if (d.__dotin === 'retargeted') {
+    const idx = form.overrides.findIndex((o) => o.selector === d.from)
+    if (idx < 0) return
+    const dup = form.overrides.findIndex((o, i) => i !== idx && o.selector === d.selector)
+    if (dup >= 0) {
+      // target already has its own override — just jump to it
+      selectedOverride.value = dup
+      return
+    }
+    const o = form.overrides[idx]
+    o.selector = String(d.selector || o.selector)
+    o.label = String(d.label || o.label)
+    o.isLeaf = d.isLeaf !== false
+    o.baseFontSize = String(d.baseFontSize || '')
+    selectedOverride.value = idx
+  }
+}
+
+function sendRetarget(dir: 'up' | 'down'): void {
+  const o = currentOverride.value
+  if (!o) return
+  try {
+    iframeEl.value?.contentWindow?.postMessage(
+      { __dotin: 'retarget', selector: o.selector, dir },
+      location.origin,
+    )
+  } catch {
+    /* iframe not ready */
   }
 }
 
@@ -816,6 +847,15 @@ onBeforeUnmount(() => {
                   </span>
                   <a-button type="primary" size="small" class="el-done" @click="selectedOverride = -1">
                     <AppIcon name="check" :size="14" /> تمام
+                  </a-button>
+                </div>
+                <div class="el-retarget" @click.stop>
+                  <span class="faint">عنصرِ هدف:</span>
+                  <a-button size="small" title="والد (عنصرِ دربرگیرنده)" @click="sendRetarget('up')">
+                    <AppIcon name="chevron-up" :size="13" /> والد
+                  </a-button>
+                  <a-button size="small" title="فرزند (عنصرِ داخلی)" @click="sendRetarget('down')">
+                    <AppIcon name="chevron-down" :size="13" /> فرزند
                   </a-button>
                 </div>
 
@@ -1210,6 +1250,13 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-sm);
   background: var(--surface-2);
 }
+.el-retarget {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 0.74rem;
+}
 .fs-row {
   display: flex;
   align-items: center;
@@ -1251,7 +1298,7 @@ onBeforeUnmount(() => {
   overflow: auto;
   height: calc(100dvh - 240px);
   display: flex;
-  justify-content: center;
+  justify-content: safe center;
 }
 .preview-frame {
   border: 1px solid var(--border);
@@ -1261,7 +1308,10 @@ onBeforeUnmount(() => {
   transition: width var(--dur) var(--ease);
 }
 .preview-frame.desktop {
-  width: 100%;
+  /* never below the 768px breakpoint, so desktop-scoped rules actually match
+     inside the iframe even when the studio pane is narrow (it scrolls) */
+  width: max(100%, 1024px);
+  flex: none;
 }
 .preview-frame.mobile {
   width: 390px;

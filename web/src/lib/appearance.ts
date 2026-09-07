@@ -351,27 +351,65 @@ function onPickOver(e: Event): void {
   t.style.setProperty('outline-offset', '-2px', 'important')
 }
 
-function onPickClick(e: MouseEvent): void {
-  e.preventDefault()
-  e.stopImmediatePropagation()
-  const t = e.target as Element
-  if (!t) return
-  const isLeaf = !t.querySelector('*')
+/** Own direct non-whitespace text? */
+function hasOwnText(el: Element): boolean {
+  return Array.from(el.childNodes).some((n) => n.nodeType === 3 && (n.nodeValue || '').trim())
+}
+
+/** Descend to the innermost element that actually carries the visible text,
+ *  so clicking near a heading lands on the heading, not its wrapper. */
+function textLeaf(el: Element): Element {
+  let cur = el
+  for (let i = 0; i < 4; i++) {
+    if (hasOwnText(cur)) return cur
+    if (cur.children.length === 1) {
+      cur = cur.children[0]
+      continue
+    }
+    break
+  }
+  return el
+}
+
+function describe(el: Element): Record<string, unknown> {
   let baseFontSize = ''
   try {
-    baseFontSize = getComputedStyle(t).fontSize || ''
+    baseFontSize = getComputedStyle(el).fontSize || ''
   } catch {
     /* detached */
   }
+  const isLeaf = !el.querySelector('*')
+  return {
+    selector: cssPath(el),
+    text: isLeaf ? (el.textContent || '').trim() : '',
+    label: (el.textContent || el.tagName).trim().slice(0, 60),
+    isLeaf,
+    baseFontSize,
+  }
+}
+
+function onPickClick(e: MouseEvent): void {
+  e.preventDefault()
+  e.stopImmediatePropagation()
+  const raw = e.target as Element
+  if (!raw) return
+  const el = textLeaf(raw)
+  window.parent?.postMessage({ __dotin: 'picked', ...describe(el) }, location.origin)
+}
+
+/** Move the current selection to its parent / first child and report back. */
+function onRetarget(selector: string, dir: 'up' | 'down'): void {
+  let el: Element | null = null
+  try {
+    el = document.querySelector(selector)
+  } catch {
+    return
+  }
+  if (!el) return
+  const next = dir === 'up' ? el.parentElement : el.firstElementChild
+  if (!next || next === document.body || next === document.documentElement) return
   window.parent?.postMessage(
-    {
-      __dotin: 'picked',
-      selector: cssPath(t),
-      text: isLeaf ? (t.textContent || '').trim() : '',
-      label: (t.textContent || t.tagName).trim().slice(0, 60),
-      isLeaf,
-      baseFontSize,
-    },
+    { __dotin: 'retargeted', from: selector, ...describe(next) },
     location.origin,
   )
 }
@@ -414,6 +452,8 @@ export function initAppearanceBridge(): void {
       applyAppearance(d.payload as Appearance)
     } else if (d.__dotin === 'pick') {
       setPickMode(!!d.on)
+    } else if (d.__dotin === 'retarget' && typeof d.selector === 'string') {
+      onRetarget(d.selector, d.dir === 'up' ? 'up' : 'down')
     }
   })
 
