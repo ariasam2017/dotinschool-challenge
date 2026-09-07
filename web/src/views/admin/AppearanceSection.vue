@@ -153,10 +153,22 @@ function sendPick(on: boolean): void {
 function togglePick(): void {
   sendPick(!picking.value)
 }
+const lastDeleted = ref<{ at: number; item: Override } | null>(null)
+
 function dropOverride(i: number): void {
+  const item = form.overrides[i]
+  if (!item) return
+  lastDeleted.value = { at: i, item: { ...item } }
   form.overrides.splice(i, 1)
   if (selectedOverride.value === i) selectedOverride.value = -1
   else if (selectedOverride.value > i) selectedOverride.value -= 1
+}
+
+function undoDelete(): void {
+  const d = lastDeleted.value
+  if (!d) return
+  form.overrides.splice(Math.min(d.at, form.overrides.length), 0, d.item)
+  lastDeleted.value = null
 }
 
 /** Open the editor for card i, or close it if already open — the override
@@ -170,10 +182,10 @@ function removeOverride(i: number): void {
   if (!o) return
   const live = publishedSelectors.value.has(o.selector)
   Modal.confirm({
-    title: 'حذف این سفارشی‌سازی؟',
+    title: 'حذف کامل این سفارشی‌سازی؟',
     content: live
-      ? `«${o.label || o.selector}» الان روی پنل کاربر منتشر شده. با حذف، این عنصر به حالت پیش‌فرض برمی‌گردد و با «انتشار» بعدی روی پنل کاربر هم اعمال می‌شود.`
-      : `«${o.label || o.selector}» از فهرست حذف می‌شود و عنصر به حالت پیش‌فرض برمی‌گردد.`,
+      ? `«${o.label || o.selector}» الان روی پنل کاربر منتشر شده. با حذف، این عنصر به حالت پیش‌فرض برمی‌گردد و با «انتشار» بعدی روی پنل کاربر هم اعمال می‌شود. (اگر فقط می‌خواهی فیلدها جمع شوند، «بستن ویرایشگر» را بزن.)`
+      : `«${o.label || o.selector}» از فهرست حذف می‌شود و عنصر به حالت پیش‌فرض برمی‌گردد. (برای جمع‌کردن فیلدها بدون حذف، «بستن ویرایشگر» را بزن.)`,
     okText: 'حذف',
     cancelText: 'انصراف',
     okType: 'danger',
@@ -732,6 +744,11 @@ onBeforeUnmount(() => {
               یا مخفی/نمایشش کنی. ادیتور جاوا و بلوک‌های کد دست‌نخورده می‌مانند.
             </p>
 
+            <div v-if="lastDeleted" class="undo-bar">
+              <span>«{{ lastDeleted.item.label || lastDeleted.item.selector }}» حذف شد.</span>
+              <a-button size="small" type="link" @click="undoDelete">بازگرداندن</a-button>
+            </div>
+
             <div v-if="!form.overrides.length" class="faint empty-els">هنوز عنصری انتخاب نشده.</div>
 
             <div v-for="(o, i) in form.overrides" :key="i" class="el-card"
@@ -746,16 +763,12 @@ onBeforeUnmount(() => {
                 >
                   {{ publishedSelectors.has(o.selector) ? 'منتشرشده' : 'پیش‌نویس' }}
                 </span>
-                <a-button size="small" type="text" danger title="حذف کامل سفارشی‌سازی"
-                  @click.stop="removeOverride(i)">
-                  <AppIcon name="trash" :size="13" />
-                </a-button>
               </div>
               <code class="el-sel">{{ shortSel(o.selector) }}</code>
 
               <template v-if="selectedOverride === i">
                 <button type="button" class="el-close" @click="selectedOverride = -1">
-                  بستن این ویرایشگر (تغییرات می‌ماند)
+                  ↑ بستن ویرایشگر (تغییرات می‌ماند)
                 </button>
                 <label class="el-toggle">
                   <a-switch v-model:checked="o.hidden" size="small" />
@@ -845,6 +858,11 @@ onBeforeUnmount(() => {
                       allow-clear />
                   </div>
                 </template>
+
+                <button type="button" class="el-danger" @click.stop="removeOverride(i)">
+                  <AppIcon name="trash" :size="13" />
+                  حذف کامل این سفارشی‌سازی و بازگرداندن عنصر به پیش‌فرض
+                </button>
               </template>
             </div>
           </a-tab-pane>
@@ -1001,17 +1019,47 @@ onBeforeUnmount(() => {
 .el-close {
   width: 100%;
   margin-top: 8px;
-  padding: 5px;
+  padding: 6px;
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-dim);
-  font-size: 0.74rem;
+  font-size: 0.76rem;
+  font-weight: 600;
   cursor: pointer;
 }
 .el-close:hover {
   background: var(--surface-2);
   color: var(--text);
+}
+.el-danger {
+  width: 100%;
+  margin-top: 12px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--danger);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.el-danger:hover {
+  background: var(--danger-soft);
+}
+.undo-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 0.78rem;
 }
 .el-label {
   flex: 1;
