@@ -365,6 +365,41 @@ const activeTab = ref('settings')
 const previewSrc = ref('/?preview=1')
 const iframeEl = ref<HTMLIFrameElement | null>(null)
 
+/* fit the preview to the pane by scaling it down (like devtools device mode),
+   so the desktop view stays a real ≥768px viewport without scrollbars */
+const DESKTOP_W = 1280
+const MOBILE_W = 390
+const stageEl = ref<HTMLElement | null>(null)
+const stageW = ref(0)
+const stageH = ref(0)
+const previewScale = computed(() => {
+  const w = device.value === 'desktop' ? DESKTOP_W : MOBILE_W
+  return stageW.value ? Math.min(1, stageW.value / w) : 1
+})
+const frameStyle = computed(() => {
+  const s = previewScale.value
+  const w = device.value === 'desktop' ? DESKTOP_W : MOBILE_W
+  const h = s ? stageH.value / s : stageH.value
+  return {
+    width: w + 'px',
+    height: Math.max(h, 200) + 'px',
+    transform: `scale(${s})`,
+    transformOrigin: 'top left',
+  }
+})
+const wrapStyle = computed(() => {
+  const s = previewScale.value
+  const w = device.value === 'desktop' ? DESKTOP_W : MOBILE_W
+  return { width: w * s + 'px', height: stageH.value + 'px' }
+})
+let stageRO: ResizeObserver | undefined
+function measureStage(): void {
+  const el = stageEl.value
+  if (!el) return
+  stageW.value = el.clientWidth - 20 // stage padding
+  stageH.value = el.clientHeight - 20
+}
+
 const savedDraftJson = ref('{}')
 const publishedJson = ref('{}')
 
@@ -629,10 +664,18 @@ watch([styleScope, hideMode], ([scope, hide]) => {
 
 onMounted(() => {
   window.addEventListener('message', onPreviewMessage)
+  measureStage()
+  if (stageEl.value && 'ResizeObserver' in window) {
+    stageRO = new ResizeObserver(measureStage)
+    stageRO.observe(stageEl.value)
+  }
+  window.addEventListener('resize', measureStage)
   void load()
 })
 onBeforeUnmount(() => {
   window.removeEventListener('message', onPreviewMessage)
+  window.removeEventListener('resize', measureStage)
+  stageRO?.disconnect()
   window.clearTimeout(pushTimer)
 })
 </script>
@@ -999,9 +1042,11 @@ onBeforeUnmount(() => {
             <AppIcon name="refresh" :size="14" /> بارگذاری مجدد
           </a-button>
         </div>
-        <div class="preview-stage">
-          <iframe ref="iframeEl" :src="previewSrc" class="preview-frame" :class="device"
-            title="پیش‌نمایش پنل کاربر" />
+        <div ref="stageEl" class="preview-stage">
+          <div class="preview-wrap" :style="wrapStyle">
+            <iframe ref="iframeEl" :src="previewSrc" class="preview-frame" :style="frameStyle"
+              title="پیش‌نمایش پنل کاربر" />
+          </div>
         </div>
       </section>
     </div>
@@ -1295,27 +1340,21 @@ onBeforeUnmount(() => {
   background: var(--surface-2);
   border-radius: var(--radius);
   padding: 10px;
-  overflow: auto;
+  overflow: hidden;
   height: calc(100dvh - 240px);
   display: flex;
-  justify-content: safe center;
+  justify-content: center;
+}
+/* holds the scaled iframe at its post-scale size so the stage never scrolls */
+.preview-wrap {
+  flex: none;
+  overflow: hidden;
 }
 .preview-frame {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
-  height: 100%;
-  transition: width var(--dur) var(--ease);
-}
-.preview-frame.desktop {
-  /* never below the 768px breakpoint, so desktop-scoped rules actually match
-     inside the iframe even when the studio pane is narrow (it scrolls) */
-  width: max(100%, 1024px);
-  flex: none;
-}
-.preview-frame.mobile {
-  width: 390px;
-  flex: none;
+  display: block;
 }
 
 @media (max-width: 1080px) {
