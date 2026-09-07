@@ -191,6 +191,15 @@ export function applyAppearance(a: Appearance | null | undefined): void {
 let ovRules: ElementOverride[] = []
 let ovObserver: MutationObserver | null = null
 let ovScheduled = false
+let ovMql: MediaQueryList | null = null
+
+/** The text for the current viewport: the موبایل / دسکتاپ layer if set,
+ *  otherwise the every-viewport text. */
+function ovTextFor(o: ElementOverride): string {
+  const mobile = ovMql ? ovMql.matches : false
+  const scoped = mobile ? o.textMobile : o.textDesktop
+  return (scoped && scoped.trim() ? scoped : o.text) ?? ''
+}
 
 function ovApplyAll(): void {
   ovScheduled = false
@@ -203,10 +212,10 @@ function ovApplyAll(): void {
     } catch {
       continue
     }
+    const next = ovTextFor(o)
     els.forEach((el) => {
       if (el.closest('.cm-editor, textarea, input, code, pre, [data-no-fa]')) return
       if (el.querySelector('*')) return // leaf elements only — never nuke a subtree
-      const next = o.text ?? ''
       if (el.textContent !== next) el.textContent = next
     })
   }
@@ -222,6 +231,11 @@ function ovSchedule(): void {
 export function setElementOverrides(list?: ElementOverride[]): void {
   ovRules = (list || []).filter((o) => o && o.selector)
   if (typeof document === 'undefined' || !document.body) return
+
+  if (!ovMql && typeof window !== 'undefined') {
+    ovMql = window.matchMedia('(max-width: 767.98px)')
+    ovMql.addEventListener('change', ovSchedule) // reapply on breakpoint crossing
+  }
 
   ovApplyAll()
 

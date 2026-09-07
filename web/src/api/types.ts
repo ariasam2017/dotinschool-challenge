@@ -72,8 +72,10 @@ export interface StyleBag {
 export interface ElementOverride {
   selector: string
   label?: string
-  text?: string
   setText?: boolean
+  text?: string
+  textMobile?: string
+  textDesktop?: string
   hidden?: boolean
   hiddenMobile?: boolean
   hiddenDesktop?: boolean

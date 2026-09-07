@@ -54,8 +54,12 @@ type StyleBag struct {
 type ElementOverride struct {
 	Selector string `json:"selector"`
 	Label    string `json:"label,omitempty"`
-	Text     string `json:"text,omitempty"`
 	SetText  bool   `json:"setText,omitempty"`
+	// Text is the every-viewport copy; TextMobile / TextDesktop override it
+	// inside their media query (empty = inherit Text).
+	Text        string `json:"text,omitempty"`
+	TextMobile  string `json:"textMobile,omitempty"`
+	TextDesktop string `json:"textDesktop,omitempty"`
 
 	Hidden        bool `json:"hidden,omitempty"` // hide on every viewport
 	HiddenMobile  bool `json:"hiddenMobile,omitempty"`

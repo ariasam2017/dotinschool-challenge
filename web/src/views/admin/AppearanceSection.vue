@@ -102,6 +102,8 @@ interface Override {
   selector: string
   label: string
   text: string
+  textMobile: string
+  textDesktop: string
   setText: boolean
   hidden: boolean
   hiddenMobile: boolean
@@ -115,7 +117,7 @@ interface Override {
 
 function blankOverride(partial: Partial<Override>): Override {
   return {
-    selector: '', label: '', text: '', setText: false,
+    selector: '', label: '', text: '', textMobile: '', textDesktop: '', setText: false,
     hidden: false, hiddenMobile: false, hiddenDesktop: false,
     all: blankBag(), mobile: blankBag(), desktop: blankBag(),
     isLeaf: true, baseFontSize: '',
@@ -127,6 +129,19 @@ function blankOverride(partial: Partial<Override>): Override {
 const styleScope = ref<'all' | 'mobile' | 'desktop'>('all')
 const currentOverride = computed<Override | null>(() => form.overrides[selectedOverride.value] ?? null)
 const activeBag = computed<Bag>(() => currentOverride.value?.[styleScope.value] ?? blankBag())
+
+/** the picked element's text for the layer currently being edited */
+const TEXT_KEY = { all: 'text', mobile: 'textMobile', desktop: 'textDesktop' } as const
+const activeText = computed<string>({
+  get() {
+    const o = currentOverride.value
+    return o ? o[TEXT_KEY[styleScope.value]] : ''
+  },
+  set(v) {
+    const o = currentOverride.value
+    if (o) o[TEXT_KEY[styleScope.value]] = v
+  },
+})
 
 /** show / hide-scope as one value */
 const hideMode = computed<'show' | 'all' | 'mobile' | 'desktop'>({
@@ -276,6 +291,8 @@ function toAppearance(): Appearance {
         o.selector &&
         (o.setText ||
           o.text ||
+          o.textMobile ||
+          o.textDesktop ||
           o.hidden ||
           o.hiddenMobile ||
           o.hiddenDesktop ||
@@ -287,6 +304,8 @@ function toAppearance(): Appearance {
       selector: o.selector,
       label: o.label,
       text: o.text,
+      textMobile: o.textMobile,
+      textDesktop: o.textDesktop,
       setText: o.setText,
       hidden: o.hidden,
       hiddenMobile: o.hiddenMobile,
@@ -343,6 +362,8 @@ function fromAppearance(a?: Appearance): void {
       selector: o.selector || '',
       label: o.label || '',
       text: o.text || '',
+      textMobile: o.textMobile || '',
+      textDesktop: o.textDesktop || '',
       setText: !!o.setText,
       hidden: !!o.hidden,
       hiddenMobile: !!o.hiddenMobile,
@@ -911,15 +932,13 @@ onBeforeUnmount(() => {
                     :disabled="!o.isLeaf || hideMode === 'all'" />
                   <span>تغییر متن</span>
                 </label>
-                <a-textarea v-if="o.setText && o.isLeaf && hideMode !== 'all'" v-model:value="o.text"
-                  :rows="2" size="small" placeholder="متن جدید" @click.stop />
                 <p v-if="!o.isLeaf" class="faint tiny">
                   این عنصر زیرالمان دارد — فقط استایل و مخفی/نمایش ممکن است.
                 </p>
 
                 <template v-if="hideMode !== 'all'">
                   <div class="el-scopebar" @click.stop>
-                    <span class="el-flbl">استایل‌ها برای:</span>
+                    <span class="el-flbl">تغییرات برای:</span>
                     <a-radio-group v-model:value="styleScope" size="small" button-style="solid">
                       <a-radio-button value="all">همه</a-radio-button>
                       <a-radio-button value="mobile">موبایل</a-radio-button>
@@ -927,8 +946,16 @@ onBeforeUnmount(() => {
                     </a-radio-group>
                   </div>
                   <p v-if="styleScope !== 'all'" class="faint tiny">
-                    فیلدهای خالی در این حالت، از «همه» ارث می‌برند.
+                    متن و فیلدهای خالی در این حالت، از «همه» ارث می‌برند.
                   </p>
+
+                  <div v-if="o.setText && o.isLeaf" class="el-field" @click.stop>
+                    <span class="el-flbl">
+                      متن ({{ styleScope === 'all' ? 'همه' : styleScope === 'mobile' ? 'موبایل' : 'دسکتاپ' }})
+                    </span>
+                    <a-textarea v-model:value="activeText" :rows="2" size="small"
+                      :placeholder="styleScope === 'all' ? 'متن جدید' : 'خالی = همان متنِ «همه»'" />
+                  </div>
 
                   <div class="el-field" @click.stop>
                     <span class="el-flbl">اندازه فونت</span>

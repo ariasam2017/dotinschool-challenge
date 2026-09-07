@@ -183,6 +183,8 @@ func cleanOverrides(in []model.ElementOverride) []model.ElementOverride {
 		}
 		o.Selector = sel
 		o.Text = clipRunes(o.Text, appearanceMaxReplace)
+		o.TextMobile = clipRunes(o.TextMobile, appearanceMaxReplace)
+		o.TextDesktop = clipRunes(o.TextDesktop, appearanceMaxReplace)
 		o.Label = clipRunes(strings.TrimSpace(o.Label), 120)
 
 		// Fold legacy flat style fields into the All layer, then drop them.
@@ -204,7 +206,8 @@ func cleanOverrides(in []model.ElementOverride) []model.ElementOverride {
 		o.Desktop = cleanStyleBag(o.Desktop)
 
 		anyHidden := o.Hidden || o.HiddenMobile || o.HiddenDesktop
-		if !o.SetText && !anyHidden && o.Text == "" &&
+		anyText := o.Text != "" || o.TextMobile != "" || o.TextDesktop != ""
+		if !o.SetText && !anyHidden && !anyText &&
 			bagEmpty(o.All) && bagEmpty(o.Mobile) && bagEmpty(o.Desktop) {
 			continue // nothing to do
 		}
