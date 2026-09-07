@@ -757,13 +757,15 @@ onBeforeUnmount(() => {
               <div v-if="selectedOverride === i" class="el-card active">
                 <div class="el-head">
                   <span class="el-dot" :class="publishedSelectors.has(o.selector) ? 'live' : 'draft'" />
-                  <span class="el-label">{{ o.label || o.selector }}</span>
+                  <span class="el-headtext">
+                    <span class="el-label">{{ o.label || o.selector }}</span>
+                    <code class="el-sel">{{ shortSel(o.selector) }}</code>
+                  </span>
+                  <a-button type="primary" size="small" class="el-done" @click="selectedOverride = -1">
+                    <AppIcon name="check" :size="14" /> تمام
+                  </a-button>
                 </div>
 
-                <code class="el-sel">{{ shortSel(o.selector) }}</code>
-                <button type="button" class="el-close" @click="selectedOverride = -1">
-                  ↑ بستن ویرایشگر (تغییرات می‌ماند)
-                </button>
                 <label class="el-toggle">
                   <a-switch v-model:checked="o.hidden" size="small" />
                   <span>مخفی کردن این بخش</span>
@@ -1019,13 +1021,11 @@ onBeforeUnmount(() => {
 .el-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  cursor: pointer;
+  gap: 8px;
   min-height: 24px;
-}
-.el-chev {
-  flex: none;
-  color: var(--text-faint);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
 }
 .el-dot {
   flex: none;
@@ -1039,21 +1039,15 @@ onBeforeUnmount(() => {
 .el-dot.draft {
   background: var(--warning);
 }
-.el-close {
-  width: 100%;
-  margin-top: 8px;
-  padding: 6px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 0.76rem;
-  font-weight: 600;
-  cursor: pointer;
+.el-headtext {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
-.el-close:hover {
-  background: var(--surface-2);
-  color: var(--text);
+.el-done {
+  flex: none;
 }
 .el-danger {
   width: 100%;
