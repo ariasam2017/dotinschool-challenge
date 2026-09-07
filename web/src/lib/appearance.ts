@@ -69,7 +69,11 @@ const TA_RE = /^(right|left|center|justify)$/
 function bagDecls(raw?: unknown): string[] {
   const b = (raw || {}) as Record<string, string | undefined>
   const d: string[] = []
-  if (b.fontSize && FS_RE.test(b.fontSize)) d.push(`font-size:${b.fontSize}`)
+  if (b.fontSize && FS_RE.test(b.fontSize)) {
+    d.push(`font-size:${b.fontSize}`)
+    // resized text must be free to wrap, or a bigger size just overflows
+    d.push('white-space:normal', 'overflow-wrap:break-word')
+  }
   if (b.fontWeight && FW_RE.test(String(b.fontWeight))) d.push(`font-weight:${b.fontWeight}`)
   if (b.textAlign && TA_RE.test(b.textAlign)) d.push(`text-align:${b.textAlign}`)
   const push = (prop: string, v?: string) => {
