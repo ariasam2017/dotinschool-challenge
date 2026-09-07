@@ -751,22 +751,23 @@ onBeforeUnmount(() => {
 
             <div v-if="!form.overrides.length" class="faint empty-els">هنوز عنصری انتخاب نشده.</div>
 
-            <div v-for="(o, i) in form.overrides" :key="i" class="el-card"
-              :class="{ active: selectedOverride === i }">
-              <div class="el-head" @click="toggleOverride(i)">
-                <AppIcon :name="selectedOverride === i ? 'chevron-down' : 'chevron-right'" :size="14"
-                  class="el-chev" />
-                <span class="el-label">{{ o.label || o.selector }}</span>
-                <span
-                  class="el-state"
-                  :class="publishedSelectors.has(o.selector) ? 'live' : 'draft'"
-                >
-                  {{ publishedSelectors.has(o.selector) ? 'منتشرشده' : 'پیش‌نویس' }}
-                </span>
-              </div>
-              <code class="el-sel">{{ shortSel(o.selector) }}</code>
+            <div v-if="form.overrides.length" class="el-listhead faint">
+              عناصر ویرایش‌شده ({{ form.overrides.length }}) — برای ویرایش، روی هرکدام بزن
+            </div>
 
-              <template v-if="selectedOverride === i">
+            <div class="el-list">
+              <div v-for="(o, i) in form.overrides" :key="i" class="el-card"
+                :class="{ active: selectedOverride === i }">
+                <div class="el-head" @click="toggleOverride(i)">
+                  <AppIcon :name="selectedOverride === i ? 'chevron-down' : 'chevron-left'" :size="13"
+                    class="el-chev" />
+                  <span class="el-dot" :class="publishedSelectors.has(o.selector) ? 'live' : 'draft'"
+                    :title="publishedSelectors.has(o.selector) ? 'منتشرشده' : 'پیش‌نویس'" />
+                  <span class="el-label">{{ o.label || o.selector }}</span>
+                </div>
+
+                <template v-if="selectedOverride === i">
+                <code class="el-sel">{{ shortSel(o.selector) }}</code>
                 <button type="button" class="el-close" @click="selectedOverride = -1">
                   ↑ بستن ویرایشگر (تغییرات می‌ماند)
                 </button>
@@ -863,7 +864,8 @@ onBeforeUnmount(() => {
                   <AppIcon name="trash" :size="13" />
                   حذف کامل این سفارشی‌سازی و بازگرداندن عنصر به پیش‌فرض
                 </button>
-              </template>
+                </template>
+              </div>
             </div>
           </a-tab-pane>
 
@@ -996,25 +998,53 @@ onBeforeUnmount(() => {
   font-size: 0.72rem;
   margin: 4px 0 0;
 }
+.el-listhead {
+  font-size: 0.74rem;
+  margin: 10px 0 4px;
+}
+.el-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 340px;
+  overflow-y: auto;
+}
 .el-card {
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  margin-top: 8px;
+  padding: 2px 6px;
+}
+.el-card:hover {
+  background: var(--surface-2);
 }
 .el-card.active {
   border-color: var(--primary);
   background: var(--primary-soft);
+  padding: 6px 10px;
+  margin: 4px 0;
 }
 .el-head {
   display: flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
+  min-height: 24px;
 }
 .el-chev {
   flex: none;
   color: var(--text-faint);
+}
+.el-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.el-dot.live {
+  background: var(--success);
+}
+.el-dot.draft {
+  background: var(--warning);
 }
 .el-close {
   width: 100%;
@@ -1064,11 +1094,14 @@ onBeforeUnmount(() => {
 .el-label {
   flex: 1;
   min-width: 0;
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.el-card.active .el-label {
+  font-weight: 700;
 }
 .el-state {
   flex: none;
