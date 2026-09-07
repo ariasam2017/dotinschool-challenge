@@ -503,29 +503,34 @@ function confirmExit() {
   overflow: hidden;
 }
 .hero {
-  display: grid;
-  gap: var(--space-6);
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  gap: var(--space-5);
+  max-width: 460px;
+  margin-inline: auto;
 }
 .hero > * {
+  width: 100%;
   min-width: 0;
 }
+.hero-copy {
+  text-align: center;
+}
 .hero-copy h1 {
-  font-size: clamp(0.95rem, 3.4vw, 1.7rem);
+  font-size: clamp(0.95rem, 3.6vw, 1.35rem);
   line-height: 1.4;
   white-space: nowrap;
 }
-@media (min-width: 900px) {
+@media (min-width: 560px) {
   .hero {
-    grid-template-columns: minmax(0, 1fr) minmax(330px, 380px);
-    gap: var(--space-7);
-    max-width: 980px;
-    margin-inline: auto;
+    gap: var(--space-6);
     padding-top: var(--space-6);
+    max-width: 480px;
   }
   .hero-copy h1 {
     white-space: normal;
-    font-size: 2rem;
+    font-size: 1.55rem;
     line-height: 1.5;
   }
 }
@@ -533,7 +538,7 @@ function confirmExit() {
   margin: var(--space-3) 0 0;
   color: var(--text-dim);
   font-size: 1rem;
-  line-height: 2;
+  line-height: 1.9;
 }
 .event-banner {
   display: flex;
