@@ -368,7 +368,7 @@ const iframeEl = ref<HTMLIFrameElement | null>(null)
 /* fit the preview to the pane with CSS `zoom` (affects layout, unlike
    transform) so the desktop view stays a real 1280px viewport but never
    overflows — a fixed box like the mobile one, at desktop proportions */
-const DESKTOP_W = 1280
+const DESKTOP_W = 1024 // a real desktop viewport, but small enough to stay legible when zoomed to fit
 const MOBILE_W = 390
 const stageEl = ref<HTMLElement | null>(null)
 const stageW = ref(900)
