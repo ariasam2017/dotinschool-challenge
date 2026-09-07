@@ -510,17 +510,24 @@ function confirmExit() {
 .hero > * {
   min-width: 0;
 }
-@media (min-width: 900px) {
-  .hero {
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-8);
-    padding-top: var(--space-6);
-  }
-}
 .hero-copy h1 {
   font-size: clamp(0.95rem, 3.4vw, 1.7rem);
   line-height: 1.4;
   white-space: nowrap;
+}
+@media (min-width: 900px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) minmax(330px, 380px);
+    gap: var(--space-7);
+    max-width: 980px;
+    margin-inline: auto;
+    padding-top: var(--space-6);
+  }
+  .hero-copy h1 {
+    white-space: normal;
+    font-size: 2rem;
+    line-height: 1.5;
+  }
 }
 .hero-sub {
   margin: var(--space-3) 0 0;
