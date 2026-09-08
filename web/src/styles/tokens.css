@@ -133,7 +133,9 @@
    is AA). --primary-bright is a luminous same-hue green for text/links/active
    states where #006839 on a near-black ground would be unreadable. Surfaces
    and hairlines carry a faint green undertone; status stays distinguishable
-   (amber warm, red, blue info). Both dark blocks below are identical. */
+   (amber warm, red, blue info). The two generic dark blocks below are
+   identical; the admin panel then overrides the surface stack to neutral grey
+   (see "DARK / ADMIN" at the end of the file). */
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
@@ -219,4 +221,40 @@
   --code-text: #dfeae4;
 
   color-scheme: dark;
+}
+
+/* ---- semantic: DARK / ADMIN — neutral "x-ui / 3x-ui (Sanaei)" dark ----
+   The admin panel's dark mode drops the emerald undertone and uses a plain
+   Ant-Design-style neutral grey stack, like the Sanaei panel. Only the
+   surface / text / hairline tokens change — brand green (#006839), the
+   luminous --primary-bright for text/links, status colours, shadows and the
+   focus ring all cascade unchanged from the emerald dark blocks above. Higher
+   specificity than the generic dark rules, so it wins for <html data-panel="admin">. */
+@media (prefers-color-scheme: dark) {
+  :root[data-panel='admin']:not([data-theme='light']) {
+    --bg: #141414;
+    --surface: #1d1d1d;
+    --surface-2: #262626;
+    --surface-3: #303030;
+    --text: #ededed;
+    --text-dim: #a6a6a6;
+    --text-faint: #6f6f6f;
+    --border: rgba(255, 255, 255, 0.11);
+    --border-strong: rgba(255, 255, 255, 0.19);
+    --code-bg: #171717;
+    --code-text: #e6e6e6;
+  }
+}
+:root[data-theme='dark'][data-panel='admin'] {
+  --bg: #141414;
+  --surface: #1d1d1d;
+  --surface-2: #262626;
+  --surface-3: #303030;
+  --text: #ededed;
+  --text-dim: #a6a6a6;
+  --text-faint: #6f6f6f;
+  --border: rgba(255, 255, 255, 0.11);
+  --border-strong: rgba(255, 255, 255, 0.19);
+  --code-bg: #171717;
+  --code-text: #e6e6e6;
 }

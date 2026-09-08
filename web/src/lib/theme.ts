@@ -75,9 +75,20 @@ const PRIMARY = {
 /** Ant Design Vue <a-config-provider :theme="antdTheme"> value. */
 export const antdTheme = computed(() => {
   const dark = isDark.value
+  const admin = APP_MODE === 'admin'
   const primary = PRIMARY[APP_MODE][dark ? 'dark' : 'light']
   const algorithm = dark ? [antTheme.darkAlgorithm] : [antTheme.defaultAlgorithm]
-  if (APP_MODE === 'admin') algorithm.push(antTheme.compactAlgorithm)
+  if (admin) algorithm.push(antTheme.compactAlgorithm)
+
+  // Dark surfaces: the admin panel uses a neutral "Sanaei / 3x-ui" grey stack;
+  // the user panel keeps the emerald-black "tech" dark. Brand green is the same
+  // in both (kept exact at #006839, seeded a touch brighter for Ant's derived
+  // tones — see PRIMARY above).
+  const darkBg = admin ? '#141414' : '#0a1310'
+  const darkText = admin ? '#ededed' : '#eef3f0'
+  const darkBorder = admin ? 'rgba(255,255,255,0.13)' : 'rgba(150,228,190,0.14)'
+  const darkBorder2 = admin ? 'rgba(255,255,255,0.07)' : 'rgba(150,228,190,0.07)'
+
   return {
     algorithm,
     token: {
@@ -89,11 +100,11 @@ export const antdTheme = computed(() => {
       borderRadius: 10,
       wireframe: false,
       fontFamily: "'IRANYekanX', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
-      colorBgBase: dark ? '#0a1310' : '#ffffff',
-      colorBgLayout: dark ? '#0a1310' : '#f8fafc',
-      colorTextBase: dark ? '#eef3f0' : '#0f172a',
-      colorBorder: dark ? 'rgba(150,228,190,0.14)' : '#e2e8f0',
-      colorBorderSecondary: dark ? 'rgba(150,228,190,0.07)' : '#eef2f7',
+      colorBgBase: dark ? darkBg : '#ffffff',
+      colorBgLayout: dark ? darkBg : '#f8fafc',
+      colorTextBase: dark ? darkText : '#0f172a',
+      colorBorder: dark ? darkBorder : '#e2e8f0',
+      colorBorderSecondary: dark ? darkBorder2 : '#eef2f7',
     },
   }
 })
