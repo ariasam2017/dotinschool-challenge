@@ -332,9 +332,9 @@ async function doUpdate() {
       </section>
 
       <section class="card card-pad">
-        <span class="section-title">آخرین شرکت‌کنندگان</span>
+        <div class="card-hd"><span class="section-title">آخرین شرکت‌کنندگان</span></div>
         <div class="scroll-x">
-          <table class="mini-table">
+          <table class="data-table">
             <thead>
               <tr><th>شناسه</th><th>نام</th><th>موبایل</th><th>وضعیت</th><th>امتیاز</th></tr>
             </thead>
@@ -356,7 +356,7 @@ async function doUpdate() {
 
     <div class="two-col">
       <section class="card card-pad">
-        <span class="section-title">پشتیبان‌گیری دیتابیس</span>
+        <div class="card-hd"><span class="section-title">پشتیبان‌گیری دیتابیس</span></div>
         <p class="faint hint">
           همه‌ی داده‌ها در یک فایل SQLite است. دانلود با روش امن <code>VACUUM INTO</code> انجام می‌شود؛
           بازیابی نسخه‌ی فعلی را قبل از جایگزینی نگه می‌دارد و سرویس را ری‌استارت می‌کند.
@@ -369,7 +369,7 @@ async function doUpdate() {
       </section>
 
       <section class="card card-pad">
-        <span class="section-title">به‌روزرسانی سامانه</span>
+        <div class="card-hd"><span class="section-title">به‌روزرسانی سامانه</span></div>
         <p class="faint hint">
           دریافت آخرین نسخه از گیت‌هاب و ری‌استارت سرویس. روی نصب Docker، دستور درست را نمایش می‌دهد.
         </p>
@@ -381,7 +381,7 @@ async function doUpdate() {
     </div>
 
     <section class="card card-pad">
-      <div class="row-wrap" style="gap: 10px; margin-bottom: 8px">
+      <div class="card-hd">
         <span class="section-title">پیامک (OTP ثبت‌نام و ورود)</span>
         <Chip :tone="sms?.configured ? 'success' : 'danger'" dot>
           {{ sms?.configured ? 'کلید ippanel فعال است' : 'کلید ippanel تنظیم نشده' }}

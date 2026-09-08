@@ -113,6 +113,21 @@
   color-scheme: light;
 }
 
+/* ---- density: DASHBOARD — the admin panel runs as a data-dense operations
+   console: tighter gutters, shorter chrome, a wider canvas, and a collapsible
+   icon rail. Spacing only — colour/lightness are inherited untouched from the
+   blocks above/below. Applies to <html data-panel="admin"> in light and dark. */
+:root[data-panel='admin'] {
+  --space-5: 20px;
+  --space-6: 28px;
+  --space-7: 40px;
+
+  --header-h: 52px;
+  --sidebar-w: 236px;
+  --rail-w: 64px;
+  --content-max: 1440px;
+}
+
 /* ---- semantic: DARK — "tech" emerald-black, harmonised with #006839 ----
    The brand hex #006839 is KEPT as --primary (button fills, white text on it
    is AA). --primary-bright is a luminous same-hue green for text/links/active
