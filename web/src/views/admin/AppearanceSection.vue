@@ -130,7 +130,7 @@ function blankOverride(partial: Partial<Override>): Override {
 }
 
 /* which viewport layer the style fields edit for the open element */
-const styleScope = ref<'all' | 'mobile' | 'desktop'>('all')
+const styleScope = ref<'all' | 'mobile' | 'desktop'>('desktop')
 const currentOverride = computed<Override | null>(() => form.overrides[selectedOverride.value] ?? null)
 const activeBag = computed<Bag>(() => currentOverride.value?.[styleScope.value] ?? blankBag())
 
@@ -170,15 +170,6 @@ function clearLayer(): void {
   if (!o || s === 'all') return
   o[s] = blankBag()
   o[TEXT_KEY[s]] = ''
-}
-/** wipe both viewport layers, leaving only «همه» */
-function clearScopedLayers(): void {
-  const o = currentOverride.value
-  if (!o) return
-  o.mobile = blankBag()
-  o.desktop = blankBag()
-  o.textMobile = ''
-  o.textDesktop = ''
 }
 
 /** show / hide-scope as one value */
@@ -500,7 +491,7 @@ function onPreviewMessage(e: MessageEvent): void {
 
   if (d.__dotin === 'picked') {
     sendPick(false) // one element at a time
-    styleScope.value = 'all'
+    styleScope.value = device.value === 'mobile' ? 'mobile' : 'desktop'
     const existing = form.overrides.findIndex((o) => o.selector === d.selector)
     if (existing >= 0) {
       selectedOverride.value = existing
@@ -972,32 +963,19 @@ onBeforeUnmount(() => {
                   <div class="el-scopebar" @click.stop>
                     <span class="el-flbl">تغییرات برای:</span>
                     <a-radio-group v-model:value="styleScope" size="small" button-style="solid">
-                      <a-radio-button value="all">همه</a-radio-button>
                       <a-radio-button value="mobile">موبایل{{ layerHas('mobile') ? ' ●' : '' }}</a-radio-button>
                       <a-radio-button value="desktop">دسکتاپ{{ layerHas('desktop') ? ' ●' : '' }}</a-radio-button>
                     </a-radio-group>
-                    <a-button v-if="styleScope !== 'all' && layerHas(styleScope)" size="small" type="text"
+                    <a-button v-if="layerHas(styleScope as 'mobile' | 'desktop')" size="small" type="text"
                       danger @click="clearLayer">پاک‌کردن این لایه</a-button>
                   </div>
-                  <p v-if="styleScope !== 'all'" class="faint tiny">
-                    متن و فیلدهای خالی در این حالت، از «همه» ارث می‌برند.
+                  <p class="faint tiny">
+                    هر تغییر فقط برای همین اندازه‌ی صفحه اعمال می‌شود. فیلدهای خالی = بدون تغییر.
                   </p>
-                  <div v-else-if="layerHas('mobile') || layerHas('desktop')" class="el-warn" @click.stop>
-                    <span>
-                      لایه‌ی {{ layerHas('mobile') ? 'موبایل' : '' }}{{ layerHas('mobile') && layerHas('desktop') ? ' و ' : '' }}{{ layerHas('desktop') ? 'دسکتاپ' : '' }}
-                      مقدار دارد و در همان اندازه‌ی صفحه، «همه» را بازنویسی می‌کند.
-                    </span>
-                    <a-button size="small" type="text" danger @click="clearScopedLayers">
-                      پاک‌کردن موبایل و دسکتاپ
-                    </a-button>
-                  </div>
 
                   <div v-if="o.setText && o.isLeaf" class="el-field" @click.stop>
-                    <span class="el-flbl">
-                      متن ({{ styleScope === 'all' ? 'همه' : styleScope === 'mobile' ? 'موبایل' : 'دسکتاپ' }})
-                    </span>
-                    <a-textarea v-model:value="activeText" :rows="2" size="small"
-                      :placeholder="styleScope === 'all' ? 'متن جدید' : 'خالی = همان متنِ «همه»'" />
+                    <span class="el-flbl">متن ({{ styleScope === 'mobile' ? 'موبایل' : 'دسکتاپ' }})</span>
+                    <a-textarea v-model:value="activeText" :rows="2" size="small" placeholder="متن جدید" />
                   </div>
 
                   <div class="el-field" @click.stop>
