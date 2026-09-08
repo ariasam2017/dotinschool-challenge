@@ -15,7 +15,11 @@ import type {
   TextReplacement,
   ElementOverride,
 } from '@/api/types'
+import { buildCss } from '@/lib/appearance'
 import AppIcon from '@/components/AppIcon.vue'
+
+declare const __BUILT_AT__: string
+const builtAt = typeof __BUILT_AT__ === 'string' ? __BUILT_AT__ : ''
 
 /* ---------------------------------------------------------------- model -- */
 
@@ -141,6 +145,17 @@ const activeText = computed<string>({
     const o = currentOverride.value
     if (o) o[TEXT_KEY[styleScope.value]] = v
   },
+})
+
+/** the exact CSS the selected element produces for the layer being edited —
+ *  shown read-only so it's obvious what targets what */
+const elementCss = computed(() => {
+  const o = currentOverride.value
+  if (!o) return ''
+  const one = toAppearance().overrides?.find((x) => x.selector === o.selector)
+  if (!one) return '(هنوز چیزی ست نشده)'
+  const force = styleScope.value === 'all' ? undefined : styleScope.value
+  return buildCss({ overrides: [one] }, force) || '(هنوز چیزی ست نشده)'
 })
 
 /** does a viewport layer carry any override (so it can shadow «همه»)? */
@@ -718,6 +733,7 @@ onBeforeUnmount(() => {
         <AppIcon name="palette" :size="18" />
         <span>استودیو طراحی</span>
         <span v-if="unpublished" class="badge-unpub">منتشرنشده</span>
+        <span v-if="builtAt" class="faint tiny" style="font-weight: 400">build {{ builtAt }}</span>
       </div>
       <div class="grow" />
       <a-button size="small" @click="openExport">خروجی</a-button>
@@ -1060,6 +1076,11 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
 
+                <details class="el-css" @click.stop>
+                  <summary class="faint tiny">CSSِ تولیدشده برای این عنصر</summary>
+                  <pre>{{ elementCss }}</pre>
+                </details>
+
                 <button type="button" class="el-danger" @click.stop="removeOverride(i)">
                   <AppIcon name="trash" :size="13" />
                   حذف کامل این سفارشی‌سازی و بازگرداندن عنصر به پیش‌فرض
@@ -1253,6 +1274,23 @@ onBeforeUnmount(() => {
 }
 .el-done {
   flex: none;
+}
+.el-css {
+  margin-top: 10px;
+}
+.el-css pre {
+  margin: 4px 0 0;
+  padding: 8px;
+  background: var(--code-bg, #0d1524);
+  color: var(--code-text, #e2e8f0);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  direction: ltr;
+  text-align: left;
 }
 .el-danger {
   width: 100%;

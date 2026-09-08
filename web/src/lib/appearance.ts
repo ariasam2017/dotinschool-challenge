@@ -186,6 +186,12 @@ export function applyAppearance(a: Appearance | null | undefined): void {
     document.head.appendChild(el)
   }
   el.textContent = buildCss(a, forceDevice)
+  if (isPreview) {
+    // help debugging from the browser console inside the preview iframe
+    console.info(
+      `[dotin-preview] device=${forceDevice ?? 'auto'}\n` + (el.textContent || '(no rules)'),
+    )
+  }
 
   const hero = a?.sections?.hero
   appearanceText.heroTitle = (hero?.title ?? '').trim()

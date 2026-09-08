@@ -8,6 +8,11 @@ import { fileURLToPath, URL } from 'url'
 // with //go:embed. `npm run build` therefore fully prepares the frontend for
 // `go build`.
 export default defineConfig({
+  define: {
+    __BUILT_AT__: JSON.stringify(
+      new Date().toISOString().replace('T', ' ').slice(0, 16),
+    ),
+  },
   plugins: [
     vue(),
     Components({
