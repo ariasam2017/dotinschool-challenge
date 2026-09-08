@@ -65,31 +65,49 @@ const FS_RE = /^[0-9]{1,3}(\.[0-9]{1,2})?(px|rem|em|%)$/
 const FW_RE = /^(300|400|500|600|700|800|900|normal|bold)$/
 const TA_RE = /^(right|left|center|justify)$/
 
+// typography that should also cascade to the text-bearing children of the
+// picked element (so setting font-size on a wrapper still resizes its heading)
+const TEXT_DESCENDANTS =
+  ':where(h1,h2,h3,h4,h5,h6,p,a,span,strong,em,b,i,small,label,li,td,th,dt,dd,figcaption,blockquote)'
+
+interface BagOut {
+  self: string[] // everything, applied to the selector
+  text: string[] // typography only, applied to selector + text descendants
+}
+
 /** CSS declarations for one style bag (unvalidated keys are dropped). */
-function bagDecls(raw?: unknown): string[] {
+function bagDecls(raw?: unknown): BagOut {
   const b = (raw || {}) as Record<string, string | undefined>
-  const d: string[] = []
-  if (b.fontSize && FS_RE.test(b.fontSize)) {
-    d.push(`font-size:${b.fontSize}`)
-    // resized text must be free to wrap, or a bigger size just overflows
-    d.push('white-space:normal', 'overflow-wrap:break-word')
+  const self: string[] = []
+  const text: string[] = []
+  const typo = (v: string) => {
+    self.push(v)
+    text.push(v)
   }
-  if (b.fontWeight && FW_RE.test(String(b.fontWeight))) d.push(`font-weight:${b.fontWeight}`)
-  if (b.textAlign && TA_RE.test(b.textAlign)) d.push(`text-align:${b.textAlign}`)
+  if (b.fontSize && FS_RE.test(b.fontSize)) {
+    typo(`font-size:${b.fontSize}`)
+    // resized text must be free to wrap, or a bigger size just overflows
+    typo('white-space:normal')
+    typo('overflow-wrap:break-word')
+  }
+  if (b.fontWeight && FW_RE.test(String(b.fontWeight))) typo(`font-weight:${b.fontWeight}`)
+  if (b.textAlign && TA_RE.test(b.textAlign)) typo(`text-align:${b.textAlign}`)
+  const c = safeValue(b.color)
+  if (c) typo(`color:${c}`)
+
   const push = (prop: string, v?: string) => {
     const s = safeValue(v)
-    if (s) d.push(`${prop}:${s}`)
+    if (s) self.push(`${prop}:${s}`)
   }
-  push('color', b.color)
   push('background', b.background)
   push('padding', b.padding)
   push('margin', b.margin)
-  if (safeValue(b.borderWidth)) d.push(`border-width:${safeValue(b.borderWidth)}`, 'border-style:solid')
+  if (safeValue(b.borderWidth)) self.push(`border-width:${safeValue(b.borderWidth)}`, 'border-style:solid')
   push('border-color', b.borderColor)
   push('border-radius', b.borderRadius)
   push('width', b.width)
   push('max-width', b.maxWidth)
-  return d
+  return { self, text }
 }
 
 /** Assemble the full stylesheet text for an Appearance. */
@@ -143,8 +161,15 @@ export function buildCss(a: Appearance | null | undefined): string {
       width: o.width, maxWidth: o.maxWidth,
     }
     const all = o.all && Object.keys(o.all).length ? o.all : legacyAll
-    const rule = (decls: string[]) =>
-      decls.length ? `${sel}{${decls.map((x) => x + ' !important').join(';')}}` : ''
+    const imp = (decls: string[]) => decls.map((x) => x + ' !important').join(';')
+    // typography also lands on the picked element's text children, so setting
+    // e.g. font-size on a wrapper still resizes the heading inside it
+    const rule = (out2: BagOut): string => {
+      const parts: string[] = []
+      if (out2.self.length) parts.push(`${sel}{${imp(out2.self)}}`)
+      if (out2.text.length) parts.push(`${sel} ${TEXT_DESCENDANTS}{${imp(out2.text)}}`)
+      return parts.join('')
+    }
     const wrap = (q: string, css: string) => (css ? `@media ${q}{${css}}` : '')
 
     out.push(rule(bagDecls(all)))
@@ -215,8 +240,10 @@ function ovApplyAll(): void {
     const next = ovTextFor(o)
     els.forEach((el) => {
       if (el.closest('.cm-editor, textarea, input, code, pre, [data-no-fa]')) return
-      if (el.querySelector('*')) return // leaf elements only — never nuke a subtree
-      if (el.textContent !== next) el.textContent = next
+      // if the picked element wraps its text, drill into the text-bearing child
+      const target = el.querySelector('*') ? textLeaf(el) : el
+      if (target.querySelector('*')) return // still branchy — never nuke a subtree
+      if (target.textContent !== next) target.textContent = next
     })
   }
 }
