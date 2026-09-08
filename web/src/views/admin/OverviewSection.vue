@@ -543,8 +543,8 @@ async function doUpdate() {
   transition: all var(--dur) var(--ease);
 }
 .dchip:hover {
-  border-color: var(--primary);
-  color: var(--primary);
+  border-color: var(--primary-bright);
+  color: var(--primary-bright);
 }
 .dchip.active {
   background: var(--primary);

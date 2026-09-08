@@ -456,7 +456,7 @@ function confirmExit() {
   height: 30px;
   border-radius: 50%;
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-bright);
   font-weight: 700;
   font-size: 0.8rem;
 }

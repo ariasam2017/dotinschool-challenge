@@ -1,6 +1,6 @@
 // Three-state theme (system / light / dark), persisted in localStorage, plus the
-// matching Ant Design Vue token/algorithm bundle. The panel personality
-// (user = green, admin = indigo) is fixed per entry point.
+// matching Ant Design Vue token/algorithm bundle. One brand emerald (#006839)
+// across both panels; admin adds the compact algorithm for denser controls.
 
 import { ref, computed, watch } from 'vue'
 import { theme as antTheme } from 'ant-design-vue'
@@ -63,9 +63,13 @@ watch(
   { immediate: true },
 )
 
+// One brand emerald across both panels. Light keeps the exact #006839; dark
+// seeds Ant Design a touch brighter so its derived text/hover tones stay
+// legible on the near-black ground (the CSS tokens do the same via
+// --primary / --primary-bright).
 const PRIMARY = {
-  user: { light: '#16a34a', dark: '#22c55e' },
-  admin: { light: '#4f46e5', dark: '#6366f1' },
+  user: { light: '#006839', dark: '#0a7d4b' },
+  admin: { light: '#006839', dark: '#0a7d4b' },
 } as const
 
 /** Ant Design Vue <a-config-provider :theme="antdTheme"> value. */
@@ -78,18 +82,18 @@ export const antdTheme = computed(() => {
     algorithm,
     token: {
       colorPrimary: primary,
-      colorInfo: primary,
-      colorSuccess: dark ? '#22c55e' : '#16a34a',
-      colorWarning: dark ? '#eab308' : '#ca8a04',
-      colorError: dark ? '#ef4444' : '#dc2626',
+      colorInfo: dark ? '#56a9f5' : '#1d4ed8',
+      colorSuccess: dark ? '#3ccf8d' : '#006839',
+      colorWarning: dark ? '#edb32a' : '#ca8a04',
+      colorError: dark ? '#f2565b' : '#dc2626',
       borderRadius: 10,
       wireframe: false,
       fontFamily: "'IRANYekanX', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
-      colorBgBase: dark ? '#0b1220' : '#ffffff',
-      colorBgLayout: dark ? '#0b1220' : '#f8fafc',
-      colorTextBase: dark ? '#f8fafc' : '#0f172a',
-      colorBorder: dark ? 'rgba(255,255,255,0.12)' : '#e2e8f0',
-      colorBorderSecondary: dark ? 'rgba(255,255,255,0.07)' : '#eef2f7',
+      colorBgBase: dark ? '#0a1310' : '#ffffff',
+      colorBgLayout: dark ? '#0a1310' : '#f8fafc',
+      colorTextBase: dark ? '#eef3f0' : '#0f172a',
+      colorBorder: dark ? 'rgba(150,228,190,0.14)' : '#e2e8f0',
+      colorBorderSecondary: dark ? 'rgba(150,228,190,0.07)' : '#eef2f7',
     },
   }
 })

@@ -58,11 +58,12 @@ p {
 }
 
 a {
-  color: var(--primary);
+  color: var(--primary-bright);
   text-decoration: none;
 }
 a:hover {
-  color: var(--primary-hover);
+  color: var(--primary-bright);
+  opacity: 0.85;
 }
 
 img {

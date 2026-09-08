@@ -170,7 +170,7 @@ function confirmLogout() {
 }
 .nav-item.active {
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-bright);
   font-weight: 600;
 }
 .nav-badge {

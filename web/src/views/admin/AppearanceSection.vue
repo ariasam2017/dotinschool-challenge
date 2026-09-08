@@ -1217,7 +1217,7 @@ onBeforeUnmount(() => {
   background: var(--surface-2);
 }
 .el-card.active {
-  border-color: var(--primary);
+  border-color: var(--primary-bright);
   background: var(--primary-soft);
   padding: 6px 10px;
   margin: 4px 0;

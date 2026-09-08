@@ -53,7 +53,7 @@ withDefaults(
   height: 28px;
   border-radius: var(--radius-sm);
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-bright);
 }
 .tone-info .stat-ico {
   background: var(--info-soft);

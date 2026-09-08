@@ -183,7 +183,7 @@ async function submit() {
   color: var(--text-dim);
 }
 .login-features li :deep(.app-icon) {
-  color: var(--primary);
+  color: var(--primary-bright);
 }
 .login-back {
   display: inline-flex;

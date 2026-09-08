@@ -384,7 +384,7 @@ function onPickOver(e: Event): void {
   if (!t || t === document.body || t === document.documentElement) return
   clearHover()
   hoverEl = t
-  t.style.setProperty('outline', '2px solid #6366f1', 'important')
+  t.style.setProperty('outline', '2px solid #34c98b', 'important')
   t.style.setProperty('outline-offset', '-2px', 'important')
 }
 
