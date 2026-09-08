@@ -143,6 +143,20 @@ const activeText = computed<string>({
   },
 })
 
+/** does a viewport layer carry any override (so it can shadow «همه»)? */
+function layerHas(scope: 'mobile' | 'desktop'): boolean {
+  const o = currentOverride.value
+  return !!o && (bagHas(o[scope]) || !!o[TEXT_KEY[scope]])
+}
+/** wipe the currently-selected non-«همه» layer */
+function clearLayer(): void {
+  const o = currentOverride.value
+  const s = styleScope.value
+  if (!o || s === 'all') return
+  o[s] = blankBag()
+  o[TEXT_KEY[s]] = ''
+}
+
 /** show / hide-scope as one value */
 const hideMode = computed<'show' | 'all' | 'mobile' | 'desktop'>({
   get() {
@@ -165,7 +179,10 @@ const hideMode = computed<'show' | 'all' | 'mobile' | 'desktop'>({
 /** Bump the active layer's font-size by `dir` px (seeds from the real size). */
 function nudgeFont(dir: number): void {
   const b = activeBag.value
-  const seed = styleScope.value === 'all' ? currentOverride.value?.baseFontSize : ''
+  const o = currentOverride.value
+  // seed a scoped layer from the «همه» value (or the element's real size),
+  // so nudging mobile/desktop starts where the design actually is
+  const seed = o ? o.all.fontSize || o.baseFontSize : ''
   const raw = (b.fontSize || seed || '16px').trim()
   const m = /^([0-9.]+)\s*(px|rem|em|%)?$/.exec(raw)
   const unit = (m && m[2]) || 'px'
@@ -951,12 +968,18 @@ onBeforeUnmount(() => {
                     <span class="el-flbl">تغییرات برای:</span>
                     <a-radio-group v-model:value="styleScope" size="small" button-style="solid">
                       <a-radio-button value="all">همه</a-radio-button>
-                      <a-radio-button value="mobile">موبایل</a-radio-button>
-                      <a-radio-button value="desktop">دسکتاپ</a-radio-button>
+                      <a-radio-button value="mobile">موبایل{{ layerHas('mobile') ? ' ●' : '' }}</a-radio-button>
+                      <a-radio-button value="desktop">دسکتاپ{{ layerHas('desktop') ? ' ●' : '' }}</a-radio-button>
                     </a-radio-group>
+                    <a-button v-if="styleScope !== 'all' && layerHas(styleScope)" size="small" type="text"
+                      danger @click="clearLayer">پاک‌کردن این لایه</a-button>
                   </div>
                   <p v-if="styleScope !== 'all'" class="faint tiny">
                     متن و فیلدهای خالی در این حالت، از «همه» ارث می‌برند.
+                  </p>
+                  <p v-else-if="layerHas('mobile') || layerHas('desktop')" class="faint tiny">
+                    توجه: لایه‌ی {{ layerHas('mobile') ? 'موبایل' : '' }}{{ layerHas('mobile') && layerHas('desktop') ? ' و ' : '' }}{{ layerHas('desktop') ? 'دسکتاپ' : '' }}
+                    مقدار دارد و در همان اندازه‌ی صفحه، روی «همه» را بازنویسی می‌کند (● کنار نامش).
                   </p>
 
                   <div v-if="o.setText && o.isLeaf" class="el-field" @click.stop>
