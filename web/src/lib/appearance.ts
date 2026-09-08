@@ -65,53 +65,38 @@ const FS_RE = /^[0-9]{1,3}(\.[0-9]{1,2})?(px|rem|em|%)$/
 const FW_RE = /^(300|400|500|600|700|800|900|normal|bold)$/
 const TA_RE = /^(right|left|center|justify)$/
 
-// typography that should also cascade to the text-bearing children of the
-// picked element (so setting font-size on a wrapper still resizes its heading)
-const TEXT_DESCENDANTS =
-  ':where(h1,h2,h3,h4,h5,h6,p,a,span,strong,em,b,i,small,label,li,td,th,dt,dd,figcaption,blockquote)'
-
-interface BagOut {
-  self: string[] // everything, applied to the selector
-  text: string[] // typography only, applied to selector + text descendants
-}
-
-/** CSS declarations for one style bag (unvalidated keys are dropped). */
-function bagDecls(raw?: unknown): BagOut {
+/** CSS declarations for one style bag (unvalidated keys are dropped).
+ *  Applied ONLY to the picked element — no descendant cascade. */
+function bagDecls(raw?: unknown): string[] {
   const b = (raw || {}) as Record<string, string | undefined>
-  const self: string[] = []
-  const text: string[] = []
-  const typo = (v: string) => {
-    self.push(v)
-    text.push(v)
-  }
+  const d: string[] = []
   if (b.fontSize && FS_RE.test(b.fontSize)) {
-    typo(`font-size:${b.fontSize}`)
+    d.push(`font-size:${b.fontSize}`)
     // resized text must be free to wrap, or a bigger size just overflows
-    typo('white-space:normal')
-    typo('overflow-wrap:break-word')
+    d.push('white-space:normal', 'overflow-wrap:break-word')
   }
-  if (b.fontWeight && FW_RE.test(String(b.fontWeight))) typo(`font-weight:${b.fontWeight}`)
-  if (b.textAlign && TA_RE.test(b.textAlign)) typo(`text-align:${b.textAlign}`)
-  const c = safeValue(b.color)
-  if (c) typo(`color:${c}`)
-
+  if (b.fontWeight && FW_RE.test(String(b.fontWeight))) d.push(`font-weight:${b.fontWeight}`)
+  if (b.textAlign && TA_RE.test(b.textAlign)) d.push(`text-align:${b.textAlign}`)
   const push = (prop: string, v?: string) => {
     const s = safeValue(v)
-    if (s) self.push(`${prop}:${s}`)
+    if (s) d.push(`${prop}:${s}`)
   }
+  push('color', b.color)
   push('background', b.background)
   push('padding', b.padding)
   push('margin', b.margin)
-  if (safeValue(b.borderWidth)) self.push(`border-width:${safeValue(b.borderWidth)}`, 'border-style:solid')
+  if (safeValue(b.borderWidth)) d.push(`border-width:${safeValue(b.borderWidth)}`, 'border-style:solid')
   push('border-color', b.borderColor)
   push('border-radius', b.borderRadius)
   push('width', b.width)
   push('max-width', b.maxWidth)
-  return { self, text }
+  return d
 }
 
-/** Assemble the full stylesheet text for an Appearance. */
-export function buildCss(a: Appearance | null | undefined): string {
+/** Assemble the full stylesheet text for an Appearance.
+ *  `force` (preview only) collapses the موبایل / دسکتاپ layer so it applies
+ *  regardless of the iframe's real width. */
+export function buildCss(a: Appearance | null | undefined, force?: 'mobile' | 'desktop'): string {
   if (!a) return ''
   const out: string[] = []
 
@@ -161,24 +146,20 @@ export function buildCss(a: Appearance | null | undefined): string {
       width: o.width, maxWidth: o.maxWidth,
     }
     const all = o.all && Object.keys(o.all).length ? o.all : legacyAll
-    const imp = (decls: string[]) => decls.map((x) => x + ' !important').join(';')
-    // typography also lands on the picked element's text children, so setting
-    // e.g. font-size on a wrapper still resizes the heading inside it
-    const rule = (out2: BagOut): string => {
-      const parts: string[] = []
-      if (out2.self.length) parts.push(`${sel}{${imp(out2.self)}}`)
-      if (out2.text.length) parts.push(`${sel} ${TEXT_DESCENDANTS}{${imp(out2.text)}}`)
-      return parts.join('')
-    }
+    const rule = (decls: string[]) =>
+      decls.length ? `${sel}{${decls.map((x) => x + ' !important').join(';')}}` : ''
     const wrap = (q: string, css: string) => (css ? `@media ${q}{${css}}` : '')
+    // in a forced-device preview the layer applies with no media query
+    const mob = (css: string) => (force === 'mobile' ? css : force ? '' : wrap(MOBILE_Q, css))
+    const desk = (css: string) => (force === 'desktop' ? css : force ? '' : wrap(DESKTOP_Q, css))
 
     out.push(rule(bagDecls(all)))
-    out.push(wrap(MOBILE_Q, rule(bagDecls(o.mobile))))
-    out.push(wrap(DESKTOP_Q, rule(bagDecls(o.desktop))))
+    out.push(mob(rule(bagDecls(o.mobile))))
+    out.push(desk(rule(bagDecls(o.desktop))))
 
     if (o.hidden) out.push(`${sel}{display:none !important}`)
-    if (o.hiddenMobile) out.push(`@media ${MOBILE_Q}{${sel}{display:none !important}}`)
-    if (o.hiddenDesktop) out.push(`@media ${DESKTOP_Q}{${sel}{display:none !important}}`)
+    if (o.hiddenMobile) out.push(mob(`${sel}{display:none !important}`))
+    if (o.hiddenDesktop) out.push(desk(`${sel}{display:none !important}`))
   }
 
   const custom = String(a.customCss ?? '').trim()
@@ -189,9 +170,14 @@ export function buildCss(a: Appearance | null | undefined): string {
   return out.filter(Boolean).join('\n')
 }
 
+// preview only: which viewport layer to simulate regardless of iframe width
+let forceDevice: 'mobile' | 'desktop' | undefined
+let lastApplied: Appearance | null | undefined
+
 /** Apply an Appearance: swap the <style> tag and update the text overrides. */
 export function applyAppearance(a: Appearance | null | undefined): void {
   if (typeof document === 'undefined') return
+  lastApplied = a
 
   let el = document.getElementById(STYLE_ID) as HTMLStyleElement | null
   if (!el) {
@@ -199,7 +185,7 @@ export function applyAppearance(a: Appearance | null | undefined): void {
     el.id = STYLE_ID
     document.head.appendChild(el)
   }
-  el.textContent = buildCss(a)
+  el.textContent = buildCss(a, forceDevice)
 
   const hero = a?.sections?.hero
   appearanceText.heroTitle = (hero?.title ?? '').trim()
@@ -219,9 +205,9 @@ let ovScheduled = false
 let ovMql: MediaQueryList | null = null
 
 /** The text for the current viewport: the موبایل / دسکتاپ layer if set,
- *  otherwise the every-viewport text. */
+ *  otherwise the every-viewport text. `forceDevice` (preview) wins. */
 function ovTextFor(o: ElementOverride): string {
-  const mobile = ovMql ? ovMql.matches : false
+  const mobile = forceDevice ? forceDevice === 'mobile' : ovMql ? ovMql.matches : false
   const scoped = mobile ? o.textMobile : o.textDesktop
   return (scoped && scoped.trim() ? scoped : o.text) ?? ''
 }
@@ -405,15 +391,24 @@ function hasOwnText(el: Element): boolean {
  *  so clicking near a heading lands on the heading, not its wrapper. */
 function textLeaf(el: Element): Element {
   let cur = el
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     if (hasOwnText(cur)) return cur
-    if (cur.children.length === 1) {
-      cur = cur.children[0]
+    const kids = Array.from(cur.children).filter(
+      (c) =>
+        !['SCRIPT', 'STYLE', 'BR', 'svg', 'SVG'].includes(c.tagName) &&
+        (c.textContent || '').trim().length > 0,
+    )
+    if (kids.length === 0) return cur
+    // the child that holds (almost) all of this element's text
+    kids.sort((a, b) => (b.textContent || '').length - (a.textContent || '').length)
+    const total = (cur.textContent || '').trim().length
+    if (total > 0 && (kids[0].textContent || '').trim().length / total >= 0.7) {
+      cur = kids[0]
       continue
     }
-    break
+    return cur // text is split across siblings — stop at this wrapper
   }
-  return el
+  return cur
 }
 
 function describe(el: Element): Record<string, unknown> {
@@ -495,6 +490,9 @@ export function initAppearanceBridge(): void {
     if (d.__dotin === 'appearance') {
       previewLive = true
       applyAppearance(d.payload as Appearance)
+    } else if (d.__dotin === 'device') {
+      forceDevice = d.device === 'mobile' ? 'mobile' : d.device === 'desktop' ? 'desktop' : undefined
+      applyAppearance(lastApplied) // re-render with the forced layer
     } else if (d.__dotin === 'pick') {
       setPickMode(!!d.on)
     } else if (d.__dotin === 'retarget' && typeof d.selector === 'string') {

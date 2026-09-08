@@ -422,45 +422,19 @@ const activeTab = ref('settings')
 const previewSrc = ref('/?preview=1')
 const iframeEl = ref<HTMLIFrameElement | null>(null)
 
-/* The iframe is a REAL 1024px (desktop) / 390px (mobile) viewport — so the
-   media queries inside evaluate against that width — and `transform: scale`
-   only shrinks the pixels to fit the pane. transform never touches layout or
-   media queries (unlike `zoom`, whose effect on an iframe's inner viewport is
-   inconsistent), and a wrapper sized to the scaled box keeps the stage from
-   ever scrolling. */
-const DESKTOP_W = 1024
-const MOBILE_W = 390
-const stageEl = ref<HTMLElement | null>(null)
-const stageW = ref(900)
-const stageH = ref(560)
-let stageRO: ResizeObserver | undefined
-function measureStage(): void {
-  const el = stageEl.value
-  if (!el) return
-  const w = el.clientWidth - 20 // stage padding
-  const h = el.clientHeight - 20
-  if (w > 0) stageW.value = w
-  if (h > 0) stageH.value = h
-}
-const previewScale = computed(() => {
-  const w = device.value === 'mobile' ? MOBILE_W : DESKTOP_W
-  return Math.min(1, stageW.value / w)
-})
-const frameStyle = computed(() => {
-  const s = previewScale.value
-  const w = device.value === 'mobile' ? MOBILE_W : DESKTOP_W
-  return {
-    width: w + 'px',
-    height: Math.round(stageH.value / s) + 'px', // × s back to the stage height
-    transform: `scale(${s})`,
-    transformOrigin: 'top left',
+/* The preview iframe fills the pane. Which viewport it *simulates* (which
+   موبایل / دسکتاپ layer applies) is sent to it explicitly, so it never
+   depends on the iframe's real width — no zoom, scale or scrollbars. */
+function sendDevice(): void {
+  try {
+    iframeEl.value?.contentWindow?.postMessage(
+      { __dotin: 'device', device: device.value },
+      location.origin,
+    )
+  } catch {
+    /* iframe not ready */
   }
-})
-const wrapStyle = computed(() => {
-  const s = previewScale.value
-  const w = device.value === 'mobile' ? MOBILE_W : DESKTOP_W
-  return { width: Math.round(w * s) + 'px', height: stageH.value + 'px' }
-})
+}
 
 const savedDraftJson = ref('{}')
 const publishedJson = ref('{}')
@@ -504,6 +478,7 @@ function onPreviewMessage(e: MessageEvent): void {
 
   if (d.__dotin === 'appearance-ready') {
     pushPreview()
+    sendDevice()
     if (picking.value) sendPick(true)
     return
   }
@@ -711,9 +686,8 @@ function applyImport(): void {
 
 watch(form, schedulePush, { deep: true })
 
-// Keep the preview on the viewport you're editing for: choosing the موبایل or
-// دسکتاپ layer (or a scoped hide) snaps the preview to that width so scoped
-// edits are actually visible. The «همه» layer leaves the preview alone.
+// Choosing the موبایل / دسکتاپ layer (or a scoped hide) switches the preview
+// to that viewport so the scoped edit is visible; «همه» leaves it alone.
 watch([styleScope, hideMode], ([scope, hide]) => {
   const target =
     scope === 'mobile' || hide === 'mobile'
@@ -724,20 +698,15 @@ watch([styleScope, hideMode], ([scope, hide]) => {
   if (target) device.value = target
 })
 
+// tell the preview which viewport to simulate
+watch(device, sendDevice)
+
 onMounted(() => {
   window.addEventListener('message', onPreviewMessage)
-  measureStage()
-  if (stageEl.value && 'ResizeObserver' in window) {
-    stageRO = new ResizeObserver(measureStage)
-    stageRO.observe(stageEl.value)
-  }
-  window.addEventListener('resize', measureStage)
   void load()
 })
 onBeforeUnmount(() => {
   window.removeEventListener('message', onPreviewMessage)
-  window.removeEventListener('resize', measureStage)
-  stageRO?.disconnect()
   window.clearTimeout(pushTimer)
 })
 </script>
@@ -1121,11 +1090,9 @@ onBeforeUnmount(() => {
             <AppIcon name="refresh" :size="14" /> بارگذاری مجدد
           </a-button>
         </div>
-        <div ref="stageEl" class="preview-stage">
-          <div class="preview-wrap" :style="wrapStyle">
-            <iframe ref="iframeEl" :src="previewSrc" class="preview-frame" :style="frameStyle"
-              title="پیش‌نمایش پنل کاربر" />
-          </div>
+        <div class="preview-stage" :class="device">
+          <iframe ref="iframeEl" :src="previewSrc" class="preview-frame"
+            title="پیش‌نمایش پنل کاربر" />
         </div>
       </section>
     </div>
@@ -1435,19 +1402,18 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: center;
 }
-.preview-wrap {
-  flex: none;
-  position: relative;
-  overflow: hidden;
-}
 .preview-frame {
-  position: absolute;
-  top: 0;
-  left: 0;
+  flex: none;
+  width: 100%;
+  height: 100%;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
   display: block;
+}
+.preview-stage.mobile .preview-frame {
+  width: 390px;
+  max-width: 100%;
 }
 
 @media (max-width: 1080px) {
