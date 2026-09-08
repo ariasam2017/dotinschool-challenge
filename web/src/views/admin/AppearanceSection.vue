@@ -167,14 +167,24 @@ function nudgeFont(dir: number): void {
   const b = activeBag.value
   const seed = styleScope.value === 'all' ? currentOverride.value?.baseFontSize : ''
   const raw = (b.fontSize || seed || '16px').trim()
-  const m = /^([0-9.]+)(px|rem|em|%)$/.exec(raw)
-  let px = 16
-  if (m) {
-    const n = parseFloat(m[1])
-    px = m[2] === 'px' ? n : m[2] === '%' ? (n / 100) * 16 : n * 16
+  const m = /^([0-9.]+)\s*(px|rem|em|%)?$/.exec(raw)
+  const unit = (m && m[2]) || 'px'
+  let n = m ? parseFloat(m[1]) : 16
+  const step = unit === 'px' ? 1 : unit === '%' ? 2 : 0.05
+  const min = unit === 'px' ? 6 : unit === '%' ? 20 : 0.4
+  const max = unit === 'px' ? 200 : unit === '%' ? 400 : 12
+  n = Math.min(max, Math.max(min, Math.round((n + dir * step) * 100) / 100))
+  b.fontSize = n + unit // only the number changes; the unit is kept
+}
+
+function onFontSizeKey(e: KeyboardEvent): void {
+  if (e.key === '+' || e.key === '=' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    nudgeFont(1)
+  } else if (e.key === '-' || e.key === '_' || e.key === 'ArrowDown') {
+    e.preventDefault()
+    nudgeFont(-1)
   }
-  px = Math.min(96, Math.max(8, Math.round((px + dir) * 10) / 10))
-  b.fontSize = px + 'px'
 }
 
 const WEIGHT_OPTIONS = [
@@ -736,7 +746,7 @@ onBeforeUnmount(() => {
       <section class="panel card" :class="{ busy: loading }">
         <a-tabs v-model:activeKey="activeTab" size="small">
           <a-tab-pane key="settings" tab="تنظیمات">
-            <a-collapse :bordered="false" :default-active-key="['colors', 'hero']" ghost>
+            <a-collapse :bordered="false" :default-active-key="[]" ghost>
               <a-collapse-panel key="colors" header="رنگ‌ها — حالت روشن">
                 <div class="rows">
                   <label v-for="k in COLOR_KEYS" :key="'l-' + k" class="row">
@@ -958,14 +968,14 @@ onBeforeUnmount(() => {
                   </div>
 
                   <div class="el-field" @click.stop>
-                    <span class="el-flbl">اندازه فونت</span>
+                    <span class="el-flbl">اندازه فونت — با کلیدهای + / − هم کم و زیاد می‌شود</span>
                     <div class="fs-row">
-                      <a-button size="small" title="کوچک‌تر" @click="nudgeFont(-1)">
-                        <AppIcon name="chevron-down" :size="14" />
+                      <a-button size="small" title="کوچک‌تر (−)" @click="nudgeFont(-1)">
+                        <AppIcon name="minus" :size="14" />
                       </a-button>
                       <a-input v-model:value="activeBag.fontSize" size="small"
-                        placeholder="خودکار — مثلاً ۱۶px" allow-clear />
-                      <a-button size="small" title="بزرگ‌تر" @click="nudgeFont(1)">
+                        placeholder="خودکار — مثلاً ۱۶px" allow-clear @keydown="onFontSizeKey" />
+                      <a-button size="small" title="بزرگ‌تر (+)" @click="nudgeFont(1)">
                         <AppIcon name="plus" :size="14" />
                       </a-button>
                     </div>
