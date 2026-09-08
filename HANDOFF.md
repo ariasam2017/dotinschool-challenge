@@ -1,6 +1,6 @@
 # HANDOFF — dotinschool
 
-سندی برای شروعِ سریع یک نشستِ جدیدِ Claude روی یک سیستم دیگر، برای ادامهٔ همین پروژه. تاریخ نوشته‌شدن: ۲۰۲۶-۰۹-۰۵.
+سندی برای شروعِ سریع یک نشستِ جدیدِ Claude روی یک سیستم دیگر، برای ادامهٔ همین پروژه. تاریخ اولین نگارش: ۲۰۲۶-۰۹-۰۵ · آخرین به‌روزرسانی: ۲۰۲۶-۰۹-۰۸.
 
 ## ۰. اولین قدم در نشست جدید
 
@@ -35,7 +35,53 @@ git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
 - ادیتور: CodeMirror 6 با Live Template های سبک IntelliJ
 - استقرار: `scripts/install.sh` (bare-metal + systemd) و Docker (`build/`, `docker-up.ps1`, `docker-up.sh`)
 
-## ۴. کارهایی که توی همین نشست انجام شد (به‌ترتیب، مهم‌ترین‌ها)
+## ۴. کارهای نشست‌های بعدی (۲۰۲۶-۰۹-۰۶ تا ۰۹-۰۸) — جدیدترین و مهم‌ترین
+
+### ۴.۱ فونت
+- فونت رابط از **Vazirmatn** به **IRANYekanX** عوض شد (۶ وزن، woff2). فایل‌ها در `web/src/assets/fonts/`، تعریف در `web/src/styles/fonts.css`، توکن `--font-ui` در `tokens.css`، و `fontFamily` تم Ant در `web/src/lib/theme.ts`. `web/assets/` (بیلد کامیت‌شده) هم بازساخته شد.
+
+### ۴.۲ اعداد فارسی سراسری
+- `web/src/lib/fa-digits.ts` (جدید) + یک خط در `web/src/main.ts`: یک `MutationObserver` روی `document.body` که همهٔ ارقام لاتینِ متن‌ها و placeholderها را در **هر دو پنل** (و منوهای بازشوی Ant که به `body` پورتال می‌شوند) به فارسی می‌کند. **استثناها:** `.cm-editor`، `code`/`pre`، `input`/`textarea` (وگرنه سابمیتِ کد جاوا/شماره خراب می‌شود؛ مسیر ارسال هم با `toEn` نرمال می‌شود).
+
+### ۴.۳ آدرسِ استارت‌آپ واقعی (به‌جای 127.0.0.1)
+- `internal/config/config.go`: فیلدهای `Domain / PublicHost / PublicPort / PublicURL` + متد `PublicBaseURL()` + `outboundIP()` (تشخیص IP کارت شبکه، در Docker خاموش). اولویت: `PUBLIC_URL` > `DOMAIN` (+ پورت غیراستاندارد) > `PUBLIC_HOST` > IP خودکار > `localhost`.
+- `cmd/server/main.go`: به‌جای هاردکدِ 127.0.0.1 از `cfg.PublicBaseURL()` استفاده می‌کند + `var version = "dev"` که با `-ldflags -X main.version=` استمپ و در استارت‌آپ لاگ می‌شود.
+- `build/docker-install.sh` و `docker-up.ps1` مقدار `PUBLIC_HOST` را در `.env` می‌نویسند.
+
+### ۴.۴ سخت‌سازیِ `dotinschool update`
+- اکشنِ `update`/`rebuild` در wrapperِ CLIِ داخل `build/docker-install.sh`: اگر `root` نباشد با `sudo` **دوباره اجرا می‌شود**؛ مراحل شماره‌دار با خطای صریح (نه زنجیرهٔ `&&` بی‌صدا)؛ خطای «رفرش CLI» غیرِمرگبار؛ `compose up -d --force-recreate`؛ آخرش هش گیت و نسخهٔ در حال اجرا را چاپ می‌کند.
+- `docker-up.ps1` هم `--force-recreate` می‌زند، `main.version` را از `git describe` استمپ می‌کند، و خط `deployed build: <hash>` را چاپ می‌کند.
+
+### ۴.۵ متنِ صفحهٔ ورودِ پنل کاربر
+- در `web/src/views/user/UserApp.vue`: پاراگرافِ «کد جاوای خود را…» حذف شد؛ تیتر شد «به چالش برنامه‌نویسی مدرسه داتین خوش آمدید»؛ هیرو **تک‌ستونی** شد (تیتر بالا، فرم زیرش، `max-width` ~۴۸۰px، وسط‌چین). تیتر و متنِ برند حالا override-aware اند (از Design Studio).
+
+### ۴.۶ Design Studio — بخش «ظاهر و طراحی» در پنل ادمین (بزرگ‌ترین کار)
+ویرایشگرِ ظاهریِ زندهٔ پنل کاربر، بدون rebuild/تغییرِ سورس در زمان استفاده.
+
+**بک‌اند:**
+- `internal/model/appearance.go` (جدید): `Appearance{ tokens, dark, sections{hero,header}, customCss, texts[], overrides[] }`، `StyleBag`، `ElementOverride{ selector, setText, text/textMobile/textDesktop, hidden/hiddenMobile/hiddenDesktop, all/mobile/desktop: StyleBag }`، `TextReplacement`. کلیدهای setting: `appearanceDraft` / `appearancePublished`.
+- `internal/service/appearance.go` (جدید): متدهای `AppearanceDraftRaw/PublishedRaw`, `SaveAppearanceDraft`, `PublishAppearance`, `RevertAppearanceDraft`, `ResetAppearance` + اعتبارسنجیِ سخت (whitelist توکن‌ها، charset مقادیر و سلکتور، بدون `; { } @ url(http)`، تصویر ≤۵۱۲KB، customCss ≤۲۰KB با بلاکِ `@import`/script/expression).
+- `internal/web/handlers_appearance.go` (جدید) + روت‌های `GET/PUT /api/admin/appearance` و `POST …/publish|revert|reset` در `server.go`.
+- `internal/service/settings.go`: فیلد `Appearance` به `ConfigDTO` اضافه شد → `GET /api/config` عمومی نسخهٔ منتشرشده را حمل می‌کند (پنل کاربر هر ۱ ثانیه poll می‌کند، پس انتشار ظرف ~۱ ثانیه همه‌جا).
+- `internal/database/seed.go`: نصب تازه از `internal/database/appearance.default.json` (کامیت‌شده، فعلاً `{}`) seed می‌شود — جای گذاشتن یک طرحِ پیش‌فرض برای پروژه.
+- `internal/web/middleware.go`: **CSP سست شد** — `frame-ancestors 'none' → 'self'` و `X-Frame-Options: DENY → SAMEORIGIN` (برای iframeِ پیش‌نمایشِ هم‌مبدأ). فریمِ cross-origin همچنان مسدود.
+
+**فرانت‌اند:**
+- `web/src/lib/appearance.ts` (جدید): `buildCss(a, force?)` یک `<style id="dotin-appearance">` می‌سازد؛ observerِ متن (find→replace و override هر عنصر، viewport-aware)؛ انتخابگرِ کلیکی (`cssPath`، `textLeaf` که به عنصرِ متن‌دار پایین می‌رود)؛ پلِ postMessage برای `?preview=1` (پیام‌های `appearance` / `device` / `pick` / `retarget`).
+- `web/src/views/admin/AppearanceSection.vue` (جدید): سه تب —
+  - **تنظیمات**: توکن‌های رنگِ روشن/تیره، گِردی، فونت، هیرو، هدر (همهٔ آکاردئون‌ها از اول بسته).
+  - **عناصر**: «انتخاب عنصر از پیش‌نمایش» → روی هر عنصر کلیک → ویرایشگرش. کنترل‌ها: نمایش/مخفی (اسکوپ‌دار: مخفی موبایل/دسکتاپ)، تغییر متن، اندازه فونت (دکمهٔ `−`/`+` + کلیدهای `+`/`-`/`↑`/`↓` روی فیلد، واحد ثابت می‌ماند)، ضخامت، تراز، رنگ متن/پس‌زمینه، padding/margin، حاشیه، width/max-width. دکمه‌های «↑ والد / ↓ فرزند» برای اصلاحِ هدف. زیرِ ویرایشگر: «CSSِ تولیدشده برای این عنصر» (فقط‌خواندنی). فقط عنصرِ در حال ویرایش نشان داده می‌شود (لیستِ همیشگی ندارد)؛ حذف فقط ته ویرایشگر با تأیید + نوار «بازگرداندن».
+  - **CSS سفارشی**: CSS خام (sanitize‌شده).
+  - نوار ابزار: ذخیره پیش‌نویس / انتشار / برگردان / پیش‌فرض + **خروجی/ورودی JSON** برای انتقالِ طرح بین نمونه‌ها. چیپِ `build <زمان>` (از `vite define: __BUILT_AT__`) برای تشخیصِ نسخهٔ در حال اجرا.
+- **اسکوپ ریسپانسیو**: هر override دو لایه دارد — **موبایل** (`@media max-width:767.98px`) و **دسکتاپ** (`@media min-width:768px`). لایهٔ دیتاییِ `all` هنوز در مدل هست ولی **از UI برداشته شد** (کاربر فعلاً نمی‌خواهد). دکمهٔ «تغییرات برای: موبایل | دسکتاپ»؛ فیلدِ خالی = بدون تغییر.
+- **پیش‌نمایش**: iframe کادر را پر می‌کند؛ ادمین با پیام `{__dotin:'device'}` می‌گوید کدام viewport شبیه‌سازی شود و `buildCss(a, force)` رولِ آن لایه را **بدون `@media`** می‌سازد تا در هر عرضی دیده شود (بدون zoom/scale/scrollbar — این‌ها قبلاً امتحان شدند و شکستند).
+- `web/src/stores/event.ts`: لایهٔ منتشرشده را روی پنل کاربر اعمال می‌کند (فقط `IS_USER` و نه وقتی iframeِ پیش‌نمایش استایل را کنترل می‌کند).
+- `web/src/api/types.ts` + `client.ts`: تایپ‌ها و توابعِ `getAppearance/saveAppearanceDraft/publishAppearance/revertAppearance/resetAppearance`.
+- `web/src/components/AppIcon.vue`: آیکون‌های `palette`, `minus`, `chevron-up` اضافه شد.
+
+**نکتهٔ باز:** کاربر گزارش کرد ادیتِ لایهٔ موبایل/دسکتاپ گاهی «فقط روی موبایل» اعمال می‌شود. منطقِ `buildCss` جداگانه تست شد و **درست است**؛ رفعِ نهایی نیاز به دیدنِ اسکرین‌شاتِ «CSSِ تولیدشده» + کنسولِ `[dotin-preview]` از سیستمِ کاربر دارد. اغلبِ این «هنوز خرابه»ها به‌خاطرِ ری‌دیپلوی‌نکردن یا کشِ مرورگر بوده.
+
+## ۴٫الف. کارهای نشست اول (۲۰۲۶-۰۹-۰۵) — README، اسکریپت‌های نصب، ویندوز
 
 ۱. **README.md کامل بازنویسی شد**: حرفه‌ای، بدون اشاره به تاریخچهٔ Node.js قبلی، با wrapper های `<div dir="rtl" align="right">` دور هر بلاک فارسی برای راست‌چین‌شدنِ درست، و بلاک‌های کد (```bash/powershell) عمداً **بیرون** آن divها تا جهتشان LTR بماند. هر جا عدد نسخهٔ لاتین (مثل `Go 1.22+`) وسط متن فارسی بود، یک RLM نامرئی بعدش گذاشته شد تا جهت‌متن بهم نریزد.
 
@@ -61,7 +107,13 @@ git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
 
 ## ۵. نکات محیطیِ حیاتی
 
-- **این ماشین (که این نشست رویش اجرا شد) Go نصب ندارد** — نمی‌شود این‌جا `go build`/`go test` زد. اگر سیستم جدید Go دارد، قبل از تغییرات Go یک `go build ./...` بزنید (این نشست نتونست).
+- **ماشینِ توسعه (ویندوز) حالا Go دارد.** ولی buildِ **بومیِ** ویندوز روی درایور `modernc.org/sqlite` شکست می‌خورد (پیش‌فرض، ربطی به تغییراتِ ما ندارد) — همیشه برای هدفِ واقعی cross-compile کنید:
+  ```bash
+  GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/server
+  GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go test -c -o /dev/null ./internal/web/ ./internal/service/
+  ```
+- **بیلدِ فرانت‌اند حافظه می‌خواهد.** روی این ماشین `vue-tsc`/`vite` وقتی RAM آزاد < ~۲GB بود OOM شد. با `NODE_OPTIONS="--max-old-space-size=2560" npm run build` و بستنِ مرورگر/کانتینر حل شد. `wsl --shutdown` هم ~۲GB آزاد می‌کند.
+- **گردشِ کارِ تست:** کامیتِ لوکال → `git bundle create ../design-studio-full.bundle <last-pushed>..HEAD` → کاربر روی سرور `sudo git pull --ff-only /root/<bundle> HEAD && sudo dotinschool rebuild`. روی داکرِ ویندوزِ خودِ کاربر فقط `.\docker-up.ps1` (یا تابعِ `dsup` که در `$PROFILE` ساخته). بعدِ هر دیپلوی `Ctrl+Shift+R` لازم است؛ خطِ `deployed build:` و چیپِ `build <زمان>` در استودیو برای تأییدِ نسخه.
 - کاربر (`amir`, `amir.kingstars@gmail.com`) گاهی پشت شبکهٔ فیلترشده کار می‌کند (VPS لینوکسیِ ایران تأیید شد؛ سیستم ویندوزی هنوز نامشخص). هر مشکل «اتصال گیر می‌کند / تایم‌اوت می‌شود بدون خطای واضح» را اول از این زاویه بررسی کنید.
 - تمام اسکریپت‌های نصب (`scripts/install.sh`, `build/docker-install.sh`, `scripts/windows-install.ps1`) توکن گیت‌هاب را **تعاملی** می‌پرسند اگر از قبل نباشد؛ کد نمونهٔ دستورهای دقیق توی README.md «نصب سریع» است.
 - `docker-up.ps1` و `scripts/windows-install.ps1` باید **ASCII خالص** بمانند (کامنت بالای هر فایل دلیلش رو توضیح می‌ده: PowerShell 5.1 بدون BOM فایل غیر-ASCII رو درست نمی‌خونه). قبل از هر commit روی این دو فایل، چک کنید:
@@ -77,15 +129,30 @@ git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
 ## ۶. محدودیت‌ها و ترجیحات کاربر
 
 - کاربر فارسی می‌نویسد و ترجیح می‌دهد پاسخ‌ها هم فارسی و کوتاه باشند.
-- پیام‌های کامیت: انگلیسی، سبک Conventional Commits، بدون خط `Co-Authored-By`.
-- قبل از force-push یا هر عملیات مخرب حتماً از کاربر تأیید بگیرید (توی این نشست چندبار force-push شد ولی هر بار بعد از تأییدِ صریح کاربر، چون مخزن تازه و فقط مالِ خودشه).
-- کاربر معمولاً می‌خواهد push هم بشود، نه فقط commit محلی — این‌کارو معمولاً بدون پرسیدنِ دوباره انجام بدید مگر عملیات واقعاً پرریسک باشه (مثل force-push روی تاریخچه).
-- **دستور صریح کاربر**: بعد از هر تغییرِ واقعی روی کد/اسکریپت‌ها (نه هر پیام چت)، همین فایل HANDOFF.md را هم به‌روزرسانی و commit/push کنید — کاربر می‌خواهد همیشه یک نسخهٔ تازه از این سند برای شروع نشست جدید در دسترس داشته باشد. این یعنی: هر commit مربوط به تغییر واقعی کد، باید یک commit جداگانهٔ «docs: update HANDOFF.md» هم به دنبال خودش داشته باشد (همان الگویی که در طول این نشست رعایت شد).
+- پیام‌های کامیت: انگلیسی، سبک Conventional Commits. **از ۲۰۲۶-۰۹-۰۶ به بعد خطِ `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>` انتهای هر پیامِ کامیت گذاشته می‌شود** (طبق راهنماییِ attributionِ نشست؛ کامیت‌های قدیمی‌تر این خط را ندارند).
+- **قاعدهٔ صریح و مهم (۲۰۲۶-۰۹-۰۸): هیچ‌وقت بدون اجازهٔ صریحِ همان‌لحظهٔ کاربر `git push` نکنید.** یک «push» در پیامِ قبلی مجوزِ دائمی نیست. کار را لوکال commit کنید و برای تستِ داکر bundle بدهید؛ push فقط با دستورِ مستقیمِ «push کن روی گیت‌هاب». (این جایگزینِ حرفِ قبلیِ «معمولاً بدون پرسیدن push کنید» است.)
+- force-push یا هر عملیاتِ مخرب: حتماً تأییدِ صریح.
+- **HANDOFF.md را زنده نگه دارید**: بعد از تغییرِ واقعیِ کد/اسکریپت، همین فایل را هم به‌روز کنید و در همان دسته کامیت کنید (نه لزوماً یک کامیتِ جدا). push فقط طبق قاعدهٔ بالا.
 
 ## ۷. دستورهای مفید
 
 ```bash
 git log --oneline -30                 # تاریخچهٔ اخیر
 gh api repos/ariasam2017/dotinschool/commits --jq '.[0:10][].commit.message | split("\n")[0]'
-bash -n scripts/install.sh build/docker-install.sh   # syntax check
+bash -n scripts/install.sh build/docker-install.sh   # syntax check شل
+
+# build و تأییدِ صحت (این ماشین)
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/server
+gofmt -l internal/ cmd/
+( cd web && NODE_OPTIONS="--max-old-space-size=2560" npm run build )   # vue-tsc + vite
+
+# انتقال به داکرِ کاربر (بدون push)
+git bundle create ../design-studio-full.bundle <last-pushed-hash>..HEAD
 ```
+
+## ۸. Design Studio — مرجعِ سریع
+
+- **فایل‌های کلیدی:** `internal/model/appearance.go`، `internal/service/appearance.go`، `internal/web/handlers_appearance.go`، `web/src/lib/appearance.ts`، `web/src/views/admin/AppearanceSection.vue`.
+- **جریانِ داده:** ادمین → `PUT /api/admin/appearance` (draft) → `POST …/publish` → ردیفِ `appearancePublished` در جدولِ `settings` → `GET /api/config` → `stores/event.ts` → `applyAppearance()` → `<style id="dotin-appearance">` روی `#app` پنل کاربر.
+- **پیش‌نمایش:** iframeِ `/?preview=1`؛ ادمین با `postMessage` پیام‌های `appearance` / `device` / `pick` / `retarget` می‌فرستد؛ `initAppearanceBridge()` در همان فایل جواب می‌دهد.
+- **دیباگ:** کنسولِ داخلِ iframe خطِ `[dotin-preview] device=… <css>` می‌زند؛ در استودیو زیرِ هر عنصر «CSSِ تولیدشده برای این عنصر» هست؛ چیپِ `build <زمان>` نسخه را نشان می‌دهد.
