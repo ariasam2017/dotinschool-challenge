@@ -156,6 +156,15 @@ function clearLayer(): void {
   o[s] = blankBag()
   o[TEXT_KEY[s]] = ''
 }
+/** wipe both viewport layers, leaving only «همه» */
+function clearScopedLayers(): void {
+  const o = currentOverride.value
+  if (!o) return
+  o.mobile = blankBag()
+  o.desktop = blankBag()
+  o.textMobile = ''
+  o.textDesktop = ''
+}
 
 /** show / hide-scope as one value */
 const hideMode = computed<'show' | 'all' | 'mobile' | 'desktop'>({
@@ -413,10 +422,13 @@ const activeTab = ref('settings')
 const previewSrc = ref('/?preview=1')
 const iframeEl = ref<HTMLIFrameElement | null>(null)
 
-/* fit the preview to the pane with CSS `zoom` (affects layout, unlike
-   transform) so the desktop view stays a real 1280px viewport but never
-   overflows — a fixed box like the mobile one, at desktop proportions */
-const DESKTOP_W = 1024 // a real desktop viewport, but small enough to stay legible when zoomed to fit
+/* The iframe is a REAL 1024px (desktop) / 390px (mobile) viewport — so the
+   media queries inside evaluate against that width — and `transform: scale`
+   only shrinks the pixels to fit the pane. transform never touches layout or
+   media queries (unlike `zoom`, whose effect on an iframe's inner viewport is
+   inconsistent), and a wrapper sized to the scaled box keeps the stage from
+   ever scrolling. */
+const DESKTOP_W = 1024
 const MOBILE_W = 390
 const stageEl = ref<HTMLElement | null>(null)
 const stageW = ref(900)
@@ -430,16 +442,24 @@ function measureStage(): void {
   if (w > 0) stageW.value = w
   if (h > 0) stageH.value = h
 }
+const previewScale = computed(() => {
+  const w = device.value === 'mobile' ? MOBILE_W : DESKTOP_W
+  return Math.min(1, stageW.value / w)
+})
 const frameStyle = computed(() => {
-  if (device.value === 'mobile') {
-    return { width: MOBILE_W + 'px', height: stageH.value + 'px', zoom: 1 }
-  }
-  const zoom = Math.min(1, stageW.value / DESKTOP_W)
+  const s = previewScale.value
+  const w = device.value === 'mobile' ? MOBILE_W : DESKTOP_W
   return {
-    width: DESKTOP_W + 'px',
-    height: Math.round(stageH.value / zoom) + 'px',
-    zoom,
+    width: w + 'px',
+    height: Math.round(stageH.value / s) + 'px', // × s back to the stage height
+    transform: `scale(${s})`,
+    transformOrigin: 'top left',
   }
+})
+const wrapStyle = computed(() => {
+  const s = previewScale.value
+  const w = device.value === 'mobile' ? MOBILE_W : DESKTOP_W
+  return { width: Math.round(w * s) + 'px', height: stageH.value + 'px' }
 })
 
 const savedDraftJson = ref('{}')
@@ -977,10 +997,15 @@ onBeforeUnmount(() => {
                   <p v-if="styleScope !== 'all'" class="faint tiny">
                     متن و فیلدهای خالی در این حالت، از «همه» ارث می‌برند.
                   </p>
-                  <p v-else-if="layerHas('mobile') || layerHas('desktop')" class="faint tiny">
-                    توجه: لایه‌ی {{ layerHas('mobile') ? 'موبایل' : '' }}{{ layerHas('mobile') && layerHas('desktop') ? ' و ' : '' }}{{ layerHas('desktop') ? 'دسکتاپ' : '' }}
-                    مقدار دارد و در همان اندازه‌ی صفحه، روی «همه» را بازنویسی می‌کند (● کنار نامش).
-                  </p>
+                  <div v-else-if="layerHas('mobile') || layerHas('desktop')" class="el-warn" @click.stop>
+                    <span>
+                      لایه‌ی {{ layerHas('mobile') ? 'موبایل' : '' }}{{ layerHas('mobile') && layerHas('desktop') ? ' و ' : '' }}{{ layerHas('desktop') ? 'دسکتاپ' : '' }}
+                      مقدار دارد و در همان اندازه‌ی صفحه، «همه» را بازنویسی می‌کند.
+                    </span>
+                    <a-button size="small" type="text" danger @click="clearScopedLayers">
+                      پاک‌کردن موبایل و دسکتاپ
+                    </a-button>
+                  </div>
 
                   <div v-if="o.setText && o.isLeaf" class="el-field" @click.stop>
                     <span class="el-flbl">
@@ -1097,8 +1122,10 @@ onBeforeUnmount(() => {
           </a-button>
         </div>
         <div ref="stageEl" class="preview-stage">
-          <iframe ref="iframeEl" :src="previewSrc" class="preview-frame" :style="frameStyle"
-            title="پیش‌نمایش پنل کاربر" />
+          <div class="preview-wrap" :style="wrapStyle">
+            <iframe ref="iframeEl" :src="previewSrc" class="preview-frame" :style="frameStyle"
+              title="پیش‌نمایش پنل کاربر" />
+          </div>
         </div>
       </section>
     </div>
@@ -1354,6 +1381,17 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   font-size: 0.74rem;
 }
+.el-warn {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 0.74rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .fs-row {
   display: flex;
   align-items: center;
@@ -1397,8 +1435,15 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: center;
 }
-.preview-frame {
+.preview-wrap {
   flex: none;
+  position: relative;
+  overflow: hidden;
+}
+.preview-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
