@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/dotinschool/dotinschool/internal/apperr"
+	"github.com/dotinschool/dotinschool/internal/database"
 )
 
 // GET /api/admin/backup — streams a consistent copy of the SQLite file made
@@ -45,8 +46,14 @@ func (s *server) handleBackup(c *gin.Context) {
 }
 
 // POST /api/admin/backup/restore — replaces the live database with an uploaded
-// backup after verifying the SQLite magic, keeping a pre-restore safety copy,
-// and restarting the process so it reopens the new file cleanly.
+// backup, then restarts the process so it reopens the new file cleanly.
+//
+// Safe to run against a brand-new / empty server: the uploaded file is opened
+// and AutoMigrated in a throwaway connection first (database.Validate), so an
+// incompatible or corrupt backup is rejected here — the live database is left
+// untouched — instead of crash-looping the panel on the next boot. All journal
+// sidecars are cleared before the swap so no stale rollback journal from the
+// previous database is replayed against the new one.
 func (s *server) handleRestore(c *gin.Context) {
 	var body struct {
 		Data string `json:"data"`
@@ -67,15 +74,29 @@ func (s *server) handleRestore(c *gin.Context) {
 	}
 
 	dbPath := s.cfg.DBPath()
-	safetyPath := filepath.Join(s.cfg.DataDir, fmt.Sprintf("pre-restore-%d.db", nowMs()))
-	if cur, rerr := os.ReadFile(dbPath); rerr == nil {
-		_ = os.WriteFile(safetyPath, cur, 0o600)
-	}
-
 	stagePath := dbPath + ".incoming"
+	database.CleanSidecars(stagePath) // any leftovers from a previous attempt
 	if err := os.WriteFile(stagePath, buf, 0o600); err != nil {
 		s.failWith(c, err)
 		return
+	}
+
+	// Prove the upload can actually become this build's database before we throw
+	// the live one away. Validate also AutoMigrates the staged file in place, so
+	// a backup from a slightly older version is upgraded here rather than on the
+	// crash-prone next boot.
+	if verr := database.Validate(stagePath, s.log); verr != nil {
+		_ = os.Remove(stagePath)
+		database.CleanSidecars(stagePath)
+		s.log.WithError(verr).Warn("restore: uploaded database failed validation — restore refused")
+		fail(c, apperr.New(400, "RESTORE_INCOMPATIBLE",
+			"این فایل بکاپ سالم نیست یا با نسخهٔ فعلی سامانه سازگار نیست — بازیابی انجام نشد و داده‌های فعلی دست‌نخورده ماند. بهتر است هر دو سرور روی یک نسخه باشند."))
+		return
+	}
+
+	safetyPath := filepath.Join(s.cfg.DataDir, fmt.Sprintf("pre-restore-%d.db", nowMs()))
+	if cur, rerr := os.ReadFile(dbPath); rerr == nil {
+		_ = os.WriteFile(safetyPath, cur, 0o600)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"ok": true, "restarting": true})
@@ -87,10 +108,21 @@ func (s *server) handleRestore(c *gin.Context) {
 		if sqlDB, e := s.svc.DB.DB(); e == nil {
 			_ = sqlDB.Close()
 		}
-		_ = os.Remove(dbPath + "-wal")
-		_ = os.Remove(dbPath + "-shm")
+		database.CleanSidecars(dbPath)    // stale -journal/-wal/-shm of the OLD db
+		database.CleanSidecars(stagePath) // and any left by validation
 		if e := os.Rename(stagePath, dbPath); e != nil {
-			s.log.WithError(e).Error("restore: could not swap in the uploaded database")
+			// Windows / a bind mount can refuse a rename over a path another
+			// handle just touched — fall back to a plain copy so the restore
+			// still lands.
+			if data, re := os.ReadFile(stagePath); re == nil {
+				if we := os.WriteFile(dbPath, data, 0o600); we == nil {
+					_ = os.Remove(stagePath)
+					e = nil
+				}
+			}
+			if e != nil {
+				s.log.WithError(e).Errorf("restore: could not swap in the uploaded database — the pre-restore copy is at %s", safetyPath)
+			}
 		}
 		os.Exit(0)
 	})
