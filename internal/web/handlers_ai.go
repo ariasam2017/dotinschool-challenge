@@ -107,6 +107,17 @@ func (s *server) handlePutAISettings(c *gin.Context) {
 		baseURL := clip(strings.TrimRight(strings.TrimSpace(p.BaseURL), "/"), 300)
 		mdl := clip(strings.TrimSpace(p.Model), 120)
 
+		// Guard the classic footgun: a browser password manager autofilling the
+		// panel login username into the "نام مدل" field (it sits right before
+		// the API-key field). Saving that makes every AI call send
+		// model="administrator" and the gateway answers "No available channel
+		// for model administrator".
+		if mdl != "" && strings.EqualFold(mdl, s.cfg.AdminUsername) {
+			fail(c, apperr.New(400, "BAD_MODEL",
+				"«نام مدل» با نام کاربری پنل یکی است — به احتمال زیاد مرورگر آن را خودکار پر کرده. نام مدل واقعی را وارد کنید (مثلاً gpt-4o-mini) یا این فیلد را خالی بگذارید."))
+			return
+		}
+
 		typedKey := ""
 		if k := strings.TrimSpace(p.APIKey); k != "" && !service.LooksLikeMask(k) {
 			typedKey = clip(k, 400)
@@ -191,7 +202,7 @@ func (s *server) handleTestAIProvider(c *gin.Context) {
 		cfg = &service.AIRuntimeConfig{
 			APIKey:  target.APIKey,
 			BaseURL: strings.TrimRight(firstNonEmpty(target.BaseURL, service.AIDefaultBaseURL), "/"),
-			Model:   firstNonEmpty(target.Model, service.AIDefaultModel),
+			Model:   s.svc.AI.ModelOrDefault(target.Model),
 		}
 	} else {
 		cfg = s.svc.AI.ResolveConfig()

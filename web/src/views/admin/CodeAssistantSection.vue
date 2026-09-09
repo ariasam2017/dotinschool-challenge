@@ -149,6 +149,13 @@ function onKeyInput(row: Row) {
 }
 
 async function save() {
+  const uname = (admin.username || '').trim().toLowerCase()
+  if (uname && rows.value.some((r) => r.model.trim().toLowerCase() === uname)) {
+    message.error(
+      '«نام مدل» با نام کاربری پنل یکی است — مرورگر آن را خودکار پر کرده. نام مدل درست را وارد کنید (مثل gpt-4o-mini) یا این فیلد را خالی بگذارید.',
+    )
+    return
+  }
   saving.value = true
   try {
     const payload = {
@@ -275,26 +282,34 @@ const presetOptions = computed(() => presets.value.map((p) => ({ value: p.label 
       />
       <p v-if="envNote" class="faint hint">{{ envNote }}</p>
 
+      <!-- soaks up browser password-manager autofill so the saved login
+           username never lands in «نام مدل» / «کلید API» below -->
+      <div class="af-trap" aria-hidden="true">
+        <input type="text" tabindex="-1" autocomplete="username" />
+        <input type="password" tabindex="-1" autocomplete="current-password" />
+      </div>
+
       <a-radio-group v-model:value="activeId" class="prov-list">
         <div v-for="row in rows" :key="row.id" class="prov card">
           <a-radio :value="row.id" class="prov-active">فعال</a-radio>
           <div class="prov-grid">
             <label class="f"><span>نام سرویس</span>
               <a-auto-complete v-model:value="row.label" :options="presetOptions" @change="applyPreset(row)">
-                <a-input placeholder="مثلاً GapGPT" />
+                <a-input placeholder="مثلاً GapGPT" autocomplete="off" />
               </a-auto-complete>
             </label>
             <label class="f"><span>آدرس پایه</span>
-              <a-input v-model:value="row.baseUrl" dir="ltr" placeholder="https://api.openai.com/v1" />
+              <a-input v-model:value="row.baseUrl" dir="ltr" autocomplete="off" placeholder="https://api.openai.com/v1" />
             </label>
             <label class="f"><span>نام مدل</span>
-              <a-input v-model:value="row.model" dir="ltr" placeholder="gpt-4o-mini" />
+              <a-input v-model:value="row.model" dir="ltr" autocomplete="off" name="ai-model-name" placeholder="gpt-4o-mini" />
             </label>
             <label class="f"><span>کلید API</span>
               <a-input-password
                 v-model:value="row.apiKey"
                 dir="ltr"
-                autocomplete="off"
+                autocomplete="new-password"
+                name="ai-provider-key"
                 :placeholder="row.hasKey ? row.keyMask + ' — برای تغییر، کلید جدید بزنید' : 'کلید API را وارد کنید'"
                 @input="onKeyInput(row)"
               />
@@ -356,6 +371,16 @@ const presetOptions = computed(() => presets.value.map((p) => ({ value: p.label 
 </template>
 
 <style scoped>
+/* off-screen decoy pair — catches the browser's username/password autofill so
+   it never overwrites the real «نام مدل» / «کلید API» inputs */
+.af-trap {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
 .head-row {
   gap: 12px;
   margin-bottom: 10px;

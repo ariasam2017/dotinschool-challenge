@@ -127,7 +127,7 @@ func (a *AIService) ResolveConfig() *AIRuntimeConfig {
 		return &AIRuntimeConfig{
 			APIKey:  active.APIKey,
 			BaseURL: strings.TrimRight(orDefault(active.BaseURL, AIDefaultBaseURL), "/"),
-			Model:   orDefault(active.Model, AIDefaultModel),
+			Model:   a.ModelOrDefault(active.Model),
 			Label:   orDefault(active.Label, "سرویس ذخیره‌شده در پنل"),
 			Source:  "panel",
 		}
@@ -137,12 +137,29 @@ func (a *AIService) ResolveConfig() *AIRuntimeConfig {
 		return &AIRuntimeConfig{
 			APIKey:  a.cfg.AIEnvAPIKey,
 			BaseURL: strings.TrimRight(orDefault(a.cfg.AIEnvBaseURL, AIDefaultBaseURL), "/"),
-			Model:   orDefault(a.cfg.AIEnvModel, AIDefaultModel),
+			Model:   a.ModelOrDefault(a.cfg.AIEnvModel),
 			Label:   "تنظیمات فایل .env",
 			Source:  "env",
 		}
 	}
 	return nil
+}
+
+// ModelOrDefault is the model name to actually send upstream. An empty value —
+// or one equal to the panel's own admin username, which browser password
+// managers routinely autofill into the "نام مدل" text field that sits directly
+// before the API-key field — falls back to the default model instead of being
+// sent verbatim. (An OpenAI-compatible gateway rejects a model literally named
+// "administrator" with "No available channel for model administrator".)
+func (a *AIService) ModelOrDefault(m string) string {
+	m = strings.TrimSpace(m)
+	if m == "" {
+		return AIDefaultModel
+	}
+	if a.cfg != nil && a.cfg.AdminUsername != "" && strings.EqualFold(m, a.cfg.AdminUsername) {
+		return AIDefaultModel
+	}
+	return m
 }
 
 // Chat performs one completion. override wins over ResolveConfig when non-nil.
@@ -204,6 +221,16 @@ func (a *AIService) Chat(messages []ChatMessage, override *AIRuntimeConfig) (*Ch
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		msg := parsed.Error.Message
+		low := strings.ToLower(msg)
+		if strings.Contains(low, "no available channel for model") ||
+			strings.Contains(low, "model_not_found") ||
+			strings.Contains(low, "model not found") ||
+			strings.Contains(low, "no such model") ||
+			strings.Contains(low, "invalid model") ||
+			(strings.Contains(low, "model") && strings.Contains(low, "does not exist")) {
+			return nil, apperr.New(502, "AI_MODEL_UNAVAILABLE",
+				"مدل «"+orDefault(cfg.Model, AIDefaultModel)+"» روی این سرویس در دسترس نیست — «نام مدل» را در تنظیمات بررسی کنید (مثلاً gpt-4o-mini).")
+		}
 		if msg == "" {
 			msg = fmt.Sprintf("سرویس هوش مصنوعی خطا داد (کد %d).", res.StatusCode)
 		}
