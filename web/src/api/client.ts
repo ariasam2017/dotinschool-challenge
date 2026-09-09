@@ -14,6 +14,8 @@ import type {
   ReviewResult,
   SessionParticipant,
   SmsInfo,
+  ParticipantExportFile,
+  ParticipantImportResult,
   SmsSettings,
   SmsSettingsInput,
   SmsTestResult,
@@ -174,6 +176,38 @@ export async function restoreBackup(file: File) {
 }
 export const checkForUpdate = () =>
   apiFetch<UpdateResult>('/api/admin/update', { method: 'POST' })
+
+/* ---- portable participant transfer (server -> server) ---- */
+export async function exportParticipants(): Promise<Blob> {
+  const token = adminToken.get()
+  let res: Response
+  try {
+    res = await fetch('/api/admin/participants/export', {
+      headers: token ? { Authorization: 'Bearer ' + token } : {},
+    })
+  } catch {
+    throw new ApiError('اتصال به سرور برقرار نشد.', 'NETWORK_ERROR', 0)
+  }
+  if (!res.ok) {
+    let data: any = null
+    try {
+      data = await res.json()
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(
+      (data && data.message) || 'دریافت خروجی شرکت‌کنندگان ناموفق بود',
+      (data && data.code) || 'UNKNOWN_ERROR',
+      res.status,
+    )
+  }
+  return res.blob()
+}
+export const importParticipants = (file: ParticipantExportFile) =>
+  apiFetch<ParticipantImportResult>('/api/admin/participants/import', {
+    method: 'POST',
+    body: file,
+  })
 
 /* ---- host resources (admin overview) ---- */
 export const systemStats = () => apiFetch<SystemStats>('/api/admin/system')

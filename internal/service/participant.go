@@ -111,3 +111,27 @@ func (s *ParticipantService) Delete(id string) (bool, error) {
 	}
 	return res.RowsAffected > 0, nil
 }
+
+// Count returns the number of participant rows.
+func (s *ParticipantService) Count() (int64, error) {
+	var n int64
+	err := s.db.Model(&model.Participant{}).Count(&n).Error
+	return n, err
+}
+
+// ReplaceAll wipes the participants table and refills it from rows, all in one
+// transaction — so a unique-key clash inside the payload (or any other insert
+// failure) rolls everything back and the caller's data is left untouched. Used
+// by the "transfer participants between servers" import.
+func (s *ParticipantService) ReplaceAll(rows []model.Participant) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Session(&gorm.Session{AllowGlobalUpdate: true}).
+			Delete(&model.Participant{}).Error; err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return nil
+		}
+		return tx.CreateInBatches(rows, 200).Error
+	})
+}

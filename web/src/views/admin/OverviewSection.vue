@@ -8,6 +8,8 @@ import {
   setConfig,
   downloadBackup,
   restoreBackup,
+  exportParticipants,
+  importParticipants,
   checkForUpdate,
   systemStats,
   smsStatus,
@@ -15,7 +17,13 @@ import {
   getSmsSettings,
   saveSmsSettings,
 } from '@/api/client'
-import type { SmsInfo, SmsTestResult, SmsSettings, SystemStats } from '@/api/types'
+import type {
+  SmsInfo,
+  SmsTestResult,
+  SmsSettings,
+  SystemStats,
+  ParticipantExportFile,
+} from '@/api/types'
 import { toFa, fmtPhone, statusLabel } from '@/lib/fa'
 
 import StatCard from '@/components/StatCard.vue'
@@ -200,6 +208,57 @@ async function doRestore(ev: Event) {
     admin.toastError(e, 'خطا در بازیابی بکاپ')
   } finally {
     ;(ev.target as HTMLInputElement).value = ''
+  }
+}
+
+/* portable participant transfer — server to server, no restart */
+const partInput = ref<HTMLInputElement>()
+async function doExportParticipants() {
+  try {
+    const blob = await exportParticipants()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `dotinschool-participants-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+    message.success('خروجی شرکت‌کنندگان دانلود شد')
+  } catch (e) {
+    admin.toastError(e, 'خطا در گرفتن خروجی شرکت‌کنندگان')
+  }
+}
+async function doImportParticipants(ev: Event) {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  let parsed: ParticipantExportFile
+  try {
+    parsed = JSON.parse(await file.text())
+  } catch {
+    message.error('فایل انتخاب‌شده JSON معتبر نیست')
+    input.value = ''
+    return
+  }
+  const n = Array.isArray(parsed?.participants) ? parsed.participants.length : 0
+  if (
+    !confirm(
+      `همهٔ شرکت‌کنندگان فعلی این سامانه پاک و با ${toFa(n)} شرکت‌کنندهٔ این فایل جایگزین می‌شوند. ` +
+        'سرویس ری‌استارت نمی‌شود. ادامه می‌دهید؟',
+    )
+  ) {
+    input.value = ''
+    return
+  }
+  try {
+    const r = await importParticipants(parsed)
+    message.success(`انتقال انجام شد — ${toFa(r.count)} شرکت‌کننده جایگزین شد`)
+    await admin.refreshParticipants()
+  } catch (e) {
+    admin.toastError(e, 'خطا در ورودی شرکت‌کنندگان')
+  } finally {
+    input.value = ''
   }
 }
 /* SMS (ippanel) diagnostics */
@@ -493,8 +552,31 @@ async function doUpdate() {
         </p>
         <div class="row-wrap">
           <a-button @click="doDownload"><template #icon><AppIcon name="download" :size="15" /></template>دانلود بکاپ</a-button>
-          <a-button @click="restoreInput?.click()"><template #icon><AppIcon name="upload" :size="15" /></template>بازیابی از فایل</a-button>
+          <a-button @click="restoreInput?.click()"><template #icon><AppIcon name="upload" :size="15" /></template>بازیابی از فایل .db</a-button>
           <input ref="restoreInput" type="file" accept=".db,.sqlite,application/octet-stream" hidden @change="doRestore" />
+        </div>
+        <p class="faint hint warn-note">
+          <AppIcon name="alert-triangle" :size="13" />
+          بازیابی فایل <code>.db</code> فقط برای همان نسخه و همان ماشین امن است — روی سروری با نسخهٔ
+          متفاوت ممکن است سامانه بالا نیاید. برای انتقال داده بین دو سرور از «انتقال شرکت‌کنندگان»
+          پایین استفاده کنید.
+        </p>
+
+        <div class="sub-divider" />
+        <div class="card-hd"><span class="section-title">انتقال شرکت‌کنندگان (بین سرورها)</span></div>
+        <p class="faint hint">
+          فقط ردیف‌های شرکت‌کنندگان را به‌صورت یک فایل <code>.json</code> جابه‌جا می‌کند — تعداد
+          ثبت‌نامی‌ها، در حال حل‌ها و ارسال‌شده‌ها منتقل می‌شود. «ورودی» جدول شرکت‌کنندگان سامانهٔ
+          مقصد را <b>کامل پاک و جایگزین</b> می‌کند و سرویس ری‌استارت نمی‌شود.
+        </p>
+        <div class="row-wrap">
+          <a-button @click="doExportParticipants">
+            <template #icon><AppIcon name="download" :size="15" /></template>خروجی شرکت‌کنندگان
+          </a-button>
+          <a-button danger @click="partInput?.click()">
+            <template #icon><AppIcon name="upload" :size="15" /></template>ورودی از فایل (جایگزینی کامل)
+          </a-button>
+          <input ref="partInput" type="file" accept="application/json,.json" hidden @change="doImportParticipants" />
         </div>
       </section>
 
@@ -770,6 +852,24 @@ async function doUpdate() {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* caution note under the .db restore button */
+.warn-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--warning);
+}
+.warn-note :deep(svg) {
+  flex: none;
+  margin-top: 2px;
+}
+/* separates the two blocks inside the backup card */
+.sub-divider {
+  height: 1px;
+  background: var(--border);
+  margin: var(--space-4) calc(-1 * var(--space-5));
 }
 
 /* caption under the registration sparkline inside the "ثبت‌نامی" card */

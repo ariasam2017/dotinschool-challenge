@@ -243,6 +243,19 @@ export interface SmsSettingsInput {
   authScheme?: string
 }
 
+// The portable "move the entrants to another server" file (participants only).
+export interface ParticipantExportFile {
+  kind: 'dotinschool.participants'
+  version: 1
+  exportedAt: number
+  count: number
+  participants: Participant[]
+}
+export interface ParticipantImportResult {
+  ok: true
+  count: number
+}
+
 // Live host resource snapshot for the admin overview "منابع سرور" card.
 export interface ResourceMeter {
   used: number // bytes

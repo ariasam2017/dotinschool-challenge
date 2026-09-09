@@ -79,6 +79,8 @@ func (s *server) mountAPI(r *gin.Engine) {
 	{
 		admin.GET("/participants", s.handleListParticipants)
 		admin.DELETE("/participants/:id", s.handleDeleteParticipant)
+		admin.GET("/admin/participants/export", s.handleExportParticipants)
+		admin.POST("/admin/participants/import", bodyLimit(restoreBodyLimit), s.handleImportParticipants)
 		admin.PUT("/config", s.handlePutConfig)
 
 		admin.POST("/admin/logout", s.handleAdminLogout)
