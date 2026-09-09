@@ -213,6 +213,18 @@ onMounted(() => {
   const state = EditorState.create({
     doc: props.modelValue,
     extensions: [
+      // No red spell-check squiggles under Java identifiers — this is a code
+      // editor, not prose. Also silences autocorrect/autocapitalise and any
+      // Grammarly-style browser extension.
+      EditorView.contentAttributes.of({
+        spellcheck: 'false',
+        autocapitalize: 'off',
+        autocorrect: 'off',
+        translate: 'no',
+        'data-gramm': 'false',
+        'data-gramm_editor': 'false',
+        'data-enable-grammarly': 'false',
+      }),
       lineNumbers(),
       highlightActiveLineGutter(),
       highlightActiveLine(),

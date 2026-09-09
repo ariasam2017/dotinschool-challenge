@@ -97,6 +97,7 @@ export const updateParticipant = (id: string, patch: Record<string, unknown>) =>
 
 /* ---- config (event + challenge) ---- */
 export const getConfig = () => apiFetch<EventConfig>('/api/config')
+export const getVersion = () => apiFetch<{ version: string }>('/api/version')
 export const setConfig = (patch: Partial<EventConfig> | { challenge: unknown }) =>
   apiFetch<EventConfig>('/api/config', { method: 'PUT', body: patch })
 

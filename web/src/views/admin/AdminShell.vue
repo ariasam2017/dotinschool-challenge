@@ -3,6 +3,7 @@ import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Modal } from 'ant-design-vue'
 import { useAdminStore } from '@/stores/admin'
+import { getVersion } from '@/api/client'
 import { toFa } from '@/lib/fa'
 import AdminLogin from './AdminLogin.vue'
 import AppIcon from '@/components/AppIcon.vue'
@@ -70,8 +71,12 @@ function toggleRail() {
   }
 }
 
+const appVersion = ref('')
 onMounted(() => {
   if (store.authed) store.startPolling()
+  getVersion()
+    .then((r) => (appVersion.value = r.version || ''))
+    .catch(() => {})
 })
 onBeforeUnmount(() => store.stopPolling())
 
@@ -131,7 +136,7 @@ function confirmLogout() {
         </div>
       </nav>
 
-      <div class="side-foot faint">نسخه {{ toFa('1.0') }}</div>
+      <div class="side-foot faint">نسخه {{ appVersion ? toFa(appVersion) : '—' }}</div>
     </aside>
 
     <div v-if="drawerOpen" class="scrim" @click="drawerOpen = false" />

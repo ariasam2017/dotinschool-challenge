@@ -62,6 +62,7 @@ func main() {
 		Config:   cfg,
 		Services: services,
 		Log:      log,
+		Version:  version,
 	})
 
 	srv := &http.Server{

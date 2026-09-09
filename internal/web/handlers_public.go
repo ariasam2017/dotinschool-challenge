@@ -177,6 +177,14 @@ func (s *server) handleGetConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, s.svc.Settings.CurrentConfig())
 }
 
+// GET /api/version — the running build's version string. Stamped at build time
+// from `git describe --tags` (e.g. "v1.2.0", or "v1.2.0-3-gabc1234" between
+// tags), "dev" for an un-stamped local `go run`.
+func (s *server) handleVersion(c *gin.Context) {
+	c.Header("Cache-Control", "no-cache")
+	c.JSON(http.StatusOK, gin.H{"version": s.version})
+}
+
 // ---- helpers ---------------------------------------------------------
 
 func (s *server) notFound(err error) bool { return err == gorm.ErrRecordNotFound }

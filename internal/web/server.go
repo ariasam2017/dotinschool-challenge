@@ -16,6 +16,7 @@ type Options struct {
 	Config   *config.Config
 	Services *service.Services
 	Log      *logrus.Logger
+	Version  string // build version stamped via -ldflags "-X main.version=..."
 }
 
 // Request body ceilings. The original Node server capped every body at 1 MiB;
@@ -27,16 +28,17 @@ const (
 )
 
 type server struct {
-	cfg *config.Config
-	svc *service.Services
-	log *logrus.Logger
+	cfg     *config.Config
+	svc     *service.Services
+	log     *logrus.Logger
+	version string
 }
 
 // NewRouter builds the fully configured gin.Engine.
 func NewRouter(opts Options) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
-	s := &server{cfg: opts.Config, svc: opts.Services, log: opts.Log}
+	s := &server{cfg: opts.Config, svc: opts.Services, log: opts.Log, version: firstNonEmpty(opts.Version, "dev")}
 
 	r := gin.New()
 	_ = r.SetTrustedProxies([]string{"127.0.0.1", "::1"})
@@ -65,6 +67,7 @@ func (s *server) mountAPI(r *gin.Engine) {
 	api.POST("/lookup", s.handleLookup)
 	api.POST("/session", s.handleSession)
 	api.GET("/config", s.handleGetConfig)
+	api.GET("/version", s.handleVersion)
 	api.POST("/client-errors", s.handleReportClientError)
 
 	// ---- participant OR admin ----

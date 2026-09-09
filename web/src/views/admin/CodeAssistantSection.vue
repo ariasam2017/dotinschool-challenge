@@ -16,6 +16,7 @@ import Gauge from '@/components/Gauge.vue'
 import MarkdownLite from '@/components/MarkdownLite.vue'
 import Chip from '@/components/Chip.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import JavaEditor from '@/components/JavaEditor.vue'
 
 const admin = useAdminStore()
 
@@ -343,14 +344,9 @@ const presetOptions = computed(() => presets.value.map((p) => ({ value: p.label 
         <input ref="crFileInput" type="file" accept=".java,text/plain" hidden @change="onJavaFile" />
       </div>
 
-      <a-textarea
-        v-model:value="crCode"
-        dir="ltr"
-        :auto-size="{ minRows: 8, maxRows: 22 }"
-        placeholder="کد جاوا را این‌جا بچسبانید…"
-        class="cr-code"
-        style="margin-top: 10px"
-      />
+      <div class="cr-editor">
+        <JavaEditor v-model="crCode" :disabled="crRunning" />
+      </div>
 
       <div class="row-wrap" style="margin-top: 10px">
         <a-button type="primary" :loading="crRunning" @click="runReview">
@@ -437,9 +433,12 @@ const presetOptions = computed(() => presets.value.map((p) => ({ value: p.label 
   text-align: center;
   color: var(--text-faint);
 }
-.cr-code {
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
+.cr-editor {
+  height: 420px;
+  margin-top: 10px;
+}
+.cr-editor :deep(.java-editor) {
+  height: 100%;
 }
 .score-row {
   display: flex;
