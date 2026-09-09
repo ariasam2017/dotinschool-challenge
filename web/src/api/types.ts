@@ -242,3 +242,19 @@ export interface SmsSettingsInput {
   baseUrl?: string
   authScheme?: string
 }
+
+// Live host resource snapshot for the admin overview "منابع سرور" card.
+export interface ResourceMeter {
+  used: number // bytes
+  total: number // bytes
+  percent: number // 0..100
+}
+export interface SystemStats {
+  cpu: { percent: number; cores: number }
+  mem: ResourceMeter
+  swap: ResourceMeter
+  uptime: number // host uptime, seconds
+  load: [number, number, number] // 1/5/15-min load avg (0 on Windows)
+  go: { goroutines: number; alloc: number }
+  at: number // epoch ms
+}

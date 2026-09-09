@@ -106,6 +106,8 @@ func (s *server) mountAPI(r *gin.Engine) {
 		admin.DELETE("/admin/client-errors/:id", s.handleDeleteClientError)
 		admin.DELETE("/admin/client-errors", s.handleClearClientErrors)
 
+		admin.GET("/admin/system", s.handleSystemStats)
+
 		admin.GET("/admin/sms-status", s.handleSMSStatus)
 		admin.POST("/admin/sms-test", s.handleSMSTest)
 		admin.GET("/admin/sms-settings", s.handleGetSMSSettings)

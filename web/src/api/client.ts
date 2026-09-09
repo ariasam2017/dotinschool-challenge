@@ -17,6 +17,7 @@ import type {
   SmsSettings,
   SmsSettingsInput,
   SmsTestResult,
+  SystemStats,
   UpdateResult,
 } from './types'
 
@@ -173,6 +174,9 @@ export async function restoreBackup(file: File) {
 }
 export const checkForUpdate = () =>
   apiFetch<UpdateResult>('/api/admin/update', { method: 'POST' })
+
+/* ---- host resources (admin overview) ---- */
+export const systemStats = () => apiFetch<SystemStats>('/api/admin/system')
 
 /* ---- SMS (ippanel) diagnostics + panel-managed settings ---- */
 export const smsStatus = () => apiFetch<SmsInfo>('/api/admin/sms-status')
