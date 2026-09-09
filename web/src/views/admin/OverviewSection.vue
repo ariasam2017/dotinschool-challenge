@@ -332,7 +332,8 @@ async function doUpdate() {
         :value="stats.total"
         tone="primary"
         :trend="recentReg > 0 ? 'up' : 'flat'"
-        :trend-text="recentReg > 0 ? `${toFa(recentReg)} در ۱۵ دقیقهٔ اخیر` : 'بدون ثبت‌نام تازه'"
+        :trend-text="recentReg > 0 ? toFa(recentReg) : ''"
+        :trend-title="recentReg > 0 ? `${toFa(recentReg)} ثبت‌نام در ۱۵ دقیقهٔ اخیر` : 'در ۱۵ دقیقهٔ اخیر ثبت‌نام تازه‌ای نبوده'"
       >
         <template #chart>
           <MiniAreaChart :data="regSeries" :height="42" color="var(--primary)" />

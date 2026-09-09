@@ -14,6 +14,7 @@ const props = withDefaults(
     /** optional live trend badge shown in the footer */
     trend?: 'up' | 'down' | 'flat'
     trendText?: string
+    trendTitle?: string
   }>(),
   { tone: 'primary' },
 )
@@ -73,12 +74,12 @@ watch(
     <div class="stat-value num">{{ display }}</div>
     <div v-if="sub || trend || $slots.chart" class="stat-foot">
       <div v-if="sub || trend" class="stat-foot-row">
-        <span v-if="trend" class="stat-trend" :class="`t-${trend}`">
+        <span v-if="trend" class="stat-trend" :class="`t-${trend}`" :title="trendTitle">
           <AppIcon
             :name="trend === 'up' ? 'trending-up' : trend === 'down' ? 'trending-down' : 'minus'"
             :size="13"
           />
-          <span v-if="trendText">{{ trendText }}</span>
+          <span v-if="trendText" class="num">{{ trendText }}</span>
         </span>
         <span v-else-if="sub" class="stat-sub">{{ sub }}</span>
       </div>
