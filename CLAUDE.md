@@ -16,7 +16,8 @@ built from the **same `index.html`**.
 ```bash
 make dev                 # Go server :8080 + Vite dev server :5173 (proxies /api). Primary dev loop.
 go run ./cmd/server      # server only (needs web/assets/ already built)
-go run ./cmd/seed        # wipe + reseed the DB: ~16 participants + a live 90-minute event
+go run ./cmd/seed        # wipe participants + reseed ~16 demo rows + a running 90-min event
+                         #   (distinct from the boot-time database.Seed, which is 7 rows + a paused event)
 make build               # web-fast + CGO_ENABLED=0 go build -> ./dotinschool
 make release             # cross-compiled artifacts into dist/ (scripts/build.sh)
 make image               # Docker image (host-compile then package; scripts/docker-build.sh)
@@ -32,24 +33,30 @@ generated, written to `.env`, and printed to the log on first boot.
 
 ### Verifying changes on the Windows dev box (important)
 
-Native Windows `go build` / `go test` **fails inside `modernc.org/sqlite`** — this
-is a driver/toolchain quirk, unrelated to any change you made. Always target the
-real platform:
+The installed Go toolchain reports `windows/386` (`go env GOHOSTARCH` = 386), and
+a bare `go build` / `go test` **fails inside `modernc.org/sqlite`** because that
+driver has no 386 build. The host is really 64-bit, so prefix commands with
+`GOARCH=amd64` and everything — including running the test binaries — works:
 
 ```bash
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build ./...        # compile check
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...      # the other shipped target
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go test -c -o /dev/null ./internal/...   # compile tests only
-gofmt -l internal/ cmd/                                     # must print nothing before committing
+GOARCH=amd64 CGO_ENABLED=0 go test -count=1 ./internal/...          # runs the suites
+GOARCH=amd64 go test ./internal/service/ -run TestName -v           # a single test
+GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build ./...              # the real Docker target
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...              # sometimes OOMs while LINKING
+gofmt -l internal/ cmd/                                             # must print nothing before committing
 ```
 
-Go tests (`internal/service/*_test.go`, `internal/web/handlers_ai_test.go`) run on
-linux/amd64 (CI / a real Linux host). On this machine you can compile-check them
-with `go test -c` but not execute them. Run a single test where execution is
-possible: `go test ./internal/service/ -run TestName -v`.
+Add `GOFLAGS=-p=2` if a build/test run OOMs (the 32-bit `go` process is
+address-space-limited; the `windows/amd64` link step is the usual casualty —
+`linux/amd64` always builds and is what Docker actually ships).
 
-The **frontend build is memory-hungry** — `vue-tsc`/`vite` OOMs on this machine
-when free RAM drops below ~2 GB. Recover with
+Test files: `internal/service/{ai,participant,ratelimit}_test.go`,
+`internal/web/handlers_ai_test.go`. There is **no in-repo HTTP integration
+harness** — endpoint behaviour is checked by building `./cmd/server`, running it
+against a throwaway `DATA_DIR`, and curling it.
+
+The **frontend build is memory-hungry** — `vue-tsc`/`vite` OOMs when free RAM
+drops below ~2 GB. Recover with
 `NODE_OPTIONS="--max-old-space-size=2560" npm run build` and by closing
 browsers/containers.
 
@@ -92,10 +99,26 @@ action).
   `data/*-config.json` sidecar > `.env`. It's resolved **fresh on every call**, so
   pasting a key in the admin panel takes effect with no restart. `SMS`/`AI` are
   always the real provider; "configured?" is computed per request.
-- **Backup / self-update**: backup is `VACUUM INTO`; restore and self-update write
-  files then `os.Exit(0)` and rely on systemd/Docker to bring the process back up.
-  `handleUpdate` runs `git fetch` + `git reset --hard origin/main` (Docker installs
-  print a manual command instead).
+- **Self-update**: `handleUpdate` runs `git fetch` + `git reset --hard origin/main`
+  then `os.Exit(0)`, relying on systemd/Docker to bring the process back up (Docker
+  installs print a manual command instead).
+
+### Data-movement paths (all in the admin overview "پشتیبان‌گیری دیتابیس" card)
+
+- **Whole-DB backup / restore** (`handlers_backup.go`) — backup is `VACUUM INTO`.
+  Restore stages the upload, then **`database.Validate`** opens + AutoMigrates it
+  in a throwaway connection and smoke-queries the core tables; an incompatible or
+  corrupt file is rejected (`RESTORE_INCOMPATIBLE`, 400) with the live DB
+  untouched, instead of crash-looping on the next boot. The swap then calls
+  **`database.CleanSidecars(path)`** (removes `-journal` **and** `-wal`/`-shm`)
+  before `os.Rename` + `os.Exit(0)`. The app runs `journal_mode(TRUNCATE)`, so a
+  stale `arena.db-journal` left next to a freshly swapped-in file is the exact bug
+  that bricked a cross-server restore — **any code that replaces the DB file must
+  `CleanSidecars` first.**
+- **Participant-only transfer** (`handlers_participants_io.go`) — a portable
+  `.json` of every participant row. Import is **replace-all in one transaction**
+  (`ParticipantService.ReplaceAll`), validated up front, **no restart**. For
+  moving entrants between differently-built servers.
 
 ### Frontend (`web/`, Vue 3 + Ant Design Vue 4 + Vite)
 
@@ -140,5 +163,11 @@ action).
   keep non-ASCII characters out of fenced code blocks.
 - `data/` (the SQLite file, generated `.env` password, AI/SMS sidecars) is runtime
   state and git-ignored.
+- **AI "model" field autofill trap**: in the provider editor the "نام مدل" text
+  input sits right before the API-key input, so a browser password manager
+  autofills the *login username* into it; saved, every AI call then sends
+  `model:"administrator"` and the gateway answers "No available channel for model
+  administrator". `AIService.ModelOrDefault` self-heals `model == AdminUsername`
+  (and empty) to the default model everywhere it's read.
 - Deploy targets: bare-metal (`scripts/install.sh` + systemd + a `dotinschool` CLI
   menu) and Docker (`build/`, `docker-compose*.yml`, Caddy for auto-HTTPS in prod).
