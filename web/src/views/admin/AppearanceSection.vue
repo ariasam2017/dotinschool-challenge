@@ -762,7 +762,7 @@ onBeforeUnmount(() => {
       <section class="panel card" :class="{ busy: loading }">
         <a-tabs v-model:activeKey="activeTab" size="small">
           <a-tab-pane key="settings" tab="تنظیمات">
-            <a-collapse :bordered="false" :default-active-key="[]" ghost>
+            <a-collapse :bordered="false" :default-active-key="['hero']" ghost>
               <a-collapse-panel key="colors" header="رنگ‌ها — حالت روشن">
                 <div class="rows">
                   <label v-for="k in COLOR_KEYS" :key="'l-' + k" class="row">
@@ -838,6 +838,7 @@ onBeforeUnmount(() => {
                     <span class="row-ctl">
                       <a-textarea v-model:value="form.hero.note" size="small" :rows="2"
                         placeholder="نشستت روی این مرورگر سپرده می‌شود؛ دفعهٔ بعد بدون کد وارد می‌شوی." allow-clear />
+                      <span class="css-hint faint">خطِ کوچکِ زیر دکمه‌های ورود/ثبت‌نام. برای حذفِ کامل، یک خط تیره «-» بگذار.</span>
                     </span>
                   </label>
                   <label class="row">
