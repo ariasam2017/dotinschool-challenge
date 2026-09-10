@@ -10,30 +10,34 @@
    -none layer (skill §6.E) so it costs nothing on scroll.
    ============================================================================= */
 
-/* LIGHT (bare :root): a calm, cool-neutral ground with NO colour cast, so the
-   white card has something to sit on and the eye has an anchor. The brand
-   ambient is a dark-mode-only flourish. */
+/* LIGHT (bare :root): a soft pastel aurora over a faint square grid — the
+   x-ui / 3x-ui (Sanaei) login mood, biased cooler and with a mint note so it
+   sits under the emerald primary rather than fighting it. Diffuse and
+   low-contrast, so it reads as gentle, not busy. */
 .auth-ambient {
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
   overflow: hidden;
-  background: linear-gradient(180deg, #eceff3 0%, #f4f6f8 55%, #eef1f4 100%);
+  background:
+    radial-gradient(44rem 34rem at 10% 14%, rgba(140, 154, 244, 0.30), transparent 60%),
+    radial-gradient(40rem 32rem at 90% 82%, rgba(244, 166, 206, 0.26), transparent 60%),
+    radial-gradient(38rem 34rem at 82% 6%, rgba(122, 214, 182, 0.22), transparent 62%),
+    radial-gradient(46rem 40rem at 26% 94%, rgba(150, 196, 255, 0.24), transparent 60%),
+    linear-gradient(180deg, #f6f7fb, #f2f3f9);
 }
 .auth-ambient::before {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(
-    circle at 1px 1px,
-    color-mix(in srgb, var(--text) 5%, transparent) 1px,
-    transparent 0
-  );
-  background-size: 34px 34px;
-  -webkit-mask-image: radial-gradient(74% 56% at 50% 34%, #000, transparent 84%);
-  mask-image: radial-gradient(74% 56% at 50% 34%, #000, transparent 84%);
-  opacity: 0.6;
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.045) 1px, transparent 1px);
+  background-size: 46px 46px;
+  -webkit-mask-image: radial-gradient(82% 72% at 50% 46%, #000, transparent 90%);
+  mask-image: radial-gradient(82% 72% at 50% 46%, #000, transparent 90%);
+  opacity: 0.55;
 }
 
 /* the centred stage that holds the plate */
@@ -45,16 +49,26 @@
   padding: var(--space-5);
 }
 
-/* the elevated card — LIGHT: crisp edge + a real contact shadow so the white
-   card separates cleanly from the near-white page. */
+/* the elevated card — LIGHT: a frosted white pane that lets the aurora tint
+   its edges, like the reference. Solid-fill fallback for reduced transparency. */
 .auth-plate {
   position: relative;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.82));
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.06),
-    0 14px 36px -10px rgba(15, 23, 42, 0.16);
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 26px 64px -20px rgba(63, 63, 110, 0.30),
+    0 8px 24px -14px rgba(63, 63, 110, 0.20);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .auth-plate {
+    background: #ffffff;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 /* ---- form fields inside the plate: one clear, legible treatment in both
@@ -122,6 +136,8 @@
   :root:not([data-theme='light']) .auth-plate {
     background: color-mix(in srgb, var(--surface) 90%, var(--primary-bright) 10%);
     border-color: color-mix(in srgb, var(--primary-bright) 14%, var(--border-strong));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
     box-shadow:
       0 1px 0 0 color-mix(in srgb, var(--primary-bright) 16%, transparent) inset,
       0 0 0 1px color-mix(in srgb, var(--primary-bright) 5%, transparent),
@@ -150,6 +166,8 @@
 :root[data-theme='dark'] .auth-plate {
   background: color-mix(in srgb, var(--surface) 90%, var(--primary-bright) 10%);
   border-color: color-mix(in srgb, var(--primary-bright) 14%, var(--border-strong));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow:
     0 1px 0 0 color-mix(in srgb, var(--primary-bright) 16%, transparent) inset,
     0 0 0 1px color-mix(in srgb, var(--primary-bright) 5%, transparent),

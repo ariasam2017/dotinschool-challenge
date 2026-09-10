@@ -119,8 +119,8 @@ async function submit() {
 }
 .login-card {
   width: 100%;
-  max-width: 424px;
-  padding: clamp(var(--space-5), 5vw, var(--space-7));
+  max-width: 460px;
+  padding: clamp(26px, 6vw, 44px);
 }
 /* centred header stack: mark, title, sub — reads clean in RTL */
 .login-head {
@@ -170,7 +170,11 @@ async function submit() {
   transform: translateY(1px);
 }
 .login-card :deep(.stack) {
-  gap: var(--space-4);
+  gap: var(--space-5);
+}
+.login-card :deep(.ant-input),
+.login-card :deep(.ant-input-affix-wrapper) {
+  padding-block: 9px;
 }
 .login-features {
   list-style: none;

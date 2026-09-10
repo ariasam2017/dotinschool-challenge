@@ -218,7 +218,7 @@ async function submit() {
 
 <style scoped>
 .auth {
-  max-width: min(480px, 100%);
+  max-width: min(460px, 100%);
   width: 100%;
   margin: 0 auto;
 }
