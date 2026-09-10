@@ -34,15 +34,27 @@ const tone = computed(() => {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 .cd-time {
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' on, 'zero' on;
   line-height: 1;
   color: var(--text);
   transition: color var(--dur) var(--ease);
+}
+/* final minute: a slow pulse draws the eye without being frantic. Decorative,
+   so it collapses to static under reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .cd-crit .cd-time {
+    animation: cd-pulse 1s var(--ease) infinite;
+  }
+}
+@keyframes cd-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 .cd-md .cd-time {
   font-size: 1.4rem;
@@ -51,11 +63,20 @@ const tone = computed(() => {
   font-size: 2.1rem;
 }
 .cd-xl .cd-time {
-  font-size: clamp(2.4rem, 8vw, 3.4rem);
+  font-size: clamp(2.6rem, 9vw, 3.8rem);
 }
 .cd-label {
   font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--text-faint);
+}
+.cd-xl .cd-label {
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  min-width: 12ch;
+  text-align: center;
 }
 .cd-warn .cd-time {
   color: var(--warning);

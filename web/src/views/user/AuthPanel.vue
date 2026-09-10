@@ -93,7 +93,7 @@ async function submit() {
       mode.value === 'register'
         ? await store.register({ firstName: form.first.trim(), lastName: form.last.trim(), phone, otp: form.otp.trim() })
         : await store.loginByPhone(phone, form.otp.trim())
-    message.success(mode.value === 'register' ? `ثبت‌نام موفق — خوش آمدید ${u.firstName}` : `خوش آمدید ${u.firstName}`)
+    message.success(mode.value === 'register' ? `ثبت‌نام شد. خوش آمدی ${u.firstName}` : `خوش آمدی ${u.firstName}`)
     emit('authed', u.status)
   } catch (e) {
     if (e instanceof ApiError) {
@@ -104,7 +104,7 @@ async function submit() {
           shakeOtp.value = true
           setTimeout(() => (shakeOtp.value = false), 450)
         }
-      } else if (e.code === 'NOT_FOUND') errors.phone = 'شماره موبایلی با این مشخصات ثبت‌نام نشده — لطفاً ابتدا ثبت‌نام کنید.'
+      } else if (e.code === 'NOT_FOUND') errors.phone = 'این شماره ثبت‌نام نشده. اول از تب «ثبت‌نام» شروع کن.'
       else errors.phone = e.message
     }
   } finally {
@@ -137,7 +137,7 @@ async function submit() {
     </div>
 
     <p class="auth-lead">
-      {{ mode === 'register' ? 'برای دیدن چالش، ابتدا با شماره موبایل خود ثبت‌نام کنید.' : 'اگر قبلاً ثبت‌نام کرده‌اید، با شماره موبایلتان وارد شوید.' }}
+      {{ mode === 'register' ? 'با شماره موبایلت ثبت‌نام کن تا سوال چالش باز شود.' : 'قبلاً ثبت‌نام کرده‌ای؟ با همان شماره موبایل وارد شو.' }}
     </p>
 
     <form class="stack" @submit.prevent="submit">
@@ -202,7 +202,7 @@ async function submit() {
       </a-button>
 
       <p class="auth-hint faint">
-        نشست شما روی این مرورگر به‌خاطر سپرده می‌شود؛ دفعه‌ی بعد بدون کد وارد می‌شوید.
+        نشستت روی این مرورگر سپرده می‌شود؛ دفعهٔ بعد بدون کد وارد می‌شوی.
       </p>
     </form>
   </div>
@@ -214,6 +214,11 @@ async function submit() {
   width: 100%;
   margin: 0 auto;
 }
+/* the card carries the split's visual weight: raised, larger radius */
+.auth.card {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+}
 .auth-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -224,19 +229,25 @@ async function submit() {
   margin-bottom: var(--space-4);
 }
 .auth-tabs button {
-  padding: 9px 0;
+  padding: 10px 0;
   border: none;
   background: transparent;
   border-radius: var(--radius-sm);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.88rem;
   color: var(--text-dim);
-  transition: all var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.auth-tabs button:hover:not(.active) {
+  color: var(--text);
 }
 .auth-tabs button.active {
   background: var(--surface);
-  color: var(--text);
+  color: var(--primary-bright);
   box-shadow: var(--shadow-1);
+}
+.auth :deep(.ant-btn):active {
+  transform: translateY(1px);
 }
 .auth-lead {
   font-size: 0.86rem;

@@ -41,9 +41,15 @@ const errCount = computed(() => problems.value.filter((p) => p.severity === 'err
 const warnCount = computed(() => problems.value.filter((p) => p.severity === 'warning').length)
 
 const RULES = [
-  'پس از شروع، تایمر رویداد از حرکت باز نمی‌ایستد.',
-  'خطاهای نحوی کد شما به‌صورت زنده زیر ادیتور نمایش داده می‌شود.',
-  'می‌توانید تا پایان زمان، کد را ویرایش و چند بار ارسال کنید.',
+  'تایمر رویداد پس از شروع متوقف نمی‌شود.',
+  'خطاهای نحوی کدت زنده، زیر ادیتور نشان داده می‌شود.',
+  'تا پایان زمان می‌توانی کد را ویرایش و چند بار ارسال کنی.',
+]
+
+const HERO_FACTS = [
+  { icon: 'file-code', text: 'ادیتور جاوا ۱۷، داخل همین مرورگر' },
+  { icon: 'clock', text: 'تایمر زندهٔ رویداد، بدون توقف' },
+  { icon: 'shield', text: 'ورود امن با کد پیامکی یک‌بارمصرف' },
 ]
 
 function resetCode() {
@@ -51,9 +57,9 @@ function resetCode() {
 }
 
 const LOCK_MESSAGES: Record<string, string> = {
-  waiting: 'چالش هنوز طبق زمان‌بندی شروع نشده — نوشتن و ارسال کد ممکن نیست',
-  paused: 'رویداد توسط مدیر متوقف شده — نوشتن و ارسال کد ممکن نیست',
-  ended: 'زمان رویداد به پایان رسید — ارسال دیگر ممکن نیست',
+  waiting: 'چالش هنوز طبق زمان‌بندی شروع نشده؛ نوشتن و ارسال کد ممکن نیست',
+  paused: 'رویداد توسط مدیر متوقف شده؛ نوشتن و ارسال کد ممکن نیست',
+  ended: 'زمان رویداد به پایان رسید؛ ارسال دیگر ممکن نیست',
 }
 const lockReason = computed(() => (eventState.value === 'running' ? '' : eventState.value))
 const clockState = computed(() =>
@@ -177,10 +183,10 @@ async function submit() {
 
 function friendlyError(err: ApiError): string {
   if (err.code === 'NETWORK_ERROR')
-    return 'ارسال کد انجام نشد — اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید.'
+    return 'ارسال کد انجام نشد. اتصال اینترنت را بررسی کن و دوباره تلاش کن.'
   if (err.code === 'INTERNAL_ERROR' || err.status >= 500)
-    return 'ارسال کد در این لحظه ممکن نشد — چند لحظه صبر کنید و دوباره تلاش کنید.'
-  return err.message || 'ارسال کد با خطا مواجه شد — دوباره تلاش کنید.'
+    return 'ارسال کد در این لحظه ممکن نشد. چند لحظه صبر کن و دوباره تلاش کن.'
+  return err.message || 'ارسال کد با خطا مواجه شد. دوباره تلاش کن.'
 }
 
 function confirmExit() {
@@ -223,13 +229,31 @@ function confirmExit() {
     </header>
 
     <main class="u-main" :class="{ 'u-main--auth': !user }">
-      <!-- not signed in -->
+      <!-- not signed in — asymmetric split: value prop on one side, auth card on
+           the other. .hero / .hero-copy / .hero-sub class names are kept because
+           the admin Design Studio targets them (lib/appearance.ts). -->
       <section v-if="!user" class="hero">
         <div class="hero-copy">
-          <h1>{{ appearanceText.heroTitle || 'به چالش برنامه‌نویسی مدرسه داتین خوش آمدید' }}</h1>
-          <p v-if="appearanceText.heroSubtitle && appearanceText.heroShowSubtitle" class="hero-sub">
+          <p class="hero-kicker">
+            <span class="hero-kicker-mark"><AppIcon name="code" :size="13" /></span>
+            چالش برنامه‌نویسی داتین
+          </p>
+          <h1>{{ appearanceText.heroTitle || 'سوال را ببین. کد را بزن. ارسال کن.' }}</h1>
+          <p
+            v-if="appearanceText.heroSubtitle && appearanceText.heroShowSubtitle"
+            class="hero-sub"
+          >
             {{ appearanceText.heroSubtitle }}
           </p>
+          <p v-else class="hero-sub">
+            برای دیدن سوالِ چالش با شماره موبایلت ثبت‌نام کن. ادیتور جاوا و تایمر رویداد همین‌جاست.
+          </p>
+          <ul class="hero-facts">
+            <li v-for="f in HERO_FACTS" :key="f.text">
+              <AppIcon :name="f.icon" :size="16" />
+              <span>{{ f.text }}</span>
+            </li>
+          </ul>
         </div>
         <AuthPanel @authed="onAuthed" />
       </section>
@@ -241,18 +265,19 @@ function confirmExit() {
            and no transition fires. -->
       <template v-else>
       <Transition name="fade" mode="out-in">
-        <!-- 1) scheduled, more than an hour away: no challenge, no timer -->
-        <section v-if="userView === 'notStarted'" key="notStarted" class="wait-card card card-pad">
-          <span class="wait-ico neutral"><AppIcon name="calendar" :size="26" /></span>
-          <h2>رویداد هنوز شروع نشده است</h2>
-          <p class="faint wait-lead">
-            زمان برگزاری را مدیر سامانه تعیین می‌کند. به‌محض شروع رویداد، سوال چالش به‌صورت
-            خودکار همین‌جا نمایش داده می‌شود — نیازی به هیچ کاری نیست.
+        <!-- 1) scheduled, more than an hour away: no challenge, no timer.
+             Left-aligned editorial panel; the start time is the prominent stat. -->
+        <section v-if="userView === 'notStarted'" key="notStarted" class="state-panel tone-neutral">
+          <p class="state-kicker"><AppIcon name="calendar" :size="14" /> زمان‌بندی رویداد</p>
+          <h2 class="state-title">رویداد هنوز شروع نشده</h2>
+          <p class="state-lead">
+            زمان برگزاری را مدیر سامانه تعیین می‌کند. لحظهٔ شروع، سوال چالش خودکار همین‌جا باز می‌شود.
           </p>
-          <p v-if="eStore.config?.eventStartsAt" class="faint">
-            زمان شروع: <span class="num">{{ fmtJalaliDateTime(eStore.config.eventStartsAt) }}</span>
-          </p>
-          <ul class="rules-list wait-rules">
+          <div v-if="eStore.config?.eventStartsAt" class="state-stat">
+            <span class="state-stat-label">شروع برنامه‌ریزی‌شده</span>
+            <span class="state-stat-value num">{{ fmtJalaliDateTime(eStore.config.eventStartsAt) }}</span>
+          </div>
+          <ul class="rules-list state-rules">
             <li v-for="(r, i) in RULES" :key="i">
               <AppIcon name="check-circle" :size="15" />
               <span>{{ r }}</span>
@@ -260,42 +285,45 @@ function confirmExit() {
           </ul>
         </section>
 
-        <!-- 2) final hour before the scheduled start: countdown, still no challenge -->
-        <section v-else-if="userView === 'countdown'" key="countdown" class="wait-card card card-pad">
-          <span class="wait-ico info"><AppIcon name="clock" :size="26" /></span>
-          <h2>رویداد به‌زودی شروع می‌شود</h2>
+        <!-- 2) final hour before the scheduled start: the clock IS the screen. -->
+        <section v-else-if="userView === 'countdown'" key="countdown" class="state-panel tone-info is-centered">
+          <p class="state-kicker"><AppIcon name="clock" :size="14" /> تا شروع رویداد</p>
+          <h2 class="state-title">به‌زودی شروع می‌شود</h2>
           <CountdownClock :ms="startsInMs" state="waiting" size="xl" label="زمان باقی‌مانده تا شروع" />
-          <p v-if="eStore.config?.eventStartsAt" class="faint">
-            شروع خودکار: <span class="num">{{ fmtJalaliDateTime(eStore.config.eventStartsAt) }}</span>
+          <p v-if="eStore.config?.eventStartsAt" class="state-foot num">
+            شروع خودکار در {{ fmtJalaliDateTime(eStore.config.eventStartsAt) }}
           </p>
         </section>
 
-        <!-- 3) admin paused a live event: hide challenge + editor immediately -->
-        <section v-else-if="userView === 'paused'" key="paused" class="wait-card card card-pad">
-          <span class="wait-ico warning"><AppIcon name="pause" :size="26" /></span>
-          <h2>رویداد متوقف شده است</h2>
-          <p class="faint wait-lead">
-            مدیر رویداد را موقتاً متوقف کرده است. سوال چالش و ادیتور تا زمان ادامه‌ی رویداد
-            نمایش داده نمی‌شوند — کدی که نوشته‌اید محفوظ است و پس از ادامه بازمی‌گردد.
+        <!-- 3) admin paused a live event. -->
+        <section v-else-if="userView === 'paused'" key="paused" class="state-panel tone-warning">
+          <p class="state-kicker"><AppIcon name="pause" :size="14" /> رویداد متوقف است</p>
+          <h2 class="state-title">مدیر رویداد را موقتاً نگه داشته</h2>
+          <p class="state-lead">
+            سوال و ادیتور تا ادامهٔ رویداد پنهان می‌شوند. کدی که نوشته‌ای محفوظ است و برمی‌گردد.
           </p>
-          <CountdownClock :ms="remainMs" state="paused" size="lg" label="زمان باقی‌ماندهٔ چالش (متوقف)" />
+          <CountdownClock :ms="remainMs" state="paused" size="lg" label="زمان باقی‌ماندهٔ چالش، متوقف" />
         </section>
 
-        <!-- 4) event finished: dedicated end screen, no challenge, no editor -->
-        <section v-else-if="userView === 'ended'" key="ended" class="wait-card card card-pad">
-          <span class="wait-ico danger"><AppIcon name="clock" :size="26" /></span>
-          <h2>زمان رویداد به پایان رسید</h2>
-          <p class="faint wait-lead">مهلت ارسال کد تمام شده است.</p>
+        <!-- 4) event finished: the verdict is the prominent element. -->
+        <section v-else-if="userView === 'ended'" key="ended" class="state-panel tone-danger">
+          <p class="state-kicker"><AppIcon name="clock" :size="14" /> پایان رویداد</p>
+          <h2 class="state-title">زمان به پایان رسید</h2>
           <p
             v-if="user.status === 'submitted'"
-            class="ended-note ok"
+            class="state-verdict ok"
           >
-            کد شما ثبت شده — نتیجه پس از بررسی مدیر سامانه به شما اعلام می‌شود.
+            <AppIcon name="check-circle" :size="18" />
+            کدت ثبت شد. نتیجه پس از بررسی مدیر سامانه به تو اعلام می‌شود.
           </p>
-          <p v-else-if="user.status === 'started'" class="ended-note bad">
-            متأسفانه کدی از شما پیش از پایان مهلت ثبت نشد.
+          <p v-else-if="user.status === 'started'" class="state-verdict bad">
+            <AppIcon name="alert-circle" :size="18" />
+            کدی از تو پیش از پایان مهلت ثبت نشد.
           </p>
-          <p v-else class="ended-note bad">شما در این رویداد کدی ارسال نکردید.</p>
+          <p v-else class="state-verdict bad">
+            <AppIcon name="alert-circle" :size="18" />
+            در این رویداد کدی ارسال نکردی.
+          </p>
         </section>
 
         <!-- 5) event live: arena (challenge + editor) — no start button -->
@@ -341,7 +369,9 @@ function confirmExit() {
                 <span class="status-bit">فاصله‌گذاری: {{ toFa(4) }}</span>
               </div>
               <div class="problems-list">
-                <div v-if="!problems.length" class="problems-empty">مشکلی یافت نشد ✓</div>
+                <div v-if="!problems.length" class="problems-empty">
+                  <AppIcon name="check-circle" :size="14" /> مشکلی یافت نشد
+                </div>
                 <div
                   v-for="(p, i) in problems"
                   :key="i"
@@ -499,10 +529,10 @@ function confirmExit() {
     padding: var(--space-6) var(--space-5) var(--space-8);
   }
 }
-/* Signed-out screen (hero + login/registration form): fit inside the visible
-   viewport so the page itself never scrolls. `margin:auto` keeps the block
-   centred but leaves the top reachable if it ever does overflow on a very
-   short screen; the auth card scrolls inside itself only as a last resort. */
+/* Signed-out screen: fit inside the visible viewport so the page never scrolls.
+   `margin:auto` centres the block but leaves the top reachable if it ever
+   overflows on a very short screen; the auth card scrolls inside itself as a
+   last resort. */
 .u-main--auth {
   min-height: 0;
   height: calc(100dvh - var(--header-h));
@@ -511,158 +541,240 @@ function confirmExit() {
   padding-block: var(--space-4);
   overflow-y: auto;
 }
-.u-main--auth .hero {
-  margin: auto;
-  gap: var(--space-4);
-  padding-top: 0;
-}
-.u-main--auth .hero-sub {
-  display: none;
-}
-.u-main--auth .hero-copy h1 {
-  margin: 0;
-  white-space: normal;
-  font-size: clamp(1.1rem, 3vw, 1.4rem);
-  line-height: 1.4;
-}
-@media (max-height: 680px) {
-  .u-main--auth {
-    padding-block: var(--space-2);
-  }
-  .u-main--auth .hero {
-    gap: var(--space-3);
-  }
-  .u-main--auth .hero-copy h1 {
-    font-size: 1.05rem;
-    line-height: 1.3;
-  }
-}
 .u-header {
   overflow: hidden;
 }
+
+/* ---- signed-out: asymmetric editorial split (value prop | auth card) ---- */
 .hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
   gap: var(--space-5);
+  width: 100%;
   max-width: 460px;
-  margin-inline: auto;
+  margin: auto;
 }
 .hero > * {
-  width: 100%;
   min-width: 0;
 }
 .hero-copy {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: start;
+  margin: 0;
+  padding: 5px 12px 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.hero-kicker-mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: var(--on-primary);
 }
 .hero-copy h1 {
-  font-size: clamp(0.95rem, 3.6vw, 1.35rem);
-  line-height: 1.4;
-  white-space: nowrap;
-}
-@media (min-width: 560px) {
-  .hero {
-    gap: var(--space-6);
-    padding-top: var(--space-6);
-    max-width: 500px;
-  }
-  .hero-copy h1 {
-    white-space: normal;
-    font-size: 1.55rem;
-    line-height: 1.5;
-  }
+  margin: 0;
+  font-size: clamp(1.5rem, 6vw, 1.9rem);
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 .hero-sub {
-  margin: var(--space-3) 0 0;
+  margin: 0;
+  max-width: 42ch;
   color: var(--text-dim);
-  font-size: 1rem;
+  font-size: 0.95rem;
   line-height: 1.9;
 }
-.event-banner {
+.hero-facts {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hero-facts li {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
-  border-radius: var(--radius);
   font-size: 0.85rem;
-  font-weight: 500;
-  margin-bottom: var(--space-4);
+  color: var(--text-dim);
 }
-.event-banner.waiting {
-  background: var(--info-soft);
-  color: var(--info);
+.hero-facts li :deep(.app-icon) {
+  color: var(--primary-bright);
+  flex: none;
 }
-.event-banner.paused {
-  background: var(--warning-soft);
-  color: var(--warning);
+@media (min-width: 900px) {
+  .hero {
+    grid-template-columns: 1.05fr 0.95fr;
+    align-items: center;
+    gap: clamp(var(--space-6), 6vw, 72px);
+    max-width: 940px;
+  }
+  .hero-copy {
+    gap: var(--space-4);
+  }
+  .hero-copy h1 {
+    font-size: clamp(1.9rem, 3.4vw, 2.6rem);
+    line-height: 1.3;
+  }
+  .hero-sub {
+    font-size: 1rem;
+  }
 }
-.event-banner.ended {
-  background: var(--danger-soft);
-  color: var(--danger);
+@media (max-width: 899px) {
+  .u-main--auth .hero-facts {
+    display: none;
+  }
 }
-.wait-card {
+@media (max-height: 720px) and (max-width: 899px) {
+  .u-main--auth .hero-kicker {
+    display: none;
+  }
+  .u-main--auth .hero-copy h1 {
+    font-size: 1.3rem;
+    line-height: 1.3;
+  }
+}
+/* ---- event-state screens (not started / countdown / paused / ended) ----
+   One panel, four distinct compositions. Tone drives an inline-start accent
+   bar + the kicker colour; the countdown variant centres and leads with the
+   clock so the four screens do not read as one template. */
+.state-panel {
+  --tone: var(--text-dim);
+  --tone-soft: var(--surface-2);
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: var(--space-4);
+  max-width: 600px;
+  margin: clamp(var(--space-5), 8vh, var(--space-8)) auto 0;
+  padding: var(--space-6);
+  padding-inline-start: calc(var(--space-6) + 4px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+}
+.state-panel::before {
+  content: '';
+  position: absolute;
+  inset-block: var(--space-5);
+  inset-inline-start: 0;
+  width: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--tone);
+}
+.state-panel.tone-neutral {
+  --tone: var(--text-faint);
+}
+.state-panel.tone-info {
+  --tone: var(--info);
+  --tone-soft: var(--info-soft);
+}
+.state-panel.tone-warning {
+  --tone: var(--warning);
+  --tone-soft: var(--warning-soft);
+}
+.state-panel.tone-danger {
+  --tone: var(--danger);
+  --tone-soft: var(--danger-soft);
+}
+.state-panel.is-centered {
+  align-items: center;
   text-align: center;
-  color: var(--text-dim);
-  max-width: 640px;
-  margin: var(--space-6) auto 0;
 }
-.wait-card h2 {
+.state-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   margin: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--tone);
 }
-.wait-ico {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+.state-title {
+  margin: 0;
+  font-size: clamp(1.35rem, 4.5vw, 1.7rem);
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
-.wait-ico.neutral {
-  background: var(--surface-2);
-  color: var(--text-dim);
-}
-.wait-ico.info {
-  background: var(--info-soft);
-  color: var(--info);
-}
-.wait-ico.warning {
-  background: var(--warning-soft);
-  color: var(--warning);
-}
-.wait-ico.danger {
-  background: var(--danger-soft);
-  color: var(--danger);
-}
-.wait-lead {
-  font-size: 0.88rem;
-  line-height: 2;
+.state-lead {
   margin: 0;
   max-width: 52ch;
+  font-size: 0.92rem;
+  line-height: 2;
+  color: var(--text-dim);
 }
-.ended-note {
-  font-size: 0.86rem;
+.state-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.state-stat-label {
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 10px 16px;
-  border-radius: var(--radius-sm);
-  margin: 0;
+  color: var(--text-faint);
 }
-.ended-note.ok {
+.state-stat-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.state-foot {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.state-verdict {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.8;
+}
+.state-verdict :deep(.app-icon) {
+  flex: none;
+}
+.state-verdict.ok {
   background: var(--success-soft);
   color: var(--success);
 }
-.ended-note.bad {
+.state-verdict.bad {
   background: var(--danger-soft);
   color: var(--danger);
 }
-.wait-rules {
-  align-self: stretch;
+.state-rules {
   margin-top: var(--space-2) !important;
-  text-align: start;
-  border-top: 1px solid var(--border);
   padding-top: var(--space-4) !important;
+  border-top: 1px solid var(--border);
 }
 .arena {
   display: grid;
@@ -823,5 +935,59 @@ function confirmExit() {
   line-height: 2;
   color: var(--text-dim);
   white-space: pre-line;
+}
+
+/* ---- editor stack reads as one instrument, not three stacked cards:
+   toolbar + editor + problems fuse into a single bordered unit, then a normal
+   gap before the submit bar. ---- */
+.arena-editor .editor-toolbar {
+  border-end-start-radius: 0;
+  border-end-end-radius: 0;
+}
+.arena-editor .editor-host {
+  margin-top: calc(-1 * var(--space-3));
+  border-inline: 1px solid var(--border);
+}
+.arena-editor .problems-panel {
+  margin-top: calc(-1 * var(--space-3));
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+}
+
+/* ---- motion layer (MOTION_INTENSITY 6): entrance choreography + tactile
+   press. Everything here is decorative and collapses under reduced-motion. ---- */
+@media (prefers-reduced-motion: no-preference) {
+  .hero-copy > * {
+    animation: hero-rise 0.5s var(--ease) both;
+  }
+  .hero-copy > :nth-child(2) {
+    animation-delay: 0.05s;
+  }
+  .hero-copy > :nth-child(3) {
+    animation-delay: 0.1s;
+  }
+  .hero-copy > :nth-child(4) {
+    animation-delay: 0.15s;
+  }
+  .hero > :last-child {
+    animation: hero-rise 0.55s var(--ease) 0.12s both;
+  }
+  .state-panel {
+    animation: hero-rise 0.4s var(--ease) both;
+  }
+}
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.hero :deep(.ant-btn):active,
+.arena :deep(.ant-btn):active {
+  transform: translateY(1px);
 }
 </style>
