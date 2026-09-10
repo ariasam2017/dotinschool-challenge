@@ -46,12 +46,6 @@ const RULES = [
   'تا پایان زمان می‌توانی کد را ویرایش و چند بار ارسال کنی.',
 ]
 
-const HERO_FACTS = [
-  { icon: 'file-code', text: 'ادیتور جاوا ۱۷، داخل همین مرورگر' },
-  { icon: 'clock', text: 'تایمر زندهٔ رویداد، بدون توقف' },
-  { icon: 'shield', text: 'ورود امن با کد پیامکی یک‌بارمصرف' },
-]
-
 function resetCode() {
   code.value = STARTER_CODE
 }
@@ -229,15 +223,12 @@ function confirmExit() {
     </header>
 
     <main class="u-main" :class="{ 'u-main--auth': !user }">
-      <!-- not signed in — asymmetric split: value prop on one side, auth card on
-           the other. .hero / .hero-copy / .hero-sub class names are kept because
-           the admin Design Studio targets them (lib/appearance.ts). -->
+      <!-- not signed in: auth card, then the one-line headline beneath it.
+           .hero / .hero-copy / .hero-sub class names are kept because the admin
+           Design Studio targets them (lib/appearance.ts). -->
       <section v-if="!user" class="hero">
+        <AuthPanel @authed="onAuthed" />
         <div class="hero-copy">
-          <p class="hero-kicker">
-            <span class="hero-kicker-mark"><AppIcon name="code" :size="13" /></span>
-            چالش برنامه‌نویسی داتین
-          </p>
           <h1>{{ appearanceText.heroTitle || 'سوال را ببین. کد را بزن. ارسال کن.' }}</h1>
           <p
             v-if="appearanceText.heroSubtitle && appearanceText.heroShowSubtitle"
@@ -245,17 +236,7 @@ function confirmExit() {
           >
             {{ appearanceText.heroSubtitle }}
           </p>
-          <p v-else class="hero-sub">
-            برای دیدن سوالِ چالش با شماره موبایلت ثبت‌نام کن. ادیتور جاوا و تایمر رویداد همین‌جاست.
-          </p>
-          <ul class="hero-facts">
-            <li v-for="f in HERO_FACTS" :key="f.text">
-              <AppIcon :name="f.icon" :size="16" />
-              <span>{{ f.text }}</span>
-            </li>
-          </ul>
         </div>
-        <AuthPanel @authed="onAuthed" />
       </section>
 
       <!-- signed in — the screen always follows the live event state. Wrapped in
@@ -545,109 +526,44 @@ function confirmExit() {
   overflow: hidden;
 }
 
-/* ---- signed-out: asymmetric editorial split (value prop | auth card) ---- */
+/* ---- signed-out: auth card, then the one-line headline beneath it ---- */
 .hero {
-  display: grid;
-  gap: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
   width: 100%;
-  max-width: 460px;
+  max-width: 480px;
   margin: auto;
 }
 .hero > * {
+  width: 100%;
   min-width: 0;
 }
 .hero-copy {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.hero-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  align-self: start;
-  margin: 0;
-  padding: 5px 12px 5px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  font-size: 0.74rem;
-  font-weight: 600;
-  color: var(--text-dim);
-}
-.hero-kicker-mark {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-pill);
-  background: var(--primary);
-  color: var(--on-primary);
+  text-align: center;
 }
 .hero-copy h1 {
   margin: 0;
-  font-size: clamp(1.5rem, 6vw, 1.9rem);
+  font-size: clamp(1.25rem, 4.5vw, 1.55rem);
   font-weight: 800;
-  line-height: 1.35;
+  line-height: 1.5;
   letter-spacing: -0.01em;
   text-wrap: balance;
 }
 .hero-sub {
-  margin: 0;
-  max-width: 42ch;
+  margin: var(--space-2) 0 0;
   color: var(--text-dim);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   line-height: 1.9;
 }
-.hero-facts {
-  list-style: none;
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.hero-facts li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.85rem;
-  color: var(--text-dim);
-}
-.hero-facts li :deep(.app-icon) {
-  color: var(--primary-bright);
-  flex: none;
-}
-@media (min-width: 900px) {
-  .hero {
-    grid-template-columns: 1.05fr 0.95fr;
-    align-items: center;
-    gap: clamp(var(--space-6), 6vw, 72px);
-    max-width: 940px;
-  }
-  .hero-copy {
-    gap: var(--space-4);
-  }
-  .hero-copy h1 {
-    font-size: clamp(1.9rem, 3.4vw, 2.6rem);
-    line-height: 1.3;
-  }
-  .hero-sub {
-    font-size: 1rem;
-  }
-}
-@media (max-width: 899px) {
-  .u-main--auth .hero-facts {
-    display: none;
-  }
-}
-@media (max-height: 720px) and (max-width: 899px) {
-  .u-main--auth .hero-kicker {
-    display: none;
+@media (max-height: 680px) {
+  .u-main--auth .hero {
+    gap: var(--space-3);
   }
   .u-main--auth .hero-copy h1 {
-    font-size: 1.3rem;
-    line-height: 1.3;
+    font-size: 1.15rem;
+    line-height: 1.4;
   }
 }
 /* ---- event-state screens (not started / countdown / paused / ended) ----
@@ -957,20 +873,11 @@ function confirmExit() {
 /* ---- motion layer (MOTION_INTENSITY 6): entrance choreography + tactile
    press. Everything here is decorative and collapses under reduced-motion. ---- */
 @media (prefers-reduced-motion: no-preference) {
-  .hero-copy > * {
+  .hero > :first-child {
     animation: hero-rise 0.5s var(--ease) both;
   }
-  .hero-copy > :nth-child(2) {
-    animation-delay: 0.05s;
-  }
-  .hero-copy > :nth-child(3) {
-    animation-delay: 0.1s;
-  }
-  .hero-copy > :nth-child(4) {
-    animation-delay: 0.15s;
-  }
-  .hero > :last-child {
-    animation: hero-rise 0.55s var(--ease) 0.12s both;
+  .hero > .hero-copy {
+    animation: hero-rise 0.5s var(--ease) 0.08s both;
   }
   .state-panel {
     animation: hero-rise 0.4s var(--ease) both;
