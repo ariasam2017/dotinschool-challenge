@@ -210,7 +210,7 @@ async function submit() {
 
 <style scoped>
 .auth {
-  max-width: min(460px, 100%);
+  max-width: min(480px, 100%);
   width: 100%;
   margin: 0 auto;
 }
@@ -274,5 +274,22 @@ async function submit() {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-5px); }
   75% { transform: translateX(5px); }
+}
+
+/* Genuinely short screens only — a gentle nudge so the form still fits without
+   a page scroll. The comfortable layout above is unchanged on normal screens. */
+@media (max-height: 680px) {
+  .auth :deep(.stack) {
+    gap: var(--space-3);
+  }
+  .auth-tabs {
+    margin-bottom: var(--space-3);
+  }
+  .auth-lead {
+    margin-bottom: var(--space-3);
+  }
+  .auth-hint {
+    display: none;
+  }
 }
 </style>

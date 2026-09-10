@@ -222,7 +222,7 @@ function confirmExit() {
       <ThemeToggle />
     </header>
 
-    <main class="u-main">
+    <main class="u-main" :class="{ 'u-main--auth': !user }">
       <!-- not signed in -->
       <section v-if="!user" class="hero">
         <div class="hero-copy">
@@ -499,6 +499,44 @@ function confirmExit() {
     padding: var(--space-6) var(--space-5) var(--space-8);
   }
 }
+/* Signed-out screen (hero + login/registration form): fit inside the visible
+   viewport so the page itself never scrolls. `margin:auto` keeps the block
+   centred but leaves the top reachable if it ever does overflow on a very
+   short screen; the auth card scrolls inside itself only as a last resort. */
+.u-main--auth {
+  min-height: 0;
+  height: calc(100dvh - var(--header-h));
+  display: flex;
+  flex-direction: column;
+  padding-block: var(--space-4);
+  overflow-y: auto;
+}
+.u-main--auth .hero {
+  margin: auto;
+  gap: var(--space-4);
+  padding-top: 0;
+}
+.u-main--auth .hero-sub {
+  display: none;
+}
+.u-main--auth .hero-copy h1 {
+  margin: 0;
+  white-space: normal;
+  font-size: clamp(1.1rem, 3vw, 1.4rem);
+  line-height: 1.4;
+}
+@media (max-height: 680px) {
+  .u-main--auth {
+    padding-block: var(--space-2);
+  }
+  .u-main--auth .hero {
+    gap: var(--space-3);
+  }
+  .u-main--auth .hero-copy h1 {
+    font-size: 1.05rem;
+    line-height: 1.3;
+  }
+}
 .u-header {
   overflow: hidden;
 }
@@ -526,7 +564,7 @@ function confirmExit() {
   .hero {
     gap: var(--space-6);
     padding-top: var(--space-6);
-    max-width: 480px;
+    max-width: 500px;
   }
   .hero-copy h1 {
     white-space: normal;
