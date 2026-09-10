@@ -10,6 +10,8 @@
    -none layer (skill §6.E) so it costs nothing on scroll.
    ============================================================================= */
 
+/* LIGHT (bare :root): a clean, low-strain backdrop — one soft brand glow in a
+   corner over a barely-there neutral wash. No green cast across the whole page. */
 .auth-ambient {
   position: fixed;
   inset: 0;
@@ -17,15 +19,11 @@
   pointer-events: none;
   overflow: hidden;
   background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary) 3%, transparent), transparent 42%),
     radial-gradient(
-      62rem 42rem at 84% -12%,
-      color-mix(in srgb, var(--primary-bright) 10%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      48rem 40rem at 4% 112%,
-      color-mix(in srgb, var(--primary) 12%, transparent),
-      transparent 66%
+      56rem 40rem at 88% -18%,
+      color-mix(in srgb, var(--primary) 7%, transparent),
+      transparent 72%
     );
 }
 .auth-ambient::before {
@@ -34,13 +32,13 @@
   inset: 0;
   background-image: radial-gradient(
     circle at 1px 1px,
-    color-mix(in srgb, var(--text) 7%, transparent) 1px,
+    color-mix(in srgb, var(--text) 4%, transparent) 1px,
     transparent 0
   );
-  background-size: 30px 30px;
-  -webkit-mask-image: radial-gradient(78% 60% at 50% 38%, #000, transparent 80%);
-  mask-image: radial-gradient(78% 60% at 50% 38%, #000, transparent 80%);
-  opacity: 0.55;
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(76% 58% at 50% 36%, #000, transparent 82%);
+  mask-image: radial-gradient(76% 58% at 50% 36%, #000, transparent 82%);
+  opacity: 0.5;
 }
 
 /* the centred stage that holds the plate */
@@ -52,13 +50,50 @@
   padding: var(--space-5);
 }
 
-/* the elevated card */
+/* the elevated card — LIGHT: crisp edge + a real contact shadow so the white
+   card separates cleanly from the near-white page. */
 .auth-plate {
   position: relative;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-strong);
   background: var(--surface);
-  box-shadow: var(--shadow-3);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 14px 36px -10px rgba(15, 23, 42, 0.16);
+}
+
+/* ---- form fields inside the plate: one clear, legible treatment in both
+   themes. Ant Design inputs render their own DOM, so target them globally. ---- */
+.auth-plate .ant-input,
+.auth-plate .ant-input-affix-wrapper,
+.auth-plate .ant-input-password {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+.auth-plate .ant-input-affix-wrapper > .ant-input {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.auth-plate .ant-input::placeholder,
+.auth-plate .ant-input-affix-wrapper .ant-input::placeholder {
+  color: var(--text-faint);
+}
+.auth-plate .ant-input:hover,
+.auth-plate .ant-input-affix-wrapper:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border-strong));
+}
+.auth-plate .ant-input:focus,
+.auth-plate .ant-input-focused,
+.auth-plate .ant-input-affix-wrapper-focused {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
+  outline: none;
 }
 
 /* dimensional brand square */

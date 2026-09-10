@@ -140,8 +140,8 @@ async function submit() {
 }
 .login-sub {
   margin: 0;
-  font-size: 0.8rem;
-  color: var(--text-faint);
+  font-size: 0.82rem;
+  color: var(--text-dim);
 }
 .brand-mark {
   width: 48px;
@@ -202,10 +202,13 @@ async function submit() {
   border-top: 1px solid var(--border);
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--text-faint);
+  color: var(--text-dim);
   transition: color var(--dur) var(--ease);
 }
 .login-back:hover {
+  color: var(--primary-bright);
+}
+.login-back :deep(.app-icon) {
   color: var(--primary-bright);
 }
 

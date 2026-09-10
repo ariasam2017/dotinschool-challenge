@@ -201,7 +201,7 @@ async function submit() {
         {{ mode === 'register' ? 'ثبت‌نام و مشاهده چالش' : 'ورود' }}
       </a-button>
 
-      <p class="auth-hint faint">
+      <p class="auth-hint">
         نشستت روی این مرورگر سپرده می‌شود؛ دفعهٔ بعد بدون کد وارد می‌شوی.
       </p>
     </form>
@@ -270,8 +270,10 @@ async function submit() {
   font-size: 1.15rem;
 }
 .auth-hint {
-  font-size: 0.72rem;
+  font-size: 0.74rem;
+  line-height: 1.9;
   margin: 0;
+  color: var(--text-dim);
 }
 .shake {
   animation: shake 0.4s var(--ease);
