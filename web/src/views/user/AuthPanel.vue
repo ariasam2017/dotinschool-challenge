@@ -10,14 +10,10 @@ import AppIcon from '@/components/AppIcon.vue'
 const emit = defineEmits<{ authed: [status: string] }>()
 const store = useParticipantStore()
 
-const DEFAULT_NOTE = 'نشستت روی این مرورگر سپرده می‌شود؛ دفعهٔ بعد بدون کد وارد می‌شوی.'
-// admin can retext this (Design Studio → محتوا → «یادداشت زیر فرم») or hide it
-// entirely by setting it to a single dash.
-const authNote = computed(() => {
-  const n = appearanceText.heroNote.trim()
-  if (n === '-' || n === '‑') return ''
-  return n || DEFAULT_NOTE
-})
+// The small line under the sign-in buttons. Fully admin-controlled from the
+// Design Studio (هیرو → «یادداشت زیر فرم»): whatever is typed shows verbatim,
+// an empty field hides the line. No built-in fallback, so the preview is 1:1.
+const authNote = computed(() => appearanceText.heroNote.trim())
 
 type Mode = 'register' | 'login'
 const mode = ref<Mode>('register')

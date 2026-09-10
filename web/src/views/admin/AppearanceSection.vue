@@ -615,7 +615,7 @@ function doRevert(): void {
         fromAppearance(draft)
         savedDraftJson.value = currentJson.value
         publishedJson.value = savedDraftJson.value
-        schedulePush()
+        reloadPreview()
         message.success('به نسخه‌ی منتشرشده برگشت')
       } catch (e) {
         message.error(e instanceof Error ? e.message : 'عملیات ناموفق بود')
@@ -637,7 +637,7 @@ function doReset(): void {
         fromAppearance({})
         savedDraftJson.value = currentJson.value
         publishedJson.value = "{}"
-        schedulePush()
+        reloadPreview()
         message.success('به طراحی پیش‌فرض بازگشت')
       } catch (e) {
         message.error(e instanceof Error ? e.message : 'بازنشانی ناموفق بود')
@@ -838,7 +838,7 @@ onBeforeUnmount(() => {
                     <span class="row-ctl">
                       <a-textarea v-model:value="form.hero.note" size="small" :rows="2"
                         placeholder="نشستت روی این مرورگر سپرده می‌شود؛ دفعهٔ بعد بدون کد وارد می‌شوی." allow-clear />
-                      <span class="css-hint faint">خطِ کوچکِ زیر دکمه‌های ورود/ثبت‌نام. برای حذفِ کامل، یک خط تیره «-» بگذار.</span>
+                      <span class="css-hint faint">خطِ کوچکِ زیر دکمه‌های ورود/ثبت‌نام. خالی بگذار تا اصلاً نمایش داده نشود.</span>
                     </span>
                   </label>
                   <label class="row">
