@@ -46,11 +46,9 @@ async function submit() {
     <div class="login-top"><ThemeToggle /></div>
     <div class="login-card auth-plate">
       <div class="login-head">
-        <span class="brand-mark auth-brandmark"><AppIcon name="shield" :size="20" /></span>
-        <div>
-          <h1>پنل مدیریت داتین‌اسکول</h1>
-          <p class="login-sub">ورود مدیر برای اداره‌ی چالش</p>
-        </div>
+        <span class="brand-mark auth-brandmark"><AppIcon name="shield" :size="22" /></span>
+        <h1>پنل مدیریت داتین‌اسکول</h1>
+        <p class="login-sub">ورود مدیر برای اداره‌ی چالش</p>
       </div>
 
       <a-alert
@@ -121,31 +119,35 @@ async function submit() {
 }
 .login-card {
   width: 100%;
-  max-width: 430px;
+  max-width: 424px;
   padding: clamp(var(--space-5), 5vw, var(--space-7));
 }
+/* centred header stack: mark, title, sub — reads clean in RTL */
 .login-head {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
+  text-align: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
 }
 .login-head h1 {
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   font-weight: 800;
   letter-spacing: -0.01em;
-  line-height: 1.4;
+  line-height: 1.45;
   margin: 0;
 }
 .login-sub {
-  margin: 3px 0 0;
+  margin: 0;
   font-size: 0.8rem;
   color: var(--text-faint);
 }
 .brand-mark {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   flex: none;
+  margin-bottom: 2px;
 }
 .field {
   display: flex;
@@ -167,14 +169,17 @@ async function submit() {
 .login-card :deep(.ant-btn):active {
   transform: translateY(1px);
 }
+.login-card :deep(.stack) {
+  gap: var(--space-4);
+}
 .login-features {
   list-style: none;
   margin: var(--space-5) 0 0;
-  padding: var(--space-4) 0 0;
+  padding: var(--space-5) 0 0;
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 11px;
 }
 .login-features li {
   display: flex;
@@ -188,11 +193,15 @@ async function submit() {
   flex: none;
 }
 .login-back {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: var(--space-4);
+  justify-content: center;
+  gap: 5px;
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
   font-size: 0.78rem;
+  font-weight: 600;
   color: var(--text-faint);
   transition: color var(--dur) var(--ease);
 }

@@ -25,6 +25,13 @@ const eStore = useEventStore()
 const { user } = storeToRefs(pStore)
 const { challenge, state: eventState, remainMs, startsInMs, canCompete } = storeToRefs(eStore)
 
+// Inside the admin Design Studio the panel renders in a short preview iframe
+// (/?preview=1). There, the fit-to-viewport lock on the signed-out screen would
+// push the headline and tabs out of view; let it flow top-down instead so every
+// editable element is visible without scrolling.
+const isPreview =
+  typeof location !== 'undefined' && new URLSearchParams(location.search).has('preview')
+
 const booted = ref(false)
 const code = ref(STARTER_CODE)
 const submitState = ref<'idle' | 'submitting' | 'submitted' | 'error'>('idle')
@@ -222,7 +229,7 @@ function confirmExit() {
       <ThemeToggle />
     </header>
 
-    <main class="u-main" :class="{ 'u-main--auth': !user }">
+    <main class="u-main" :class="{ 'u-main--auth': !user && !isPreview }">
       <!-- not signed in: auth card, then the one-line headline beneath it.
            .hero / .hero-copy / .hero-sub class names are kept because the admin
            Design Studio targets them (lib/appearance.ts). -->
@@ -535,7 +542,12 @@ function confirmExit() {
   gap: var(--space-4);
   width: 100%;
   max-width: 480px;
-  margin: auto;
+  margin-inline: auto;
+}
+/* only the viewport-locked screen centres vertically; in the Design Studio
+   preview the hero flows from the top so nothing is scrolled off. */
+.u-main--auth .hero {
+  margin-block: auto;
 }
 .hero > * {
   width: 100%;
