@@ -41,14 +41,15 @@ async function submit() {
 </script>
 
 <template>
-  <div class="login-shell">
+  <div class="login-shell auth-scene">
+    <div class="auth-ambient" aria-hidden="true" />
     <div class="login-top"><ThemeToggle /></div>
-    <div class="login-card card">
+    <div class="login-card auth-plate">
       <div class="login-head">
-        <span class="brand-mark"><AppIcon name="shield" :size="20" /></span>
+        <span class="brand-mark auth-brandmark"><AppIcon name="shield" :size="20" /></span>
         <div>
-          <h1>پنل مدیریت dotinschool</h1>
-          <p class="faint">برای ادامه وارد شوید</p>
+          <h1>پنل مدیریت داتین‌اسکول</h1>
+          <p class="login-sub">ورود مدیر برای اداره‌ی چالش</p>
         </div>
       </div>
 
@@ -112,41 +113,38 @@ async function submit() {
 </template>
 
 <style scoped>
-.login-shell {
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding: var(--space-5);
-  position: relative;
-}
 .login-top {
   position: absolute;
   top: var(--space-5);
   inset-inline-end: var(--space-5);
+  z-index: 1;
 }
 .login-card {
   width: 100%;
-  max-width: 420px;
-  padding: var(--space-6);
+  max-width: 430px;
+  padding: clamp(var(--space-5), 5vw, var(--space-7));
 }
 .login-head {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4);
   margin-bottom: var(--space-5);
 }
 .login-head h1 {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
   margin: 0;
 }
+.login-sub {
+  margin: 3px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-faint);
+}
 .brand-mark {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: var(--primary);
-  color: var(--on-primary);
+  width: 44px;
+  height: 44px;
   flex: none;
 }
 .field {
@@ -166,24 +164,28 @@ async function submit() {
   display: grid;
   place-items: center;
 }
+.login-card :deep(.ant-btn):active {
+  transform: translateY(1px);
+}
 .login-features {
   list-style: none;
-  margin: var(--space-4) 0 0;
+  margin: var(--space-5) 0 0;
   padding: var(--space-4) 0 0;
   border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .login-features li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.76rem;
+  gap: 10px;
+  font-size: 0.77rem;
   color: var(--text-dim);
 }
 .login-features li :deep(.app-icon) {
   color: var(--primary-bright);
+  flex: none;
 }
 .login-back {
   display: inline-flex;
@@ -192,8 +194,25 @@ async function submit() {
   margin-top: var(--space-4);
   font-size: 0.78rem;
   color: var(--text-faint);
+  transition: color var(--dur) var(--ease);
 }
 .login-back:hover {
-  color: var(--text);
+  color: var(--primary-bright);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .login-card {
+    animation: login-rise 0.5s var(--ease) both;
+  }
+}
+@keyframes login-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 </style>

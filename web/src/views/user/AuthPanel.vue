@@ -214,11 +214,6 @@ async function submit() {
   width: 100%;
   margin: 0 auto;
 }
-/* the card carries the split's visual weight: raised, larger radius */
-.auth.card {
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-2);
-}
 .auth-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;

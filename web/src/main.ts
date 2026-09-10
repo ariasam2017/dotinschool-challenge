@@ -11,6 +11,7 @@ import 'ant-design-vue/dist/reset.css'
 import './styles/fonts.css'
 import './styles/tokens.css'
 import './styles/base.css'
+import './styles/auth.css'
 
 applyTheme()
 initAppearanceBridge()

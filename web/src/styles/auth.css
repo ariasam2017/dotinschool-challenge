@@ -1,0 +1,132 @@
+/* =============================================================================
+   Login "scene" — shared by the participant sign-in (views/user) and the admin
+   sign-in (views/admin/AdminLogin.vue).
+
+   A quiet, dimensional backdrop (brand-emerald radial ambient + a hairline dot
+   grid) behind an elevated plate. Calibrated against design-taste-frontend:
+   one accent only (brand #006839), no neon outer glow, no pure black, shadows
+   tinted to the background hue, and a genuinely considered dark mode rather
+   than an inverted light one. The ambient is a single fixed, pointer-events
+   -none layer (skill §6.E) so it costs nothing on scroll.
+   ============================================================================= */
+
+.auth-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      62rem 42rem at 84% -12%,
+      color-mix(in srgb, var(--primary-bright) 10%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      48rem 40rem at 4% 112%,
+      color-mix(in srgb, var(--primary) 12%, transparent),
+      transparent 66%
+    );
+}
+.auth-ambient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in srgb, var(--text) 7%, transparent) 1px,
+    transparent 0
+  );
+  background-size: 30px 30px;
+  -webkit-mask-image: radial-gradient(78% 60% at 50% 38%, #000, transparent 80%);
+  mask-image: radial-gradient(78% 60% at 50% 38%, #000, transparent 80%);
+  opacity: 0.55;
+}
+
+/* the centred stage that holds the plate */
+.auth-scene {
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+}
+
+/* the elevated card */
+.auth-plate {
+  position: relative;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-3);
+}
+
+/* dimensional brand square */
+.auth-brandmark {
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: linear-gradient(150deg, var(--primary-hover), var(--primary));
+  color: var(--on-primary);
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--primary) 55%, transparent);
+}
+
+/* ---- dark: the "special" pass. The plate lifts a touch toward the brand hue,
+   carries a faint emerald rim light and a top inner highlight for a real edge,
+   and the ambient deepens. Same 3-state guard pattern as tokens.css. ---- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .auth-ambient {
+    background:
+      radial-gradient(
+        64rem 44rem at 84% -14%,
+        color-mix(in srgb, var(--primary-bright) 16%, transparent),
+        transparent 68%
+      ),
+      radial-gradient(
+        52rem 42rem at 2% 114%,
+        color-mix(in srgb, var(--primary) 22%, transparent),
+        transparent 64%
+      ),
+      radial-gradient(90rem 70rem at 50% 50%, transparent 40%, color-mix(in srgb, #000 32%, transparent));
+  }
+  :root:not([data-theme='light']) .auth-plate {
+    background: color-mix(in srgb, var(--surface) 90%, var(--primary-bright) 10%);
+    border-color: color-mix(in srgb, var(--primary-bright) 14%, var(--border-strong));
+    box-shadow:
+      0 1px 0 0 color-mix(in srgb, var(--primary-bright) 16%, transparent) inset,
+      0 0 0 1px color-mix(in srgb, var(--primary-bright) 5%, transparent),
+      var(--shadow-3);
+  }
+  :root:not([data-theme='light']) .auth-brandmark {
+    box-shadow:
+      0 1px 0 0 color-mix(in srgb, #fff 20%, transparent) inset,
+      0 10px 24px -10px color-mix(in srgb, var(--primary-bright) 42%, transparent);
+  }
+}
+:root[data-theme='dark'] .auth-ambient {
+  background:
+    radial-gradient(
+      64rem 44rem at 84% -14%,
+      color-mix(in srgb, var(--primary-bright) 16%, transparent),
+      transparent 68%
+    ),
+    radial-gradient(
+      52rem 42rem at 2% 114%,
+      color-mix(in srgb, var(--primary) 22%, transparent),
+      transparent 64%
+    ),
+    radial-gradient(90rem 70rem at 50% 50%, transparent 40%, color-mix(in srgb, #000 32%, transparent));
+}
+:root[data-theme='dark'] .auth-plate {
+  background: color-mix(in srgb, var(--surface) 90%, var(--primary-bright) 10%);
+  border-color: color-mix(in srgb, var(--primary-bright) 14%, var(--border-strong));
+  box-shadow:
+    0 1px 0 0 color-mix(in srgb, var(--primary-bright) 16%, transparent) inset,
+    0 0 0 1px color-mix(in srgb, var(--primary-bright) 5%, transparent),
+    var(--shadow-3);
+}
+:root[data-theme='dark'] .auth-brandmark {
+  box-shadow:
+    0 1px 0 0 color-mix(in srgb, #fff 20%, transparent) inset,
+    0 10px 24px -10px color-mix(in srgb, var(--primary-bright) 42%, transparent);
+}

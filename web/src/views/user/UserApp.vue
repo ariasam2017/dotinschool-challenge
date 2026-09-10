@@ -227,6 +227,7 @@ function confirmExit() {
            .hero / .hero-copy / .hero-sub class names are kept because the admin
            Design Studio targets them (lib/appearance.ts). -->
       <section v-if="!user" class="hero">
+        <div class="auth-ambient" aria-hidden="true" />
         <div class="hero-copy">
           <h1>{{ appearanceText.heroTitle || 'سوال را ببین. کد را بزن. ارسال کن.' }}</h1>
           <p
@@ -236,7 +237,7 @@ function confirmExit() {
             {{ appearanceText.heroSubtitle }}
           </p>
         </div>
-        <AuthPanel @authed="onAuthed" />
+        <AuthPanel class="auth-plate" @authed="onAuthed" />
       </section>
 
       <!-- signed in — the screen always follows the live event state. Wrapped in
