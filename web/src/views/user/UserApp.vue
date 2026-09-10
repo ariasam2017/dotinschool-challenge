@@ -227,7 +227,6 @@ function confirmExit() {
            .hero / .hero-copy / .hero-sub class names are kept because the admin
            Design Studio targets them (lib/appearance.ts). -->
       <section v-if="!user" class="hero">
-        <AuthPanel @authed="onAuthed" />
         <div class="hero-copy">
           <h1>{{ appearanceText.heroTitle || 'سوال را ببین. کد را بزن. ارسال کن.' }}</h1>
           <p
@@ -237,6 +236,7 @@ function confirmExit() {
             {{ appearanceText.heroSubtitle }}
           </p>
         </div>
+        <AuthPanel @authed="onAuthed" />
       </section>
 
       <!-- signed in — the screen always follows the live event state. Wrapped in
@@ -873,10 +873,10 @@ function confirmExit() {
 /* ---- motion layer (MOTION_INTENSITY 6): entrance choreography + tactile
    press. Everything here is decorative and collapses under reduced-motion. ---- */
 @media (prefers-reduced-motion: no-preference) {
-  .hero > :first-child {
+  .hero > .hero-copy {
     animation: hero-rise 0.5s var(--ease) both;
   }
-  .hero > .hero-copy {
+  .hero > .auth {
     animation: hero-rise 0.5s var(--ease) 0.08s both;
   }
   .state-panel {
