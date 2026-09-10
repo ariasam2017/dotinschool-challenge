@@ -47,7 +47,7 @@ async function submit() {
     <div class="login-card auth-plate">
       <div class="login-head">
         <span class="brand-mark auth-brandmark"><AppIcon name="shield" :size="22" /></span>
-        <h1>پنل مدیریت داتین‌اسکول</h1>
+        <h1>پنل مدیریت چالش مدرسه داتین</h1>
         <p class="login-sub">ورود مدیر برای اداره‌ی چالش</p>
       </div>
 
