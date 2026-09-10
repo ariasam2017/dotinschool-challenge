@@ -37,6 +37,7 @@ export interface Challenge {
 export interface HeroAppearance {
   title?: string
   subtitle?: string
+  note?: string
   showSubtitle?: boolean
   align?: '' | 'start' | 'center' | 'end'
   background?: string

@@ -134,6 +134,7 @@ func sanitizeAppearance(a *model.Appearance) error {
 	h := &a.Sections.Hero
 	h.Title = clipRunes(strings.TrimSpace(h.Title), appearanceMaxText)
 	h.Subtitle = clipRunes(strings.TrimSpace(h.Subtitle), appearanceMaxText)
+	h.Note = clipRunes(strings.TrimSpace(h.Note), appearanceMaxText)
 	if !appearanceAligns[h.Align] {
 		h.Align = ""
 	}

@@ -109,6 +109,7 @@ type AppearanceSections struct {
 type HeroSection struct {
 	Title        string `json:"title,omitempty"`
 	Subtitle     string `json:"subtitle,omitempty"`
+	Note         string `json:"note,omitempty"` // small line under the sign-in form
 	ShowSubtitle *bool  `json:"showSubtitle,omitempty"`
 	Align        string `json:"align,omitempty"`      // "" | start | center | end
 	Background   string `json:"background,omitempty"` // css color / gradient

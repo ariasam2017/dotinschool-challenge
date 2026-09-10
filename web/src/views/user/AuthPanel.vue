@@ -4,10 +4,20 @@ import { message } from 'ant-design-vue'
 import { requestOtp, ApiError } from '@/api/client'
 import { useParticipantStore } from '@/stores/participant'
 import { toFa } from '@/lib/fa'
+import { appearanceText } from '@/lib/appearance'
 import AppIcon from '@/components/AppIcon.vue'
 
 const emit = defineEmits<{ authed: [status: string] }>()
 const store = useParticipantStore()
+
+const DEFAULT_NOTE = 'نشستت روی این مرورگر سپرده می‌شود؛ دفعهٔ بعد بدون کد وارد می‌شوی.'
+// admin can retext this (Design Studio → محتوا → «یادداشت زیر فرم») or hide it
+// entirely by setting it to a single dash.
+const authNote = computed(() => {
+  const n = appearanceText.heroNote.trim()
+  if (n === '-' || n === '‑') return ''
+  return n || DEFAULT_NOTE
+})
 
 type Mode = 'register' | 'login'
 const mode = ref<Mode>('register')
@@ -201,9 +211,7 @@ async function submit() {
         {{ mode === 'register' ? 'ثبت‌نام و مشاهده چالش' : 'ورود' }}
       </a-button>
 
-      <p class="auth-hint">
-        نشستت روی این مرورگر سپرده می‌شود؛ دفعهٔ بعد بدون کد وارد می‌شوی.
-      </p>
+      <p v-if="authNote" class="auth-hint">{{ authNote }}</p>
     </form>
   </div>
 </template>

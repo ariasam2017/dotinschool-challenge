@@ -17,11 +17,13 @@ export const appearanceText = reactive<{
   heroTitle: string
   heroSubtitle: string
   heroShowSubtitle: boolean
+  heroNote: string
   brand: string
 }>({
   heroTitle: '',
   heroSubtitle: '',
   heroShowSubtitle: true,
+  heroNote: '',
   brand: '',
 })
 
@@ -197,6 +199,7 @@ export function applyAppearance(a: Appearance | null | undefined): void {
   appearanceText.heroTitle = (hero?.title ?? '').trim()
   appearanceText.heroSubtitle = (hero?.subtitle ?? '').trim()
   appearanceText.heroShowSubtitle = hero?.showSubtitle !== false
+  appearanceText.heroNote = (hero?.note ?? '').trim()
   appearanceText.brand = (a?.sections?.header?.brand ?? '').trim()
 
   setTextReplacements(a?.texts)

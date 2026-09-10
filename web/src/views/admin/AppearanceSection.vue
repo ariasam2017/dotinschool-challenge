@@ -64,6 +64,7 @@ const form = reactive({
   hero: {
     title: '',
     subtitle: '',
+    note: '',
     showSubtitle: true,
     align: '' as '' | 'start' | 'center' | 'end',
     background: '',
@@ -303,6 +304,7 @@ function toAppearance(): Appearance {
   const hero: HeroAppearance = {}
   if (form.hero.title.trim()) hero.title = form.hero.title.trim()
   if (form.hero.subtitle.trim()) hero.subtitle = form.hero.subtitle.trim()
+  if (form.hero.note.trim()) hero.note = form.hero.note.trim()
   if (!form.hero.showSubtitle) hero.showSubtitle = false
   if (form.hero.align) hero.align = form.hero.align
   if (form.hero.background.trim()) hero.background = form.hero.background.trim()
@@ -374,6 +376,7 @@ function fromAppearance(a?: Appearance): void {
   const h = a?.sections?.hero || {}
   form.hero.title = h.title || ''
   form.hero.subtitle = h.subtitle || ''
+  form.hero.note = h.note || ''
   form.hero.showSubtitle = h.showSubtitle !== false
   form.hero.align = (h.align as typeof form.hero.align) || ''
   form.hero.background = h.background || ''
@@ -829,6 +832,13 @@ onBeforeUnmount(() => {
                   <label class="row">
                     <span class="row-lbl">نمایش زیرعنوان</span>
                     <span class="row-ctl"><a-switch v-model:checked="form.hero.showSubtitle" /></span>
+                  </label>
+                  <label class="row">
+                    <span class="row-lbl">یادداشت زیر فرم</span>
+                    <span class="row-ctl">
+                      <a-textarea v-model:value="form.hero.note" size="small" :rows="2"
+                        placeholder="نشستت روی این مرورگر سپرده می‌شود؛ دفعهٔ بعد بدون کد وارد می‌شوی." allow-clear />
+                    </span>
                   </label>
                   <label class="row">
                     <span class="row-lbl">ترازبندی متن</span>
