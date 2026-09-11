@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted } from 'vue'
 import { useAdminStore } from '@/stores/admin'
-import { ApiError, getConfig, getVersion } from '@/api/client'
+import { ApiError, getConfig } from '@/api/client'
 import AppIcon from '@/components/AppIcon.vue'
 
 const store = useAdminStore()
@@ -10,7 +10,6 @@ const showPass = ref(false)
 const loading = ref(false)
 const error = ref('')
 const reachable = ref<boolean | null>(null)
-const version = ref('')
 
 // Proactive connectivity probe: GET /api/config is public. If it fails the
 // problem is the network/proxy/extension, not the password — say so up front so
@@ -22,9 +21,6 @@ onMounted(async () => {
   } catch {
     reachable.value = false
   }
-  getVersion()
-    .then((r) => (version.value = r.version || ''))
-    .catch(() => {})
 })
 
 async function submit() {
@@ -52,8 +48,7 @@ async function submit() {
 
     <main class="dev-panel">
       <div class="dev-brand">
-        <span class="dev-mark"><AppIcon name="shield" :size="15" /></span>
-        <span class="dev-word">داتین‌اسکول</span>
+        <span class="dev-mark"><AppIcon name="shield" :size="19" /></span>
       </div>
 
       <h1 class="dev-title">ورود به پنل مدیریت</h1>
@@ -104,7 +99,6 @@ async function submit() {
 
       <div class="dev-foot">
         <a class="dev-back" href="/">بازگشت به سامانهٔ چالش</a>
-        <span v-if="version" class="dev-version">v{{ version }}</span>
       </div>
     </main>
   </div>
@@ -147,42 +141,36 @@ async function submit() {
 .dev-panel {
   position: relative;
   width: 100%;
-  max-width: 336px;
+  max-width: 408px;
 }
 .dev-brand {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin-bottom: 28px;
+  margin-bottom: 32px;
 }
 .dev-mark {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   background: var(--brand);
   color: #fff;
   flex: none;
 }
-.dev-word {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-dim);
-}
 .dev-title {
-  margin: 0 0 6px;
-  font-size: 19px;
-  font-weight: 600;
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.4;
   text-align: center;
   color: var(--text);
 }
 .dev-sub {
-  margin: 0 0 32px;
-  font-size: 13px;
+  margin: 0 0 36px;
+  font-size: 14.5px;
   line-height: 1.7;
   text-align: center;
   color: var(--text-dim);
@@ -191,18 +179,18 @@ async function submit() {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 .stack {
-  gap: 14px;
+  gap: 17px;
 }
 .field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
 }
 .field-label {
-  font-size: 12.5px;
+  font-size: 13.7px;
   font-weight: 500;
   color: var(--text-dim);
 }
@@ -218,10 +206,10 @@ async function submit() {
 .dev-panel :deep(.ant-input-affix-wrapper) {
   background: var(--field-bg);
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 8px;
   color: var(--text);
-  height: 38px;
-  font-size: 14px;
+  height: 46px;
+  font-size: 15.5px;
 }
 .dev-panel :deep(.ant-input-affix-wrapper > .ant-input) {
   background: transparent;
@@ -242,11 +230,11 @@ async function submit() {
   box-shadow: 0 0 0 3px rgba(60, 207, 141, 0.18);
 }
 .dev-panel :deep(.ant-btn-primary) {
-  height: 38px;
+  height: 46px;
   background: var(--brand);
   border-color: var(--brand);
-  border-radius: 7px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 15.5px;
   font-weight: 600;
 }
 .dev-panel :deep(.ant-btn-primary:not(:disabled):hover) {
@@ -260,26 +248,19 @@ async function submit() {
 .dev-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 20px;
+  justify-content: center;
+  margin-top: 28px;
+  padding-top: 22px;
   border-top: 1px solid var(--line-soft);
 }
 .dev-back {
-  font-size: 12.5px;
+  font-size: 13.7px;
   font-weight: 500;
   color: var(--text-dim);
   transition: color var(--dur) var(--ease);
 }
 .dev-back:hover {
   color: var(--text);
-}
-.dev-version {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-faint);
-  direction: ltr;
 }
 
 @media (prefers-reduced-motion: no-preference) {
