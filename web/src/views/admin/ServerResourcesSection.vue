@@ -22,7 +22,7 @@ async function refreshSys() {
 }
 onMounted(() => {
   void refreshSys()
-  sysTimer = window.setInterval(refreshSys, 4000)
+  sysTimer = window.setInterval(refreshSys, 2000)
 })
 onBeforeUnmount(() => {
   if (sysTimer) clearInterval(sysTimer)
@@ -97,6 +97,7 @@ const faDec = (n: number) => toFa(String(n)).replace('.', '٫')
         <span>پردازش‌های همزمان: <b class="num">{{ toFa(sys?.go.goroutines ?? 0) }}</b></span>
         <span>حافظهٔ خودِ برنامه: <b class="num">{{ fmtBytes(sys?.go.alloc ?? 0) }}</b></span>
       </p>
+      <p class="faint hint">به‌روزرسانی خودکار هر ۲ ثانیه — همهٔ اعداد بالا همین لحظه از سرور خوانده می‌شوند.</p>
     </section>
   </div>
 </template>

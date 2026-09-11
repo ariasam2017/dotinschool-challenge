@@ -33,6 +33,7 @@
 
   --yellow-500: #eab308;
   --yellow-600: #ca8a04;
+  --yellow-700: #a16207; /* light-mode --warning text — yellow-600 is only 2.9:1 on white, fails AA */
 
   --slate-50: #f8fafc;
   --slate-100: #f1f5f9;
@@ -94,7 +95,7 @@
 
   --danger: var(--red-600);
   --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
-  --warning: var(--yellow-600);
+  --warning: var(--yellow-700);
   --warning-soft: color-mix(in srgb, var(--warning) 15%, transparent);
   --success: var(--green-800);
   --success-soft: color-mix(in srgb, var(--success) 12%, transparent);

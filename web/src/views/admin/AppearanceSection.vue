@@ -431,9 +431,14 @@ const activeTab = ref('settings')
 const previewSrc = ref('/?preview=1')
 const iframeEl = ref<HTMLIFrameElement | null>(null)
 
-/* The preview iframe fills the pane. Which viewport it *simulates* (which
-   موبایل / دسکتاپ layer applies) is sent to it explicitly, so it never
-   depends on the iframe's real width — no zoom, scale or scrollbars. */
+/* The preview iframe fills the pane. Which override LAYER applies (موبایل /
+   دسکتاپ per-element overrides from the Studio's element picker) is sent to
+   it explicitly over postMessage, so that is independent of the iframe's
+   real width. The iframe itself is still visually scaled down to fit the
+   pane without an internal scrollbar (see .preview-frame) — that scaling
+   inflates its real DOM size first so the page's own responsive CSS keeps
+   seeing realistic desktop/mobile widths, then shrinks the result back down
+   to fit visually. */
 function sendDevice(): void {
   try {
     iframeEl.value?.contentWindow?.postMessage(
@@ -762,7 +767,7 @@ onBeforeUnmount(() => {
       <section class="panel card" :class="{ busy: loading }">
         <a-tabs v-model:activeKey="activeTab" size="small">
           <a-tab-pane key="settings" tab="تنظیمات">
-            <a-collapse :bordered="false" :default-active-key="['hero']" ghost>
+            <a-collapse :bordered="false" :default-active-key="[]" ghost>
               <a-collapse-panel key="colors" header="رنگ‌ها — حالت روشن">
                 <div class="rows">
                   <label v-for="k in COLOR_KEYS" :key="'l-' + k" class="row">
@@ -1425,22 +1430,29 @@ onBeforeUnmount(() => {
   border-radius: var(--radius);
   padding: 10px;
   overflow: hidden;
-  height: calc(100dvh - 240px);
+  height: calc(100dvh - 200px);
   display: flex;
   justify-content: center;
 }
+/* Zoomed out to a fixed scale so the whole page (hero + full form, not just
+   the fold) is visible without an internal scrollbar. The frame's own box is
+   inflated by the reciprocal of the scale first, so the page inside still
+   sees a realistic desktop/mobile width to respond to — only the visual
+   result shrinks to fit the pane. */
 .preview-frame {
   flex: none;
-  width: 100%;
-  height: 100%;
+  width: 133.34%;
+  height: 133.34%;
+  transform: scale(0.75);
+  transform-origin: top center;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
   display: block;
 }
 .preview-stage.mobile .preview-frame {
-  width: 390px;
-  max-width: 100%;
+  width: 520px;
+  max-width: 133.34%;
 }
 
 @media (max-width: 1080px) {
@@ -1451,7 +1463,7 @@ onBeforeUnmount(() => {
     position: static;
   }
   .preview-stage {
-    height: 70vh;
+    height: 75vh;
   }
 }
 </style>
