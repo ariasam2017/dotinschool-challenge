@@ -48,7 +48,10 @@ const NAV: NavGroup[] = [
   },
   {
     label: 'سامانه',
-    items: [{ name: 'admin-appearance', label: 'ظاهر و طراحی', icon: 'palette' }],
+    items: [
+      { name: 'admin-appearance', label: 'ظاهر و طراحی', icon: 'palette' },
+      { name: 'admin-resources', label: 'منابع سرور', icon: 'cpu' },
+    ],
   },
 ]
 const ALL_ITEMS = NAV.flatMap((g) => g.items)

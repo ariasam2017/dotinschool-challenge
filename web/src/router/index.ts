@@ -19,6 +19,7 @@ const adminRoutes: RouteRecordRaw[] = [
       { path: 'ai', name: 'admin-ai', component: () => import('@/views/admin/AiReviewSection.vue') },
       { path: 'assistant', name: 'admin-assistant', component: () => import('@/views/admin/CodeAssistantSection.vue') },
       { path: 'appearance', name: 'admin-appearance', component: () => import('@/views/admin/AppearanceSection.vue') },
+      { path: 'resources', name: 'admin-resources', component: () => import('@/views/admin/ServerResourcesSection.vue') },
       { path: 'errors', name: 'admin-errors', component: () => import('@/views/admin/ClientErrorsSection.vue') },
     ],
   },
