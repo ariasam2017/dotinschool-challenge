@@ -226,6 +226,17 @@ form.stack {
   border-radius: var(--radius-sm);
   color: var(--ctext);
 }
+/* The password field nests a plain .ant-input inside .ant-input-affix-wrapper
+   for the eye-icon suffix. Without this, the inner input keeps its own border
+   + radius too, so two rounded rects overlap and the field reads as a pill
+   instead of matching the plain username field exactly. */
+.page-center :deep(.ant-input-affix-wrapper > .ant-input) {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
 .page-center :deep(.ant-input::placeholder) {
   color: var(--ctext-faint);
 }
