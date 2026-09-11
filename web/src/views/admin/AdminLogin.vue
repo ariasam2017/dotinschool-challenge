@@ -44,19 +44,22 @@ async function submit() {
 </script>
 
 <template>
-  <!-- One screen, permanently dark console chrome (this login does not
-       answer the light/dark toggle — the toggle lives inside the dashboard
-       itself, once the admin is in). -->
-  <div class="console-page">
-    <header class="page-top">
-      <span class="brand-mark"><AppIcon name="shield" :size="18" /></span>
-      <span class="brand-word">داتین‌اسکول</span>
-    </header>
+  <!-- Linear / Vercel register: near-black, neutral hairlines, no card box,
+     one accent colour (the brand green) and nothing else competing for
+     attention. Permanently dark, independent of the light/dark toggle. -->
+  <div class="dev-shell">
+    <div class="dev-glow" aria-hidden="true" />
 
-    <main class="page-center">
-      <h1 class="page-title">ورود به سامانهٔ مدیریت چالش</h1>
+    <main class="dev-panel">
+      <div class="dev-brand">
+        <span class="dev-mark"><AppIcon name="shield" :size="15" /></span>
+        <span class="dev-word">داتین‌اسکول</span>
+      </div>
 
-      <div class="form-alerts">
+      <h1 class="dev-title">ورود به پنل مدیریت</h1>
+      <p class="dev-sub">برای دسترسی به کنسول مدیریت وارد شو</p>
+
+      <div class="dev-alerts">
         <a-alert
           v-if="reachable === false"
           type="error"
@@ -77,221 +80,217 @@ async function submit() {
       <form class="stack" @submit.prevent="submit">
         <label class="field">
           <span class="field-label">نام کاربری</span>
-          <a-input v-model:value="form.username" size="large" dir="ltr" autocomplete="username" />
+          <a-input v-model:value="form.username" dir="ltr" autocomplete="username" />
         </label>
         <label class="field">
           <span class="field-label">رمز عبور</span>
           <a-input
             v-model:value="form.password"
             :type="showPass ? 'text' : 'password'"
-            size="large"
             dir="ltr"
             autocomplete="current-password"
           >
             <template #suffix>
               <button type="button" class="eye" :aria-label="showPass ? 'پنهان‌کردن رمز' : 'نمایش رمز'" @click="showPass = !showPass">
-                <AppIcon :name="showPass ? 'eye-off' : 'eye'" :size="16" />
+                <AppIcon :name="showPass ? 'eye-off' : 'eye'" :size="15" />
               </button>
             </template>
           </a-input>
         </label>
-        <a-button type="primary" size="large" block html-type="submit" :loading="loading">
-          ورود به پنل مدیریت
+        <a-button type="primary" block html-type="submit" :loading="loading">
+          ورود
         </a-button>
       </form>
-    </main>
 
-    <footer class="page-foot">
-      <a class="page-back" href="/">
-        <AppIcon name="chevron-right" :size="13" />
-        بازگشت به سامانهٔ چالش
-      </a>
-      <span v-if="version" class="page-version">نسخهٔ {{ version }}</span>
-    </footer>
+      <div class="dev-foot">
+        <a class="dev-back" href="/">بازگشت به سامانهٔ چالش</a>
+        <span v-if="version" class="dev-version">v{{ version }}</span>
+      </div>
+    </main>
   </div>
 </template>
 
 <style scoped>
-/* Fixed-dark console chrome for the whole screen — not theme tokens, on
-   purpose: the login to an ops console reads the same regardless of the
-   visitor's OS light/dark preference, like a terminal. */
-.console-page {
-  --cbg: #0a1310;
-  --cline: rgba(150, 228, 190, 0.14);
-  --ctext: #eef3f0;
-  --ctext-dim: #a2b7ab;
-  --ctext-faint: #6f847a;
-  --cbright: #3ccf8d;
+.dev-shell {
+  --bg: #0a0a0b;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-soft: rgba(255, 255, 255, 0.06);
+  --text: #f2f2f3;
+  --text-dim: #8b8b8f;
+  --text-faint: #5c5c60;
+  --field-bg: rgba(255, 255, 255, 0.03);
+  /* locked brand: #006839 for solid fills, its luminous dark-mode sibling
+     #3ccf8d (same as tokens.css's --primary-bright) for rings/links, where
+     the flat fill alone would be too low-contrast on near-black. */
+  --brand: #006839;
+  --brand-strong: #0a7d4b;
+  --brand-bright: #3ccf8d;
   position: relative;
   min-height: 100dvh;
   display: flex;
-  flex-direction: column;
-  background: var(--cbg);
-  color: var(--ctext);
-  overflow: hidden;
-}
-/* structural schematic grid across the whole page — console chrome, not
-   decoration for its own sake. */
-.console-page::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(var(--cline) 1px, transparent 1px),
-    linear-gradient(90deg, var(--cline) 1px, transparent 1px);
-  background-size: 44px 44px;
-  -webkit-mask-image: radial-gradient(85% 70% at 50% 38%, #000, transparent 88%);
-  mask-image: radial-gradient(85% 70% at 50% 38%, #000, transparent 88%);
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.page-top {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: var(--space-5);
-}
-.brand-mark {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: var(--primary);
-  color: var(--on-primary);
-  flex: none;
-}
-.brand-word {
-  font-weight: 800;
-  font-size: 0.98rem;
-  letter-spacing: -0.01em;
-}
-
-.page-center {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: var(--space-5);
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
 }
-.page-title {
-  margin: 0 0 var(--space-6);
-  font-size: clamp(1.5rem, 4vw, 2rem);
-  font-weight: 800;
-  line-height: 1.4;
-  letter-spacing: -0.01em;
-  text-align: center;
-  color: var(--ctext);
+/* one soft, colourless light source above the panel — the only "atmosphere"
+   this screen allows itself. No grid, no gradient wash, no second colour. */
+.dev-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(60rem 36rem at 50% -8%, rgba(255, 255, 255, 0.07), transparent 70%);
 }
 
-.form-alerts {
+.dev-panel {
+  position: relative;
   width: 100%;
-  max-width: 380px;
+  max-width: 336px;
+}
+.dev-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+.dev-mark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--brand);
+  color: #fff;
+  flex: none;
+}
+.dev-word {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.dev-title {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--text);
+}
+.dev-sub {
+  margin: 0 0 32px;
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: center;
+  color: var(--text-dim);
+}
+.dev-alerts {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: var(--space-4);
+  margin-bottom: 20px;
 }
-form.stack {
-  width: 100%;
-  max-width: 380px;
-  gap: var(--space-4);
+.stack {
+  gap: 14px;
 }
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 .field-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--ctext-dim);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-dim);
 }
 .eye {
   border: none;
   background: transparent;
-  color: var(--ctext-faint);
+  color: var(--text-faint);
   display: grid;
   place-items: center;
 }
-.page-center :deep(.ant-input),
-.page-center :deep(.ant-input-affix-wrapper) {
-  background: #101914;
-  border: 1.5px solid var(--cline);
-  border-radius: var(--radius-sm);
-  color: var(--ctext);
+
+.dev-panel :deep(.ant-input),
+.dev-panel :deep(.ant-input-affix-wrapper) {
+  background: var(--field-bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  height: 38px;
+  font-size: 14px;
 }
-/* The password field nests a plain .ant-input inside .ant-input-affix-wrapper
-   for the eye-icon suffix. Without this, the inner input keeps its own border
-   + radius too, so two rounded rects overlap and the field reads as a pill
-   instead of matching the plain username field exactly. */
-.page-center :deep(.ant-input-affix-wrapper > .ant-input) {
+.dev-panel :deep(.ant-input-affix-wrapper > .ant-input) {
   background: transparent;
   border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  padding: 0;
+  height: auto;
 }
-.page-center :deep(.ant-input::placeholder) {
-  color: var(--ctext-faint);
+.dev-panel :deep(.ant-input::placeholder) {
+  color: var(--text-faint);
 }
-.page-center :deep(.ant-input:focus),
-.page-center :deep(.ant-input-focused),
-.page-center :deep(.ant-input-affix-wrapper-focused) {
-  border-color: var(--cbright);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cbright) 30%, transparent);
+.dev-panel :deep(.ant-input:hover),
+.dev-panel :deep(.ant-input-affix-wrapper:hover) {
+  border-color: rgba(255, 255, 255, 0.18);
 }
-.page-center :deep(.ant-btn):active {
+.dev-panel :deep(.ant-input:focus),
+.dev-panel :deep(.ant-input-focused),
+.dev-panel :deep(.ant-input-affix-wrapper-focused) {
+  border-color: var(--brand-bright);
+  box-shadow: 0 0 0 3px rgba(60, 207, 141, 0.18);
+}
+.dev-panel :deep(.ant-btn-primary) {
+  height: 38px;
+  background: var(--brand);
+  border-color: var(--brand);
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.dev-panel :deep(.ant-btn-primary:not(:disabled):hover) {
+  background: var(--brand-strong);
+  border-color: var(--brand-strong);
+}
+.dev-panel :deep(.ant-btn):active {
   transform: translateY(1px);
 }
 
-.page-foot {
-  position: relative;
+.dev-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  padding: var(--space-5);
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line-soft);
 }
-.page-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--ctext-dim);
+.dev-back {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-dim);
   transition: color var(--dur) var(--ease);
 }
-.page-back:hover {
-  color: var(--cbright);
+.dev-back:hover {
+  color: var(--text);
 }
-.page-version {
+.dev-version {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--ctext-faint);
-  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--text-faint);
+  direction: ltr;
 }
 
-/* one orchestrated entrance moment; nothing else on the page animates */
 @media (prefers-reduced-motion: no-preference) {
-  .page-title,
-  form.stack {
-    animation: page-rise 0.5s var(--ease) both;
-  }
-  form.stack {
-    animation-delay: 0.08s;
+  .dev-panel {
+    animation: dev-rise 0.4s var(--ease) both;
   }
 }
-@keyframes page-rise {
+@keyframes dev-rise {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
