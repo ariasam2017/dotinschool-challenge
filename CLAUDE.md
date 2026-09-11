@@ -19,6 +19,8 @@ go run ./cmd/server      # server only (needs web/assets/ already built)
 go run ./cmd/seed        # wipe participants + reseed ~16 demo rows + a running 90-min event
                          #   (distinct from the boot-time database.Seed, which is 7 rows + a paused event)
 make build               # web-fast + CGO_ENABLED=0 go build -> ./dotinschool
+make test                # go test ./... + frontend typecheck (needs GOARCH=amd64 prefix below)
+make tidy                # gofmt -w . + go mod tidy
 make release             # cross-compiled artifacts into dist/ (scripts/build.sh)
 make image               # Docker image (host-compile then package; scripts/docker-build.sh)
 
@@ -44,6 +46,7 @@ GOARCH=amd64 go test ./internal/service/ -run TestName -v           # a single t
 GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build ./...              # the real Docker target
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./...              # sometimes OOMs while LINKING
 gofmt -l internal/ cmd/                                             # must print nothing before committing
+GOARCH=amd64 make test                                              # `make test`/`make tidy` need the prefix too
 ```
 
 Add `GOFLAGS=-p=2` if a build/test run OOMs (the 32-bit `go` process is
@@ -102,6 +105,28 @@ action).
 - **Self-update**: `handleUpdate` runs `git fetch` + `git reset --hard origin/main`
   then `os.Exit(0)`, relying on systemd/Docker to bring the process back up (Docker
   installs print a manual command instead).
+
+### API surface & auth model
+
+Full endpoint-by-endpoint table lives in `README.md` ("قرارداد API") — this is
+the cross-file business logic that table doesn't spell out:
+
+- **`PATCH /api/participants/:id`** accepts either the admin bearer token or
+  the participant's own session token, but the two callers can't do the same
+  things: `name`/`aiScore` are admin-only, and a `status` transition to
+  `started`/`submitted` is honored **only while the event is live** — the
+  server enforces this itself (`handlePatchParticipant` in
+  `handlers_participants.go`), ignoring a client-sent status otherwise, so the
+  frontend's own state never has to be trusted.
+- **Sessions**: admin bearer token lives 12h server-side in memory (not a
+  JWT); participant session token is sliding 30 days. Both the admin password
+  and OTP checks are timing-safe comparisons.
+- **OTP**: 5-digit code, 2-minute TTL, 60s resend cooldown, 5 verify attempts.
+- Sensitive routes (login, OTP request, AI review, client-error reporting)
+  carry an in-memory rate limit (`internal/service/ratelimit.go`); failed
+  admin-login attempts are logged by IP, and `dotinschool fail2ban`
+  (`scripts/install.sh`) auto-bans after repeated failures on bare-metal
+  installs.
 
 ### Data-movement paths (all in the admin overview "پشتیبان‌گیری دیتابیس" card)
 
