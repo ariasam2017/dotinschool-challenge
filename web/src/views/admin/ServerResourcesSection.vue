@@ -22,7 +22,10 @@ async function refreshSys() {
 }
 onMounted(() => {
   void refreshSys()
-  sysTimer = window.setInterval(refreshSys, 2000)
+  // The backend now samples in the background every 1s and just serves the
+  // cache (no per-request blocking), so polling at the same 1s cadence is
+  // cheap and gives a genuinely live reading instead of a stale one.
+  sysTimer = window.setInterval(refreshSys, 1000)
 })
 onBeforeUnmount(() => {
   if (sysTimer) clearInterval(sysTimer)
@@ -97,7 +100,7 @@ const faDec = (n: number) => toFa(String(n)).replace('.', '٫')
         <span>پردازش‌های همزمان: <b class="num">{{ toFa(sys?.go.goroutines ?? 0) }}</b></span>
         <span>حافظهٔ خودِ برنامه: <b class="num">{{ fmtBytes(sys?.go.alloc ?? 0) }}</b></span>
       </p>
-      <p class="faint hint">به‌روزرسانی خودکار هر ۲ ثانیه — همهٔ اعداد بالا همین لحظه از سرور خوانده می‌شوند.</p>
+      <p class="faint hint">به‌روزرسانی خودکار هر ۱ ثانیه — همهٔ اعداد بالا همین لحظه از سرور خوانده می‌شوند.</p>
     </section>
   </div>
 </template>

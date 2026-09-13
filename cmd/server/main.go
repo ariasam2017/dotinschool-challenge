@@ -52,6 +52,12 @@ func main() {
 	services := service.New(cfg, db, log)
 	services.RestoreAISidecarIfMissing()
 
+	// Background CPU/RAM/Swap sampler for the admin "منابع سرور" page — one
+	// sample per second, cached, so the endpoint answers instantly instead of
+	// blocking on cpu.Percent for every poll.
+	services.SysStats.Start(time.Second)
+	defer services.SysStats.Stop()
+
 	// The cron scheduler flips a scheduled event live the moment eventStartsAt
 	// arrives, with no manual action from the admin.
 	scheduler := service.NewScheduler(services.Settings, log)

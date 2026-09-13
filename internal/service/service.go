@@ -24,6 +24,7 @@ type Services struct {
 	SMS          SMSProvider
 	AI           *AIService
 	ClientErrors *ClientErrorService
+	SysStats     *SysStatsService
 }
 
 // New constructs every service with its dependencies.
@@ -47,6 +48,7 @@ func New(cfg *config.Config, db *gorm.DB, log *logrus.Logger) *Services {
 		SMS:          sms,
 		AI:           newAIService(cfg, settings, log),
 		ClientErrors: newClientErrorService(db),
+		SysStats:     newSysStatsService(),
 	}
 }
 
