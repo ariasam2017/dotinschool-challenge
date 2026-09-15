@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, computed, onBeforeUnmount } from 'vue'
+import { reactive, ref, computed, nextTick, onBeforeUnmount } from 'vue'
 import { message } from 'ant-design-vue'
 import { requestOtp, ApiError } from '@/api/client'
 import { useParticipantStore } from '@/stores/participant'
@@ -21,6 +21,7 @@ const mode = ref<Mode>('register')
 const form = reactive({ first: '', last: '', phone: '', otp: '' })
 const errors = reactive<Record<string, string>>({})
 const otpSent = ref(false)
+const otpInput = ref<{ focus: () => void }>()
 const sending = ref(false)
 const submitting = ref(false)
 const cooldown = ref(0)
@@ -76,6 +77,10 @@ async function sendOtp() {
     otpSent.value = true
     startCooldown()
     message.success('کد تأیید برای شماره‌ی شما پیامک شد')
+    // move the caret straight into the OTP box the moment it appears, so
+    // typing the phone (+ Enter, or the send button) flows right into it
+    await nextTick()
+    otpInput.value?.focus()
   } catch (e) {
     errors.phone = e instanceof ApiError ? e.message : 'ارسال کد ناموفق بود'
   } finally {
@@ -99,7 +104,7 @@ async function submit() {
       mode.value === 'register'
         ? await store.register({ firstName: form.first.trim(), lastName: form.last.trim(), phone, otp: form.otp.trim() })
         : await store.loginByPhone(phone, form.otp.trim())
-    message.success(mode.value === 'register' ? `ثبت‌نام شد. خوش آمدی ${u.firstName}` : `خوش آمدی ${u.firstName}`)
+    message.success(`${u.firstName} ${u.lastName} خوش آمدید`)
     emit('authed', u.status)
   } catch (e) {
     if (e instanceof ApiError) {
@@ -190,6 +195,7 @@ async function submit() {
       <label v-if="otpSent" class="field" :class="{ shake: shakeOtp }">
         <span class="field-label">کد تأیید پیامک‌شده</span>
         <a-input
+          ref="otpInput"
           v-model:value="form.otp"
           size="large"
           dir="ltr"

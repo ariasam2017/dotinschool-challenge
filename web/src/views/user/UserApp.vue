@@ -56,6 +56,9 @@ const LOCK_MESSAGES: Record<string, string> = {
   ended: 'زمان رویداد به پایان رسید؛ ارسال دیگر ممکن نیست',
 }
 const lockReason = computed(() => (eventState.value === 'running' ? '' : eventState.value))
+// Submission is one-time: once submitted, the editor and the submit/reset
+// buttons all lock the same way an event-lock would.
+const editingLocked = computed(() => !canCompete.value || submitState.value === 'submitted')
 const clockState = computed(() =>
   eventState.value === 'waiting' ? 'waiting' : eventState.value === 'paused' ? 'paused' : eventState.value === 'ended' ? 'ended' : 'running',
 )
@@ -109,7 +112,7 @@ onMounted(async () => {
   eStore.start()
   const resumed = await pStore.resume()
   if (resumed) {
-    message.success(`خوش آمدید دوباره، ${resumed.firstName}`)
+    message.success(`${resumed.firstName} ${resumed.lastName} خوش آمدید`)
     if (resumed.code) code.value = resumed.code
     if (resumed.status === 'submitted') submitState.value = 'submitted'
     if (resumed.status !== 'registered') startedSent = true
@@ -125,6 +128,7 @@ function onAuthed(status: string) {
 
 async function submit() {
   if (!user.value) return
+  if (submitState.value === 'submitted') return // one-time submission — belt and braces, the button is disabled too
   if (!canCompete.value) {
     message.error(LOCK_MESSAGES[lockReason.value] || 'ارسال ممکن نیست')
     return
@@ -158,6 +162,13 @@ async function submit() {
     submitState.value = 'submitted'
   } catch (e) {
     const err = e as ApiError
+    if (err.code === 'ALREADY_SUBMITTED') {
+      // e.g. a second tab/device raced this one — reflect the true state
+      // instead of offering a "retry" that would just fail again the same way
+      submitState.value = 'submitted'
+      message.info(err.message || 'کد شما قبلاً ارسال شده است.')
+      return
+    }
     if (err.code !== 'EVENT_LOCKED' && err.code !== 'EVENT_NOT_STARTED') {
       submitClientError({
         participantId: user.value.id,
@@ -323,8 +334,8 @@ function confirmExit() {
           <div class="arena-editor">
             <div class="editor-toolbar card">
               <span class="file-tab"><AppIcon name="file-code" :size="14" /> Main.java</span>
-              <span class="lang-badge">Java 17</span>
-              <a-button size="small" :disabled="!canCompete" @click="resetCode">
+              <span class="lang-badge">Java 25 LTS</span>
+              <a-button size="small" :disabled="editingLocked" @click="resetCode">
                 <template #icon><AppIcon name="rotate-ccw" :size="13" /></template>
                 بازنشانی کد
               </a-button>
@@ -335,7 +346,7 @@ function confirmExit() {
 
             <JavaEditor
               v-model="code"
-              :disabled="!canCompete"
+              :disabled="editingLocked"
               class="editor-host"
               @problems="problems = $event"
               @cursor="cursor = $event"
@@ -370,7 +381,13 @@ function confirmExit() {
             <div class="submit-bar card card-pad">
               <div class="grow">
                 <p class="submit-hint faint">
-                  {{ canCompete ? 'می‌توانید تا پایان زمان، کد را ویرایش و چند بار ارسال کنید.' : LOCK_MESSAGES[lockReason] }}
+                  {{
+                    !canCompete
+                      ? LOCK_MESSAGES[lockReason]
+                      : submitState === 'submitted'
+                        ? 'کد شما ثبت شد — امکان ویرایش یا ارسال دوباره وجود ندارد.'
+                        : 'کد را کامل و با دقت بنویس؛ فقط یک‌بار می‌توانی آن را ارسال کنی.'
+                  }}
                 </p>
                 <div v-if="submitState === 'submitted'" class="result-panel">
                   <div class="result-head">
@@ -385,11 +402,11 @@ function confirmExit() {
                 type="primary"
                 size="large"
                 :loading="submitState === 'submitting'"
-                :disabled="!canCompete"
+                :disabled="editingLocked"
                 @click="submit"
               >
                 <template #icon><AppIcon name="send" :size="16" /></template>
-                {{ submitState === 'submitted' ? 'ارسال مجدد' : submitState === 'error' ? 'تلاش مجدد' : 'ارسال کد' }}
+                {{ submitState === 'submitted' ? 'ارسال شد' : submitState === 'error' ? 'تلاش مجدد' : 'ارسال کد' }}
               </a-button>
             </div>
           </div>

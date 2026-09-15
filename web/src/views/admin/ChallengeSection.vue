@@ -252,8 +252,17 @@ function resetSubmitMessage() {
   min-width: 140px;
 }
 .img-preview {
-  margin-top: 10px;
+  /* .f is a column flexbox, whose default align-items:stretch was forcing
+     this <img> to the full form width while max-height clamped it short —
+     squashing/stretching it. align-self + explicit auto sizing keeps its
+     natural aspect ratio. */
+  align-self: flex-start;
+  width: auto;
+  height: auto;
+  max-width: 100%;
   max-height: 180px;
+  object-fit: contain;
+  margin-top: 10px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
 }

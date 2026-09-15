@@ -96,6 +96,20 @@ func (s *server) handlePatchParticipant(c *gin.Context) {
 		}
 	}
 
+	// One-time submission: once a participant has submitted, they cannot
+	// submit again or otherwise touch their challenge progress (status, code,
+	// score, exec stats) — resubmitting no longer overwrites the graded
+	// result. The admin is exempt, so grading/correction still works.
+	if !isAdmin && p.Status == model.StatusSubmitted {
+		touchesProgress := body.Status != nil || body.Code != nil ||
+			len(body.Score) > 0 || len(body.ExecMs) > 0 || len(body.ExecDepth) > 0
+		if touchesProgress {
+			fail(c, apperr.New(409, "ALREADY_SUBMITTED",
+				"شما قبلاً کد خود را ارسال کرده‌اید — امکان ارسال یا ویرایش دوباره وجود ندارد."))
+			return
+		}
+	}
+
 	// name changes
 	if body.FirstName != nil || body.LastName != nil {
 		if !isAdmin {
