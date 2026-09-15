@@ -28,7 +28,18 @@ ARG GOPROXY=https://goproxy.cn,direct
 ARG GOSUMDB=sum.golang.google.cn
 ENV CGO_ENABLED=0 GOFLAGS=-trimpath GOPROXY=${GOPROXY} GOSUMDB=${GOSUMDB}
 COPY go.mod go.sum ./
-RUN go mod download
+# goproxy.cn's own DNS lookup is occasionally flaky inside Docker Desktop's
+# build network (intermittent "i/o timeout" from the internal resolver, not a
+# block) — retry a few times instead of failing/appearing to hang on one bad
+# lookup. Already-fetched modules are cached, so a retry only redoes the ones
+# that failed.
+RUN n=0; until [ $n -ge 5 ]; do \
+      go mod download && break; \
+      n=$((n + 1)); \
+      echo "go mod download failed (attempt $n/5), retrying in 5s..." >&2; \
+      sleep 5; \
+    done; \
+    if [ $n -ge 5 ]; then echo "go mod download failed after 5 attempts" >&2; exit 1; fi
 COPY . .
 # use the freshly built assets, not whatever was committed
 RUN rm -rf web/assets
