@@ -36,6 +36,11 @@
 #   dotinschool warp            fix GitHub connectivity via Cloudflare WARP
 #                               (some hosting networks block GitHub outright —
 #                               if `git clone`/`update` just hangs, run this)
+#   dotinschool tunnel          access with a VPN on: Cloudflare Tunnel for
+#                               visitors from foreign IPs (Iranian data centres
+#                               often drop those) — token <TOKEN> | on | status | off
+#                               (token = your domain on Cloudflare; works from Iran.
+#                               "on" = free trycloudflare.com, filtered in Iran)
 #   dotinschool start|stop|restart|status
 #   dotinschool enable|disable  auto-start on boot
 #   dotinschool uninstall
@@ -68,7 +73,10 @@ BOX_WIDTH=54
 box_top(){ printf '╔'; printf '─%.0s' $(seq 1 $BOX_WIDTH); printf '╗\n'; }
 box_bottom(){ printf '╚'; printf '─%.0s' $(seq 1 $BOX_WIDTH); printf '╝\n'; }
 box_div(){ printf '│'; printf '─%.0s' $(seq 1 $BOX_WIDTH); printf '│\n'; }
-box_line(){ local plain="$1" colored="$2" pad=$((BOX_WIDTH - 2 - ${#plain})); (( pad < 0 )) && pad=0; echo -e "│  ${colored}$(printf '%*s' "$pad" '')│"; }
+# NB: two statements on purpose — bash expands every word of a `local` line
+# before assigning any of them, so `local plain="$1" pad=${#plain}` reads an
+# unset $plain and aborts under `set -u`.
+box_line(){ local plain="$1" colored="$2" pad; pad=$((BOX_WIDTH - 2 - ${#plain})); (( pad < 0 )) && pad=0; echo -e "│  ${colored}$(printf '%*s' "$pad" '')│"; }
 box_title(){ box_line "$1" "${BOLD}${1}${NC}"; }
 box_item(){ box_line "${1}.  ${2}" "${GREEN}${1}.${NC}  ${2}"; }
 
@@ -363,6 +371,10 @@ print_access_info(){
   ok "User panel (public address):          ${scheme}://${ip}:${port}/"
   ok "Admin panel (secret path — you only): ${scheme}://${ip}:${port}/${adminpath}/"
   [[ -n "$subdomain" ]] && ok "Admin panel (dedicated subdomain):    ${scheme}://${subdomain}/"
+  if systemctl is-active --quiet dotinschool-tunnel 2>/dev/null; then
+    local turl; turl=$(journalctl -u dotinschool-tunnel --no-pager -n 300 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -n1 || true)
+    [[ -n "$turl" ]] && ok "With a VPN on (Cloudflare Tunnel):    ${turl}/   admin: ${turl}/${adminpath}/"
+  fi
   ok "Admin username:                       $(get_env_val ADMIN_USERNAME)"
   ok "Admin password:                       $(get_env_val ADMIN_PASSWORD)"
   echo
@@ -438,7 +450,8 @@ cmd_uninstall(){
   [[ "$ans" == "y" || "$ans" == "Y" ]] || { info "Cancelled."; return; }
   systemctl stop "$SERVICE_NAME" 2>/dev/null || true
   systemctl disable "$SERVICE_NAME" 2>/dev/null || true
-  rm -f "$SERVICE_FILE"; systemctl daemon-reload
+  systemctl disable --now "$TUNNEL_SERVICE" 2>/dev/null || true
+  rm -f "$SERVICE_FILE" "$TUNNEL_UNIT"; systemctl daemon-reload
   rm -rf "$INSTALL_DIR" "$CONFIG_DIR" "$CLI_PATH"
   ok "dotinschool fully removed."
 }
@@ -660,6 +673,189 @@ EOF
   warn "If you ever lock yourself out: fail2ban-client set dotinschool unbanip <your-ip>"
 }
 
+# ---- access with a VPN on: Cloudflare Tunnel -----------------------------------
+# Many Iranian data centres drop *incoming* connections from foreign IPs, and a
+# visitor with a VPN on arrives from a foreign IP — so the panel never loads for
+# them. A tunnel turns that around: cloudflared on this server dials OUT to
+# Cloudflare (outgoing traffic works — it's how updates reach GitHub) and keeps
+# the connection open; VPN users open a Cloudflare https address and their
+# requests come back down that connection. Users without a VPN keep using the
+# normal IP:port address. --protocol http2 (TCP) is used because the default
+# QUIC (UDP) is often blocked or throttled on Iranian networks.
+#
+# Tested from an Iranian network: a *named* tunnel (your own domain on
+# Cloudflare + a tunnel token) connects fine — its edge, *.argotunnel.com:7844
+# with TLS name h2.cftunnel.com, is reachable. The free *quick* tunnel is not:
+# trycloudflare.com is filtered in Iran (poisoned DNS, and connections to it are
+# cut by name), so quick mode only works on servers outside Iran.
+TUNNEL_SERVICE="dotinschool-tunnel"
+TUNNEL_UNIT="/etc/systemd/system/${TUNNEL_SERVICE}.service"
+CLOUDFLARED="/usr/local/bin/cloudflared"
+
+install_cloudflared(){
+  if [[ -x "$CLOUDFLARED" ]] && "$CLOUDFLARED" --version >/dev/null 2>&1; then return; fi
+  info "Installing cloudflared..."
+  local arch; arch=$(arch_tag)
+  if curl -fsSL --connect-timeout 15 --max-time 300 -o "${CLOUDFLARED}.tmp" \
+      "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}"; then
+    mv -f "${CLOUDFLARED}.tmp" "$CLOUDFLARED"; chmod +x "$CLOUDFLARED"
+  else
+    rm -f "${CLOUDFLARED}.tmp"
+    # GitHub unreachable from this network: fall back to Cloudflare's own package repo
+    local pm; pm=$(detect_pkg_manager)
+    case "$pm" in
+      apt)
+        mkdir -p --mode=0755 /usr/share/keyrings
+        curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg -o /usr/share/keyrings/cloudflare-main.gpg
+        echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" > /etc/apt/sources.list.d/cloudflared.list
+        apt-get update -y >/dev/null && apt-get install -y cloudflared >/dev/null
+        [[ -x /usr/bin/cloudflared ]] && ln -sf /usr/bin/cloudflared "$CLOUDFLARED"
+        ;;
+      dnf|yum)
+        curl -fsSL https://pkg.cloudflare.com/cloudflared-ascii.repo -o /etc/yum.repos.d/cloudflared.repo
+        "$pm" install -y cloudflared >/dev/null
+        [[ -x /usr/bin/cloudflared ]] && ln -sf /usr/bin/cloudflared "$CLOUDFLARED"
+        ;;
+    esac
+  fi
+  "$CLOUDFLARED" --version >/dev/null 2>&1 || die "Could not download cloudflared. If GitHub is blocked here, run \"dotinschool warp\" first and try again."
+  ok "cloudflared installed: $("$CLOUDFLARED" --version 2>&1 | head -n1)"
+}
+
+# the local address cloudflared forwards to (https + no-verify when the panel terminates TLS itself)
+tunnel_origin_args(){
+  local port; port=$(get_env_val PORT); port=${port:-8080}
+  if [[ -n "$(get_env_val SSL_CERT_PATH)" ]]; then
+    echo "--url https://127.0.0.1:${port} --no-tls-verify"
+  else
+    echo "--url http://127.0.0.1:${port}"
+  fi
+}
+
+write_tunnel_unit(){
+  cat > "$TUNNEL_UNIT" <<EOF
+[Unit]
+Description=dotinschool - Cloudflare Tunnel (access with a VPN on)
+After=network-online.target ${SERVICE_NAME}.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=${CLOUDFLARED} tunnel --no-autoupdate --protocol http2 $1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable "$TUNNEL_SERVICE" >/dev/null 2>&1
+  systemctl restart "$TUNNEL_SERVICE"
+}
+
+# the current quick-tunnel address, read from the tunnel's own log
+quick_tunnel_url(){
+  journalctl -u "$TUNNEL_SERVICE" --no-pager -n 300 2>/dev/null \
+    | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -n1 || true
+}
+
+print_tunnel_info(){
+  local url="$1" adminpath; adminpath=$(get_env_val ADMIN_PATH); adminpath=${adminpath:-admin}
+  echo
+  ok "Address for users WITH a VPN on:   ${url}/"
+  ok "Admin panel through the tunnel:     ${url}/${adminpath}/"
+  info "Users without a VPN keep using the normal address (dotinschool admin -> 1)."
+}
+
+tunnel_quick(){
+  require_root
+  [[ -f "$ENV_FILE" ]] || die "Not installed yet — run \"dotinschool install\" first."
+  install_cloudflared
+  write_tunnel_unit "$(tunnel_origin_args)"
+  set_env_val TUNNEL_MODE quick
+  info "Connecting to Cloudflare (up to 60 seconds)..."
+  local url="" i
+  for i in $(seq 1 60); do
+    url=$(quick_tunnel_url)
+    [[ -n "$url" ]] && break
+    sleep 1
+  done
+  if [[ -z "$url" ]]; then
+    warn "No free address could be obtained: trycloudflare.com is filtered on Iranian networks."
+    warn "Use your own domain instead (works from Iran): dotinschool tunnel token"
+    tunnel_off >/dev/null
+    return
+  fi
+  print_tunnel_info "$url"
+  warn "This free address changes whenever the tunnel or the server restarts — check it again with: dotinschool tunnel status"
+  warn "For a permanent address, use your own domain on Cloudflare (dotinschool tunnel token <TOKEN>)."
+}
+
+tunnel_token(){
+  require_root
+  [[ -f "$ENV_FILE" ]] || die "Not installed yet — run \"dotinschool install\" first."
+  local token="${1:-}"
+  if [[ -z "$token" ]]; then
+    echo "In the Cloudflare dashboard: Zero Trust -> Networks -> Tunnels -> Create a tunnel (Cloudflared),"
+    echo "copy the token, and add a Public Hostname (e.g. game.example.com) pointing to:"
+    echo "  $(tunnel_origin_args | sed -e 's/--url //' -e 's/ --no-tls-verify/  (enable \"No TLS Verify\")/')"
+    read -r -p "Tunnel token: " token
+  fi
+  [[ -n "$token" ]] || die "A tunnel token is required."
+  install_cloudflared
+  write_tunnel_unit "run --token ${token}"
+  set_env_val TUNNEL_MODE token
+  sleep 5
+  if systemctl is-active --quiet "$TUNNEL_SERVICE"; then
+    ok "Tunnel is running with your Cloudflare token — users with a VPN on can use the Public Hostname you set."
+  else
+    warn "The tunnel did not start. Check: journalctl -u ${TUNNEL_SERVICE} -e"
+  fi
+}
+
+tunnel_status(){
+  if ! systemctl is-active --quiet "$TUNNEL_SERVICE" 2>/dev/null; then
+    warn "The VPN-access tunnel is off. Turn it on with: dotinschool tunnel"
+    return
+  fi
+  if [[ "$(get_env_val TUNNEL_MODE)" == "token" ]]; then
+    ok "Tunnel is running (your own domain — see the Public Hostname in the Cloudflare dashboard)."
+    return
+  fi
+  local url; url=$(quick_tunnel_url)
+  if [[ -n "$url" ]]; then print_tunnel_info "$url"; else warn "Tunnel is running but has no address yet — try again in a few seconds."; fi
+}
+
+tunnel_off(){
+  require_root
+  systemctl disable --now "$TUNNEL_SERVICE" >/dev/null 2>&1 || true
+  rm -f "$TUNNEL_UNIT"; systemctl daemon-reload
+  set_env_val TUNNEL_MODE ""
+  ok "VPN-access tunnel turned off. The normal IP:port address keeps working."
+}
+
+cmd_tunnel(){
+  case "${1:-}" in
+    quick|on) tunnel_quick ;;
+    token) tunnel_token "${2:-}" ;;
+    status) tunnel_status ;;
+    off) tunnel_off ;;
+    "")
+      echo; tunnel_status; echo
+      box_top; box_title "Access with a VPN on (Cloudflare Tunnel)"
+      box_item 0 "Back"; box_div
+      box_item 1 "Use my domain (recommended, works in Iran)"
+      box_item 2 "Free trycloudflare URL (often blocked in Iran)"
+      box_item 3 "Show the current status / address"
+      box_item 4 "Turn off"
+      box_bottom
+      read -r -p "Choice [0-4]: " c
+      case "$c" in 1) tunnel_token ;; 2) tunnel_quick ;; 3) tunnel_status ;; 4) tunnel_off ;; *) return ;; esac
+      ;;
+    *) die "Usage: dotinschool tunnel [on|token <TOKEN>|status|off]" ;;
+  esac
+}
+
 cmd_banlog(){
   require_root
   command -v fail2ban-client >/dev/null 2>&1 || die "fail2ban is not installed — run \"dotinschool fail2ban\" first."
@@ -687,19 +883,21 @@ show_menu(){
   box_item 8 "Logs"
   box_item 9 "Factory reset"
   box_item 10 "Brute-force protection (fail2ban)"
-  box_item 11 "Fix GitHub connectivity (Cloudflare WARP)"; box_div
+  box_item 11 "Fix GitHub connectivity (Cloudflare WARP)"
+  box_item 18 "Access with a VPN on (Cloudflare Tunnel)"; box_div
   box_item 12 "Start"; box_item 13 "Stop"; box_item 14 "Restart"; box_item 15 "Status"; box_div
   box_item 16 "Enable autostart"; box_item 17 "Disable autostart"
   box_bottom; echo; show_status; echo
-  read -r -p "Choice [0-17]: " choice
+  read -r -p "Choice [0-18]: " choice
   case "$choice" in
     1) cmd_install ;; 2) cmd_update ;; 3) cmd_update_menu ;; 4) cmd_uninstall ;;
     5) cmd_admin ;; 6) cmd_cert ;; 7) cmd_cert_cf ;; 8) cmd_log ;; 9) cmd_reset ;; 10) install_fail2ban ;; 11) install_warp ;;
     12) cmd_service start ;; 13) cmd_service stop ;; 14) cmd_service restart ;; 15) cmd_service status ;;
     16) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "Autostart enabled." ;;
     17) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "Autostart disabled." ;;
+    18) cmd_tunnel ;;
     0) exit 0 ;;
-    *) warn "Enter a number between 0 and 17." ;;
+    *) warn "Enter a number between 0 and 18." ;;
   esac
 }
 
@@ -717,6 +915,7 @@ main(){
     fail2ban) install_fail2ban ;;
     banlog) cmd_banlog ;;
     warp) install_warp ;;
+    tunnel) shift; cmd_tunnel "$@" ;;
     start|stop|restart|status) cmd_service "$1" ;;
     enable) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "Autostart enabled." ;;
     disable) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "Autostart disabled." ;;

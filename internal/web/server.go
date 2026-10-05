@@ -43,7 +43,7 @@ func NewRouter(opts Options) *gin.Engine {
 	s := &server{cfg: opts.Config, svc: opts.Services, log: opts.Log, version: firstNonEmpty(opts.Version, "dev")}
 
 	r := gin.New()
-	_ = r.SetTrustedProxies([]string{"127.0.0.1", "::1"})
+	configureProxyTrust(r)
 
 	r.Use(s.recovery())
 	r.Use(s.requestLogger())
@@ -56,6 +56,17 @@ func NewRouter(opts Options) *gin.Engine {
 	s.mountStatic(r) // must be last: it owns every non-/api path via NoRoute
 
 	return r
+}
+
+// configureProxyTrust decides where c.ClientIP() comes from. Only loopback is a
+// trusted proxy (a local Caddy, or cloudflared for "dotinschool tunnel"). Behind
+// the Cloudflare Tunnel every request arrives from cloudflared on loopback and
+// CF-Connecting-IP carries the real visitor — without it, all VPN players would
+// share one IP for rate limiting and fail2ban. Forwarding headers are ignored
+// from anyone else, so a direct visitor cannot spoof their IP with them.
+func configureProxyTrust(r *gin.Engine) {
+	_ = r.SetTrustedProxies([]string{"127.0.0.1", "::1"})
+	r.RemoteIPHeaders = []string{"CF-Connecting-IP", "X-Forwarded-For", "X-Real-IP"}
 }
 
 // mountAPI registers every /api/* route with the exact method, path, auth, and
