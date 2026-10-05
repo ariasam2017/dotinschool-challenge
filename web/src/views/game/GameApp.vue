@@ -589,21 +589,23 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 /* "Tech" palette — fixed in both themes: deep-space navy, electric cyan, a
    violet second accent, and neon green/red for right/wrong. */
 .g-root {
-  --g-bg0: #030712;
-  --g-bg1: #07122b;
-  --g-glass: rgba(13, 25, 50, 0.72);
-  --g-glass-2: rgba(22, 40, 74, 0.7);
-  --g-line: rgba(56, 189, 248, 0.22);
-  --g-line-strong: rgba(56, 189, 248, 0.45);
-  --g-text: #e6f1ff;
-  --g-dim: #9fb3d1;
-  --g-faint: #6b7fa3;
-  --g-cyan: #22d3ee;
-  --g-blue: #3b82f6;
-  --g-violet: #8b5cf6;
+  --g-bg0: #020d08;
+  --g-bg1: #063a24;
+  --g-glass: rgba(6, 32, 21, 0.72);
+  --g-glass-2: rgba(10, 48, 32, 0.7);
+  --g-line: rgba(60, 207, 141, 0.22);
+  --g-line-strong: rgba(60, 207, 141, 0.45);
+  --g-text: #eaf6ef;
+  --g-dim: #a7c4b5;
+  --g-faint: #6f9483;
+  --g-cyan: #3ccf8d;
+  --g-blue: #006839;
+  --g-violet: #f68b1f;
+  --g-green: #006839; /* Dotin brand green */
+  --g-orange: #f68b1f; /* Dotin brand orange */
   --g-ok: #10b981;
   --g-bad: #f43f5e;
-  --g-warn: #f59e0b;
+  --g-warn: #f68b1f;
   --g-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   position: relative;
@@ -611,7 +613,10 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   display: flex;
   flex-direction: column;
   color: var(--g-text);
-  background: radial-gradient(120% 80% at 50% 0%, var(--g-bg1) 0%, var(--g-bg0) 70%);
+  background:
+    radial-gradient(120% 70% at 50% -10%, #0a4a2e 0%, transparent 60%),
+    radial-gradient(90% 60% at 100% 110%, rgba(246, 139, 31, 0.16) 0%, transparent 60%),
+    linear-gradient(180deg, var(--g-bg1) 0%, var(--g-bg0) 75%);
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   padding-bottom: env(safe-area-inset-bottom);
@@ -627,8 +632,8 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(56, 189, 248, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.07) 1px, transparent 1px);
+    linear-gradient(rgba(60, 207, 141, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(60, 207, 141, 0.07) 1px, transparent 1px);
   background-size: 34px 34px;
   mask-image: radial-gradient(ellipse 90% 70% at 50% 30%, #000 30%, transparent 80%);
   -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 30%, #000 30%, transparent 80%);
@@ -641,21 +646,21 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 .gl1 {
   width: 300px;
   height: 300px;
-  background: rgba(34, 211, 238, 0.28);
+  background: rgba(0, 104, 57, 0.55);
   top: -110px;
   inset-inline-end: -90px;
 }
 .gl2 {
   width: 280px;
   height: 280px;
-  background: rgba(139, 92, 246, 0.25);
+  background: rgba(246, 139, 31, 0.22);
   bottom: 8%;
   inset-inline-start: -130px;
 }
 .gl3 {
   width: 220px;
   height: 220px;
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(0, 104, 57, 0.2);
   bottom: -80px;
   inset-inline-end: 5%;
 }
@@ -664,7 +669,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   inset-inline: 0;
   top: 0;
   height: 120px;
-  background: linear-gradient(180deg, transparent, rgba(34, 211, 238, 0.06), transparent);
+  background: linear-gradient(180deg, transparent, rgba(60, 207, 141, 0.06), transparent);
   animation: g-scan 7s linear infinite;
 }
 
@@ -692,9 +697,9 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background: linear-gradient(135deg, var(--g-cyan), var(--g-blue));
-  color: #04111f;
-  box-shadow: 0 0 18px rgba(34, 211, 238, 0.45);
+  background: linear-gradient(135deg, #0a8f54, var(--g-green));
+  color: #fff;
+  box-shadow: 0 0 18px rgba(60, 207, 141, 0.4);
 }
 .g-logo-text {
   font-size: 1.05rem;
@@ -704,8 +709,8 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 .g-logo-text b {
   font-family: var(--g-mono);
   font-weight: 700;
-  color: var(--g-cyan);
-  text-shadow: 0 0 12px rgba(34, 211, 238, 0.6);
+  color: var(--g-orange);
+  text-shadow: 0 0 12px rgba(246, 139, 31, 0.55);
 }
 .g-exit {
   display: grid;
@@ -762,7 +767,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   width: 108px;
   height: auto;
   margin: 4px auto 14px;
-  filter: drop-shadow(0 0 18px rgba(34, 211, 238, 0.45));
+  filter: drop-shadow(0 0 18px rgba(60, 207, 141, 0.45));
   animation: g-float 3.2s ease-in-out infinite;
 }
 .g-kicker {
@@ -781,7 +786,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 }
 .g-hero h1 b {
   font-family: var(--g-mono);
-  color: var(--g-cyan);
+  color: var(--g-orange);
 }
 .g-hero p {
   color: var(--g-dim);
@@ -814,7 +819,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   padding: 0 16px;
   border-radius: 14px;
   border: 1px solid var(--g-line);
-  background: rgba(3, 10, 25, 0.65);
+  background: rgba(2, 14, 9, 0.65);
   color: var(--g-text);
   font-family: inherit;
   font-size: 16px; /* >= 16px: stops iOS zooming into the field */
@@ -823,7 +828,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 }
 .g-field input:focus {
   border-color: var(--g-cyan);
-  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.2);
+  box-shadow: 0 0 0 3px rgba(60, 207, 141, 0.2);
 }
 .g-field input.ltr {
   direction: ltr;
@@ -837,8 +842,8 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 /* keep autofilled fields on the dark glass */
 .g-field input:-webkit-autofill {
   -webkit-text-fill-color: var(--g-text);
-  -webkit-box-shadow: inset 0 0 0 1000px #071430 !important;
-  box-shadow: inset 0 0 0 1000px #071430 !important;
+  -webkit-box-shadow: inset 0 0 0 1000px #052016 !important;
+  box-shadow: inset 0 0 0 1000px #052016 !important;
 }
 .g-error {
   display: flex;
@@ -878,16 +883,16 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   cursor: not-allowed;
 }
 .g-btn-primary {
-  background: linear-gradient(135deg, var(--g-cyan), var(--g-blue) 55%, var(--g-violet));
+  background: linear-gradient(135deg, #ff9d3d, #f68b1f 45%, #e2730a);
   color: #fff;
-  box-shadow: 0 0 22px rgba(34, 211, 238, 0.35);
+  box-shadow: 0 0 22px rgba(60, 207, 141, 0.35);
 }
 .g-btn-start {
   min-height: 64px;
   font-size: 1.25rem;
-  background: linear-gradient(135deg, var(--g-cyan), var(--g-blue));
+  background: linear-gradient(135deg, #0a8f54, #006839);
   color: #fff;
-  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.6), 0 0 34px rgba(34, 211, 238, 0.45);
+  box-shadow: 0 0 0 1px rgba(60, 207, 141, 0.6), 0 0 34px rgba(60, 207, 141, 0.45);
   margin-bottom: 10px;
   animation: g-glow 2.4s ease-in-out infinite;
 }
@@ -896,15 +901,15 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 }
 
 .g-btn-replay {
-  background: rgba(245, 158, 11, 0.14);
-  border: 1px dashed rgba(245, 158, 11, 0.6);
-  color: #fcd34d;
+  background: rgba(246, 139, 31, 0.14);
+  border: 1px dashed rgba(246, 139, 31, 0.6);
+  color: #ffb877;
 }
 .g-test-badge {
   padding: 2px 10px;
   border-radius: 999px;
-  border: 1px dashed rgba(245, 158, 11, 0.6);
-  color: #fcd34d;
+  border: 1px dashed rgba(246, 139, 31, 0.6);
+  color: #ffb877;
   font-size: 0.72rem;
   font-weight: 700;
   white-space: nowrap;
@@ -962,11 +967,11 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   height: 52px;
   flex: none;
   border-radius: 16px;
-  background: linear-gradient(135deg, var(--g-violet), var(--g-blue));
+  background: linear-gradient(135deg, #0a8f54, var(--g-green));
   color: #fff;
   font-weight: 800;
   font-size: 1.1rem;
-  box-shadow: 0 0 16px rgba(139, 92, 246, 0.45);
+  box-shadow: 0 0 16px rgba(246, 139, 31, 0.45);
 }
 .g-player-name {
   font-weight: 800;
@@ -1028,9 +1033,9 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   margin: 0;
   padding: 12px 14px;
   border-radius: 14px;
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.45);
-  color: #fcd34d;
+  background: rgba(246, 139, 31, 0.12);
+  border: 1px solid rgba(246, 139, 31, 0.45);
+  color: #ffb877;
   font-size: 0.9rem;
 }
 .g-lobby .g-btn-start {
@@ -1086,7 +1091,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 }
 .g-dot.current {
   border-color: var(--g-cyan);
-  box-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+  box-shadow: 0 0 10px rgba(60, 207, 141, 0.6);
 }
 .g-dot.correct {
   background: var(--g-ok);
@@ -1108,7 +1113,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   flex: 1;
   height: 10px;
   border-radius: 999px;
-  background: rgba(13, 25, 50, 0.9);
+  background: rgba(6, 32, 21, 0.9);
   border: 1px solid var(--g-line);
   overflow: hidden;
 }
@@ -1116,12 +1121,12 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--g-blue), var(--g-cyan));
-  box-shadow: 0 0 12px rgba(34, 211, 238, 0.7);
+  box-shadow: 0 0 12px rgba(60, 207, 141, 0.7);
   transition: width 0.1s linear, background 0.3s;
 }
 .g-timer.warn .g-timer-fill {
   background: var(--g-warn);
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.7);
+  box-shadow: 0 0 12px rgba(246, 139, 31, 0.7);
 }
 .g-timer.danger .g-timer-fill {
   background: var(--g-bad);
@@ -1148,7 +1153,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 
 .g-qcard {
   position: relative;
-  background: linear-gradient(160deg, rgba(22, 40, 74, 0.85), rgba(10, 20, 42, 0.85));
+  background: linear-gradient(160deg, rgba(10, 48, 32, 0.85), rgba(4, 24, 15, 0.85));
   border: 1px solid var(--g-line-strong);
   border-radius: 22px;
   padding: 32px 20px 26px;
@@ -1156,7 +1161,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   display: grid;
   place-items: center;
   text-align: center;
-  box-shadow: 0 0 30px rgba(34, 211, 238, 0.12), 0 14px 34px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 30px rgba(60, 207, 141, 0.12), 0 14px 34px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
@@ -1194,13 +1199,13 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   gap: 5px;
   padding: 3px 14px;
   border-radius: 999px;
-  background: #06243a;
-  border: 1px solid var(--g-cyan);
-  color: var(--g-cyan);
+  background: #3a2006;
+  border: 1px solid var(--g-orange);
+  color: #ffb877;
   font-size: 0.8rem;
   font-weight: 800;
   white-space: nowrap;
-  box-shadow: 0 0 14px rgba(34, 211, 238, 0.35);
+  box-shadow: 0 0 14px rgba(246, 139, 31, 0.35);
 }
 .g-qtext {
   margin: 0;
@@ -1256,8 +1261,8 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   height: 34px;
   flex: none;
   border-radius: 10px;
-  background: rgba(34, 211, 238, 0.1);
-  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: rgba(60, 207, 141, 0.1);
+  border: 1px solid rgba(60, 207, 141, 0.35);
   color: var(--g-cyan);
   font-family: var(--g-mono);
   font-size: 0.9rem;
@@ -1277,7 +1282,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 }
 .g-opt.picked {
   border-color: var(--g-cyan);
-  box-shadow: 0 0 18px rgba(34, 211, 238, 0.45);
+  box-shadow: 0 0 18px rgba(60, 207, 141, 0.45);
   animation: g-wait 0.9s ease-in-out infinite;
 }
 .g-opt.correct {
@@ -1344,9 +1349,9 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   width: 80px;
   height: 80px;
   border-radius: 24px;
-  background: linear-gradient(135deg, var(--g-cyan), var(--g-violet));
-  color: #04111f;
-  box-shadow: 0 0 34px rgba(34, 211, 238, 0.45);
+  background: linear-gradient(135deg, #ffa24a, var(--g-orange));
+  color: #021a0f;
+  box-shadow: 0 0 34px rgba(60, 207, 141, 0.45);
   margin-bottom: 12px;
   animation: g-float 3.2s ease-in-out infinite;
 }
@@ -1368,16 +1373,16 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   align-items: center;
   justify-content: center;
   background:
-    radial-gradient(closest-side, #081733 80%, transparent 81%),
-    conic-gradient(var(--g-cyan) var(--pct), rgba(56, 189, 248, 0.15) 0);
-  box-shadow: 0 0 30px rgba(34, 211, 238, 0.3);
+    radial-gradient(closest-side, #052016 80%, transparent 81%),
+    conic-gradient(var(--g-cyan) var(--pct), rgba(60, 207, 141, 0.15) 0);
+  box-shadow: 0 0 30px rgba(60, 207, 141, 0.3);
 }
 .g-score-num {
   font-size: 2.6rem;
   font-weight: 900;
   line-height: 1.1;
   color: var(--g-cyan);
-  text-shadow: 0 0 14px rgba(34, 211, 238, 0.6);
+  text-shadow: 0 0 14px rgba(60, 207, 141, 0.6);
 }
 .g-score-of {
   font-size: 0.9rem;
@@ -1393,8 +1398,8 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   margin: 0;
   padding: 12px;
   border-radius: 14px;
-  background: rgba(34, 211, 238, 0.07);
-  border: 1px dashed rgba(34, 211, 238, 0.3);
+  background: rgba(60, 207, 141, 0.07);
+  border: 1px dashed rgba(60, 207, 141, 0.3);
   color: var(--g-dim);
   font-size: 0.93rem;
   white-space: pre-line;
@@ -1459,8 +1464,8 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   gap: 8px;
   padding: 8px 10px;
   border-radius: 12px;
-  background: rgba(3, 10, 25, 0.5);
-  border: 1px solid rgba(56, 189, 248, 0.12);
+  background: rgba(2, 14, 9, 0.5);
+  border: 1px solid rgba(60, 207, 141, 0.12);
   color: var(--g-dim);
   font-size: 0.9rem;
   overflow-wrap: anywhere;
@@ -1485,7 +1490,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   height: 15px;
   flex: none;
   border-radius: 4px;
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  border: 1px solid rgba(60, 207, 141, 0.35);
 }
 
 /* ---------- spinner ---------- */
@@ -1493,7 +1498,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  border: 3px solid rgba(34, 211, 238, 0.2);
+  border: 3px solid rgba(60, 207, 141, 0.2);
   border-top-color: var(--g-cyan);
   animation: g-spin 0.8s linear infinite;
 }
@@ -1587,10 +1592,10 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 @keyframes g-glow {
   0%,
   100% {
-    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.6), 0 0 24px rgba(34, 211, 238, 0.35);
+    box-shadow: 0 0 0 1px rgba(60, 207, 141, 0.6), 0 0 24px rgba(60, 207, 141, 0.35);
   }
   50% {
-    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.9), 0 0 40px rgba(34, 211, 238, 0.6);
+    box-shadow: 0 0 0 1px rgba(60, 207, 141, 0.9), 0 0 40px rgba(60, 207, 141, 0.6);
   }
 }
 @keyframes g-rise {

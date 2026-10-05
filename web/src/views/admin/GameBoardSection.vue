@@ -83,6 +83,17 @@ function toggleOpen(v: boolean | string | number) {
 /* questions per game: one-tap presets + a custom count, saved immediately */
 const QC_PRESETS = [3, 5, 10, 15, 20]
 const qcCustom = ref<number | undefined>(undefined)
+/* seconds to answer each question: presets + custom, saved immediately */
+const QT_PRESETS = [10, 15, 20, 30, 45, 60]
+const qtCustom = ref<number | undefined>(undefined)
+async function setQuestionTime(n: number) {
+  if (n < 5 || n > 300) return message.error('زمان هر سوال باید بین ۵ تا ۳۰۰ ثانیه باشد')
+  const s = board.value?.settings
+  if (s) Object.assign(sform, s)
+  await saveSettings({ secondsPerQuestion: n })
+  qtCustom.value = undefined
+}
+
 async function setQuestionCount(n: number) {
   const bank = board.value?.questionCount ?? 0
   if (n < 1 || n > 50) return message.error('تعداد سوال باید بین ۱ تا ۵۰ باشد')
@@ -373,7 +384,10 @@ const bankShort = computed(
     <!-- number of questions per game -->
     <section class="card card-pad">
       <div class="card-hd">
-        <span class="section-title grow"><AppIcon name="list" :size="16" /> تعداد سوالات مسابقه</span>
+        <span class="section-title grow"><AppIcon name="list" :size="16" /> سوالات مسابقه</span>
+      </div>
+      <div class="qc-label">
+        <span>تعداد سوال هر بازی</span>
         <span class="faint small">
           فعلی: <b class="num qc-current">{{ toFa(board?.settings.questionsPerGame ?? sform.questionsPerGame) }} سوال</b>
         </span>
@@ -398,9 +412,37 @@ const bankShort = computed(
           </a-button>
         </div>
       </div>
+
+      <div class="qc-label qc-gap">
+        <span>زمان پاسخ به هر سوال</span>
+        <span class="faint small">
+          فعلی: <b class="num qc-current">{{ toFa(board?.settings.secondsPerQuestion ?? sform.secondsPerQuestion) }} ثانیه</b>
+        </span>
+      </div>
+      <div class="qc-row">
+        <button
+          v-for="n in QT_PRESETS"
+          :key="n"
+          type="button"
+          class="qc-btn"
+          :class="{ on: (board?.settings.secondsPerQuestion ?? sform.secondsPerQuestion) === n }"
+          :disabled="savingSettings"
+          @click="setQuestionTime(n)"
+        >
+          <b class="num">{{ toFa(n) }}</b>
+          <small>ثانیه</small>
+        </button>
+        <div class="qc-custom">
+          <a-input-number v-model:value="qtCustom" :min="5" :max="300" placeholder="ثانیه‌ی دلخواه" style="width: 130px" />
+          <a-button :disabled="!qtCustom || savingSettings" :loading="savingSettings" @click="setQuestionTime(qtCustom!)">
+            اعمال
+          </a-button>
+        </div>
+      </div>
+
       <p class="faint small qc-note">
         هر بازیکن این تعداد سوال تصادفی از بانک ({{ toFa(board?.questionCount ?? 0) }} سوال) می‌گیرد.
-        تغییر فقط روی بازی‌هایی اثر دارد که از این به بعد شروع می‌شوند؛ کسی که الان در حال بازی است با همان تعداد قبلی ادامه می‌دهد.
+        تغییر تعداد یا زمان فقط روی بازی‌هایی اثر دارد که از این به بعد شروع می‌شوند؛ کسی که الان در حال بازی است با همان تنظیم قبلی ادامه می‌دهد.
         <template v-if="board">
           مدت هر بازی حداکثر {{ toFa(Math.ceil((board.settings.questionsPerGame * board.settings.secondsPerQuestion) / 60)) }} دقیقه است.
         </template>
@@ -417,10 +459,6 @@ const bankShort = computed(
         </span>
       </div>
       <div class="settings-grid">
-        <label class="f">
-          <span>زمان هر سوال (ثانیه)</span>
-          <a-input-number v-model:value="sform.secondsPerQuestion" :min="5" :max="300" style="width: 100%" @change="markDirty" />
-        </label>
         <div class="test-box wide">
           <div class="grow">
             <b><AppIcon name="rotate-ccw" :size="14" /> حالت تست</b>
@@ -899,6 +937,21 @@ const bankShort = computed(
 }
 .qc-current {
   color: var(--primary-bright);
+}
+.qc-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.qc-gap {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
 }
 .qc-note {
   margin: var(--space-3) 0 0;

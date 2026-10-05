@@ -176,7 +176,7 @@ function close() {
 
 let confettiSeq = 0
 function burstConfetti(n: number) {
-  const colors = ['#fbbf24', '#22d3ee', '#a78bfa', '#34d399', '#f472b6', '#ffffff', '#f97316']
+  const colors = ['#f68b1f', '#ffb877', '#006839', '#3ccf8d', '#9be7c4', '#ffffff']
   const batch = Array.from({ length: n }, () => ({
     id: ++confettiSeq,
     left: Math.random() * 100,
@@ -346,15 +346,15 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .wr {
-  --gold: #fbbf24;
-  --cyan: #22d3ee;
+  --gold: #f68b1f; /* Dotin orange */
+  --cyan: #3ccf8d; /* bright Dotin green */
   position: fixed;
   inset: 0;
   z-index: 3000;
   display: flex;
   flex-direction: column;
-  color: #f1f5ff;
-  background: radial-gradient(120% 90% at 50% 10%, #0b1838 0%, #03060f 70%);
+  color: #eef8f2;
+  background: radial-gradient(120% 90% at 50% 10%, #073321 0%, #020b07 70%);
   font-family: var(--font-ui);
   overflow: hidden;
 }
@@ -367,8 +367,8 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(56, 189, 248, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.07) 1px, transparent 1px);
+    linear-gradient(rgba(60, 207, 141, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(60, 207, 141, 0.07) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: radial-gradient(ellipse at 50% 45%, #000 25%, transparent 75%);
   -webkit-mask-image: radial-gradient(ellipse at 50% 45%, #000 25%, transparent 75%);
@@ -381,12 +381,12 @@ onBeforeUnmount(() => {
   height: 900px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(34, 211, 238, 0.16), transparent 60%);
+  background: radial-gradient(circle, rgba(60, 207, 141, 0.16), transparent 60%);
   transition: background 0.6s;
 }
 .st-revealed .wr-spot,
 .st-final .wr-spot {
-  background: radial-gradient(circle, rgba(251, 191, 36, 0.25), transparent 60%);
+  background: radial-gradient(circle, rgba(246, 139, 31, 0.25), transparent 60%);
 }
 .st-suspense .wr-spot {
   background: radial-gradient(circle, rgba(244, 63, 94, 0.14), transparent 55%);
@@ -405,7 +405,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   font-weight: 700;
-  color: #b9c7e6;
+  color: #b6d2c3;
 }
 .wr-brand b {
   color: var(--cyan);
@@ -414,8 +414,8 @@ onBeforeUnmount(() => {
 .wr-demo {
   padding: 2px 10px;
   border-radius: 999px;
-  border: 1px dashed rgba(245, 158, 11, 0.7);
-  color: #fcd34d;
+  border: 1px dashed rgba(246, 139, 31, 0.7);
+  color: #ffb877;
   font-size: 0.78rem;
 }
 .wr-tools {
@@ -428,9 +428,9 @@ onBeforeUnmount(() => {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  background: rgba(13, 25, 50, 0.7);
-  color: #e6f1ff;
+  border: 1px solid rgba(60, 207, 141, 0.3);
+  background: rgba(6, 32, 21, 0.7);
+  color: #eaf6ef;
 }
 
 .wr-main {
@@ -456,7 +456,7 @@ onBeforeUnmount(() => {
   width: clamp(110px, 16vw, 150px);
   height: auto;
   margin: 0 auto 22px;
-  filter: drop-shadow(0 0 26px rgba(34, 211, 238, 0.5));
+  filter: drop-shadow(0 0 26px rgba(60, 207, 141, 0.5));
   animation: float 3s ease-in-out infinite;
 }
 .wr-final-logo {
@@ -464,7 +464,7 @@ onBeforeUnmount(() => {
   width: clamp(70px, 9vw, 96px);
   height: auto;
   margin: 0 auto 10px;
-  filter: drop-shadow(0 0 22px rgba(251, 191, 36, 0.45));
+  filter: drop-shadow(0 0 22px rgba(246, 139, 31, 0.45));
 }
 .wr-intro h1 {
   color: #fff;
@@ -473,7 +473,7 @@ onBeforeUnmount(() => {
   margin-bottom: 10px;
 }
 .wr-intro p {
-  color: #b9c7e6;
+  color: #b6d2c3;
   font-size: 1.15rem;
 }
 .wr-start {
@@ -488,7 +488,7 @@ onBeforeUnmount(() => {
   font-weight: 900;
   color: #1a1204;
   background: linear-gradient(135deg, var(--gold), #f97316);
-  box-shadow: 0 0 40px rgba(251, 191, 36, 0.5);
+  box-shadow: 0 0 40px rgba(246, 139, 31, 0.5);
   animation: glow 2s ease-in-out infinite;
 }
 .wr-slot.tappable {
@@ -497,7 +497,7 @@ onBeforeUnmount(() => {
 .wr-hint {
   margin-top: 18px;
   font-size: 0.9rem !important;
-  color: #7184ab !important;
+  color: #6f9483 !important;
 }
 
 /* ---- the show ---- */
@@ -532,11 +532,11 @@ onBeforeUnmount(() => {
   font-size: clamp(1.6rem, 4vw, 2.6rem);
   font-weight: 900;
   color: var(--cyan);
-  text-shadow: 0 0 22px rgba(34, 211, 238, 0.5);
+  text-shadow: 0 0 22px rgba(60, 207, 141, 0.5);
 }
 .pl-1 .wr-place-label {
   color: var(--gold);
-  text-shadow: 0 0 26px rgba(251, 191, 36, 0.6);
+  text-shadow: 0 0 26px rgba(246, 139, 31, 0.6);
 }
 
 .wr-slot {
@@ -547,9 +547,9 @@ onBeforeUnmount(() => {
   place-items: center;
   overflow: hidden;
   border-radius: 26px;
-  border: 2px solid rgba(56, 189, 248, 0.45);
-  background: linear-gradient(180deg, rgba(3, 8, 20, 0.9), rgba(16, 32, 64, 0.85) 50%, rgba(3, 8, 20, 0.9));
-  box-shadow: 0 0 40px rgba(34, 211, 238, 0.2), inset 0 0 40px rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(60, 207, 141, 0.45);
+  background: linear-gradient(180deg, rgba(2, 12, 8, 0.9), rgba(8, 44, 28, 0.85) 50%, rgba(2, 12, 8, 0.9));
+  box-shadow: 0 0 40px rgba(60, 207, 141, 0.2), inset 0 0 40px rgba(0, 0, 0, 0.6);
   transition: border-color 0.3s, box-shadow 0.3s;
 }
 .wr-slot.hot {
@@ -559,7 +559,7 @@ onBeforeUnmount(() => {
 }
 .st-revealed .wr-slot {
   border-color: var(--gold);
-  box-shadow: 0 0 70px rgba(251, 191, 36, 0.5), inset 0 0 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 70px rgba(246, 139, 31, 0.5), inset 0 0 40px rgba(0, 0, 0, 0.5);
 }
 .wr-slot-edge {
   position: absolute;
@@ -570,16 +570,16 @@ onBeforeUnmount(() => {
 }
 .wr-slot-edge.top {
   top: 0;
-  background: linear-gradient(180deg, rgba(3, 8, 20, 0.95), transparent);
+  background: linear-gradient(180deg, rgba(2, 12, 8, 0.95), transparent);
 }
 .wr-slot-edge.bottom {
   bottom: 0;
-  background: linear-gradient(0deg, rgba(3, 8, 20, 0.95), transparent);
+  background: linear-gradient(0deg, rgba(2, 12, 8, 0.95), transparent);
 }
 .wr-roll-name {
   font-size: clamp(1.8rem, 5vw, 3.4rem);
   font-weight: 900;
-  color: #e6f1ff;
+  color: #eaf6ef;
   white-space: nowrap;
   animation: roll-in 0.09s linear;
 }
@@ -593,7 +593,7 @@ onBeforeUnmount(() => {
   font-size: clamp(2rem, 6vw, 4rem);
   font-weight: 900;
   color: var(--gold);
-  text-shadow: 0 0 30px rgba(251, 191, 36, 0.7);
+  text-shadow: 0 0 30px rgba(246, 139, 31, 0.7);
   white-space: nowrap;
   animation: winner-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -616,7 +616,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 8px;
   border-radius: 999px;
-  background: rgba(56, 189, 248, 0.15);
+  background: rgba(60, 207, 141, 0.15);
   overflow: hidden;
 }
 .wr-bar-fill {
@@ -639,8 +639,8 @@ onBeforeUnmount(() => {
   min-width: 150px;
   padding: 14px 22px;
   border-radius: 18px;
-  background: rgba(13, 25, 50, 0.8);
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(6, 32, 21, 0.8);
+  border: 1px solid rgba(60, 207, 141, 0.35);
 }
 .wr-stat b {
   font-size: clamp(1.6rem, 3.5vw, 2.4rem);
@@ -650,11 +650,11 @@ onBeforeUnmount(() => {
 }
 .wr-stat small {
   font-size: 0.95rem;
-  color: #9fb3d1;
+  color: #a7c4b5;
   font-weight: 600;
 }
 .wr-stat.gold {
-  border-color: rgba(251, 191, 36, 0.6);
+  border-color: rgba(246, 139, 31, 0.6);
 }
 .wr-stat.gold b {
   color: var(--gold);
@@ -665,9 +665,9 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 10px 22px;
   border-radius: 14px;
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  background: rgba(13, 25, 50, 0.7);
-  color: #e6f1ff;
+  border: 1px solid rgba(60, 207, 141, 0.4);
+  background: rgba(6, 32, 21, 0.7);
+  color: #eaf6ef;
   font-weight: 700;
   font-size: 1rem;
 }
@@ -685,9 +685,9 @@ onBeforeUnmount(() => {
 .wr-chip {
   padding: 8px 16px;
   border-radius: 999px;
-  background: rgba(13, 25, 50, 0.8);
-  border: 1px solid rgba(251, 191, 36, 0.4);
-  color: #cbd5f0;
+  background: rgba(6, 32, 21, 0.8);
+  border: 1px solid rgba(246, 139, 31, 0.4);
+  color: #c7ddd1;
   animation: rise 0.5s both;
 }
 .wr-chip b {
@@ -707,7 +707,7 @@ onBeforeUnmount(() => {
   margin-bottom: 4px;
 }
 .wr-rule {
-  color: #9fb3d1;
+  color: #a7c4b5;
   margin-bottom: 30px;
 }
 .wr-podium {
@@ -745,7 +745,7 @@ onBeforeUnmount(() => {
 }
 .wr-col-meta {
   font-size: 0.95rem;
-  color: #9fb3d1;
+  color: #a7c4b5;
 }
 .wr-col-score {
   font-size: 1.15rem;
@@ -764,8 +764,8 @@ onBeforeUnmount(() => {
 }
 .wr-col.c1 .wr-col-block {
   height: 200px;
-  background: linear-gradient(180deg, #fbbf24, #b45309);
-  box-shadow: 0 0 50px rgba(251, 191, 36, 0.4);
+  background: linear-gradient(180deg, #f68b1f, #b45309);
+  box-shadow: 0 0 50px rgba(246, 139, 31, 0.4);
 }
 .wr-col.c2 .wr-col-block {
   height: 150px;
@@ -773,7 +773,7 @@ onBeforeUnmount(() => {
 }
 .wr-col.c3 .wr-col-block {
   height: 110px;
-  background: linear-gradient(180deg, #f59e0b, #78350f);
+  background: linear-gradient(180deg, #f68b1f, #78350f);
 }
 .wr-final-actions {
   display: flex;
@@ -787,9 +787,9 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 10px 22px;
   border-radius: 14px;
-  border: 1px solid rgba(56, 189, 248, 0.4);
-  background: rgba(13, 25, 50, 0.7);
-  color: #e6f1ff;
+  border: 1px solid rgba(60, 207, 141, 0.4);
+  background: rgba(6, 32, 21, 0.7);
+  color: #eaf6ef;
   font-weight: 700;
 }
 
@@ -881,7 +881,7 @@ onBeforeUnmount(() => {
 }
 @keyframes glow {
   50% {
-    box-shadow: 0 0 60px rgba(251, 191, 36, 0.8);
+    box-shadow: 0 0 60px rgba(246, 139, 31, 0.8);
   }
 }
 @media (max-width: 640px) {
