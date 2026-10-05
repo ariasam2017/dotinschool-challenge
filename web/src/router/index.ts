@@ -22,6 +22,7 @@ const adminRoutes: RouteRecordRaw[] = [
     children: [
       { path: '', redirect: { name: 'admin-game' } },
       { path: 'game', name: 'admin-game', component: () => import('@/views/admin/GameBoardSection.vue') },
+      { path: 'game-top', name: 'admin-game-top', component: () => import('@/views/admin/GameTopSection.vue') },
       { path: 'game-questions', name: 'admin-game-questions', component: () => import('@/views/admin/GameQuestionsSection.vue') },
       { path: 'overview', name: 'admin-overview', component: () => import('@/views/admin/OverviewSection.vue') },
       { path: 'schedule', name: 'admin-schedule', component: () => import('@/views/admin/ScheduleSection.vue') },

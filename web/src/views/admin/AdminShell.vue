@@ -28,6 +28,7 @@ const NAV: NavGroup[] = [
     label: 'بازی',
     items: [
       { name: 'admin-game', label: 'نتایج زنده‌ی بازی', icon: 'trophy' },
+      { name: 'admin-game-top', label: '۳ نفر برتر', icon: 'crown' },
       { name: 'admin-game-questions', label: 'بانک سوالات بازی', icon: 'help-circle' },
     ],
   },

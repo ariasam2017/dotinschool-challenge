@@ -104,6 +104,19 @@ async function rollPlace(id: number, p: number) {
     // fast at first, then the roller drags — longer for higher places
     await sleep(50 + (p === 0 ? 720 : 560) * Math.pow(t, 2.4))
   }
+  if (id !== runId) return
+
+  // The roller always comes to rest on a *decoy*: one name drawn uniformly at
+  // random from every participant, chosen without looking at the winner. So
+  // the last name before "؟" carries no information — it is the winner only
+  // by chance (1 in N), and never systematically excluded either (which would
+  // leak just as much).
+  const everyone = [...new Set(pool)]
+  rollName.value = everyone[Math.floor(Math.random() * everyone.length)]
+  rollKey.value++
+  sound?.tick()
+  await sleep(p === 0 ? 900 : 700)
+  if (id !== runId) return
   stopRiser?.()
   progress.value = 1
 
