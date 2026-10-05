@@ -9,13 +9,16 @@ import (
 	"github.com/glebarez/sqlite"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"github.com/dotinschool/dotinschool/internal/model"
 )
 
 func gameSvc(t *testing.T) (*GameService, *time.Time) {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent), // "record not found" is routine here
+	})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -224,14 +227,27 @@ func TestGameClosedAndRanking(t *testing.T) {
 	}
 }
 
-// The deck deals distinct questions to consecutive players until the bank is
-// used up, instead of independent random picks that overlap early.
+// The decks deal distinct questions to consecutive players until a difficulty
+// level is used up, instead of independent random picks that overlap early.
 func TestGameDeckSpreadsQuestions(t *testing.T) {
 	g, _ := gameSvc(t)
-	bank := int(g.QuestionCount())
 	per := g.Settings().QuestionsPerGame
+	need := map[string]int{}
+	for _, lv := range model.DifficultyPlan(per) {
+		need[lv]++
+	}
+	var hard int64
+	g.db.Model(&model.GameQuestion{}).Where("difficulty = ?", model.DifficultyHard).Count(&hard)
+	easy := g.QuestionCount() - hard
+	players := int(easy) / need[model.DifficultyEasy]
+	if h := int(hard) / need[model.DifficultyHard]; h < players {
+		players = h
+	}
+	if players < 40 {
+		t.Fatalf("only %d players get repeat-free games — want at least a full class of 40", players)
+	}
 	seen := map[string]bool{}
-	for i := 0; i < bank/per; i++ {
+	for i := 0; i < players; i++ {
 		p, _, err := g.Register("n", "f", fmt.Sprintf("912%07d", i))
 		if err != nil {
 			t.Fatal(err)
@@ -345,5 +361,120 @@ func TestGameQuestionCountSetting(t *testing.T) {
 	// the player who started before the change still has 3
 	if st, _ := g.State(early.Token); st.Total != 3 {
 		t.Fatalf("in-progress game changed to %d questions", st.Total)
+	}
+}
+
+// Fairness: a correct answer always outweighs any amount of speed. 4 correct
+// in 60 s must beat 3 correct in 5 s — in the score and in the ranking.
+func TestMoreCorrectAlwaysBeatsFaster(t *testing.T) {
+	const limit = int64(20_000) // 20 s per question
+	slow4 := ComputeGameScore(4, 5, 60_000, limit)
+	fast3 := ComputeGameScore(3, 5, 5_000, limit)
+	if slow4 <= fast3 {
+		t.Fatalf("score: 4 correct/60s = %d must beat 3 correct/5s = %d", slow4, fast3)
+	}
+	// even the slowest possible 4 vs the fastest possible 3
+	if ComputeGameScore(4, 5, 5*limit, limit) <= ComputeGameScore(3, 5, 0, limit) {
+		t.Fatal("score: the slowest 4-correct run must still beat the fastest 3-correct run")
+	}
+	rows := []BoardRow{
+		{ID: "fast3", Correct: 3, TotalMs: 5_000, FinishedAt: 1},
+		{ID: "slow4", Correct: 4, TotalMs: 60_000, FinishedAt: 2},
+		{ID: "tie-slower", Correct: 3, TotalMs: 9_000, FinishedAt: 0},
+	}
+	RankFinished(rows)
+	if rows[0].ID != "slow4" || rows[1].ID != "fast3" || rows[2].ID != "tie-slower" {
+		t.Fatalf("ranking = %s, %s, %s; want slow4, fast3, tie-slower", rows[0].ID, rows[1].ID, rows[2].ID)
+	}
+}
+
+// The easy/hard order the admin asked for: 5 = E E E H H, 10 = 3E 2H 4E 1H.
+func TestDifficultyPlan(t *testing.T) {
+	want := map[int]string{
+		3:  "EEH",
+		5:  "EEEHH",
+		10: "EEEHHEEEEH",
+		15: "EEEHHEEEEHEEEHH",
+		20: "EEEHHEEEEHEEEHHEEEEH",
+	}
+	for n, w := range want {
+		got := ""
+		for _, lv := range model.DifficultyPlan(n) {
+			got += map[string]string{model.DifficultyEasy: "E", model.DifficultyHard: "H"}[lv]
+		}
+		if got != w {
+			t.Errorf("plan(%d) = %s, want %s", n, got, w)
+		}
+	}
+	for n := 1; n <= 50; n++ {
+		if l := len(model.DifficultyPlan(n)); l != n {
+			t.Fatalf("plan(%d) has %d entries", n, l)
+		}
+	}
+}
+
+// Games are dealt in plan order from the matching difficulty.
+func TestGameDealsByDifficulty(t *testing.T) {
+	g, _ := gameSvc(t)
+	for _, n := range []int{5, 10} {
+		gs := g.Settings()
+		gs.QuestionsPerGame = n
+		g.SaveSettings(gs)
+		for k := 0; k < 4; k++ {
+			p, _, _ := g.Register("n", "f", fmt.Sprintf("9133%03d%03d", n, k))
+			if _, err := g.Start(p.Token); err != nil {
+				t.Fatal(err)
+			}
+			var row model.GamePlayer
+			g.db.Where("id = ?", p.ID).First(&row)
+			plan := model.DifficultyPlan(n)
+			for i, it := range loadItems(&row) {
+				if it.Difficulty != plan[i] {
+					t.Fatalf("n=%d game %d question %d is %s, want %s", n, k, i+1, it.Difficulty, plan[i])
+				}
+			}
+		}
+	}
+}
+
+// With no hard questions in the bank a game still gets its full count.
+func TestDealFallsBackWhenALevelIsEmpty(t *testing.T) {
+	g, _ := gameSvc(t)
+	g.db.Model(&model.GameQuestion{}).Where("1 = 1").Update("difficulty", model.DifficultyEasy)
+	g.bankRev.Add(1)
+	gs := g.Settings()
+	gs.QuestionsPerGame = 5
+	g.SaveSettings(gs)
+	p, _, _ := g.Register("n", "f", "9134000000")
+	st, err := g.Start(p.Token)
+	if err != nil || st.Total != 5 {
+		t.Fatalf("got %d questions, err %v; want 5 easy ones as fallback", st.Total, err)
+	}
+}
+
+// Changing the round mid-competition is flagged so the admin knows the
+// comparison is not like-for-like.
+func TestBoardFlagsMixedRounds(t *testing.T) {
+	g, _ := gameSvc(t)
+	play := func(phone string) {
+		p, _, _ := g.Register("n", "f", phone)
+		st, _ := g.Start(p.Token)
+		for q := 0; q < st.Total; q++ {
+			g.Answer(p.Token, q, 0)
+			if q < st.Total-1 {
+				g.Next(p.Token)
+			}
+		}
+	}
+	play("9135000001")
+	if b, _ := g.Board(); b.MixedRounds {
+		t.Fatal("one round only — must not be flagged")
+	}
+	gs := g.Settings()
+	gs.QuestionsPerGame = 5
+	g.SaveSettings(gs)
+	play("9135000002")
+	if b, _ := g.Board(); !b.MixedRounds {
+		t.Fatal("3- and 5-question games finished — must be flagged")
 	}
 }

@@ -4,18 +4,45 @@ package model
 // a random subset; the correct option index is never sent to a player before
 // they answer.
 type GameQuestion struct {
-	ID        string `gorm:"primaryKey;column:id" json:"id"`
-	Category  string `gorm:"column:category;not null;default:''" json:"category"`
-	Text      string `gorm:"column:text;not null" json:"text"`
-	Option1   string `gorm:"column:option1;not null" json:"-"`
-	Option2   string `gorm:"column:option2;not null" json:"-"`
-	Option3   string `gorm:"column:option3;not null" json:"-"`
-	Option4   string `gorm:"column:option4;not null" json:"-"`
-	Correct   int    `gorm:"column:correct;not null" json:"correct"` // 0..3
-	CreatedAt int64  `gorm:"column:created_at;not null" json:"createdAt"`
+	ID         string `gorm:"primaryKey;column:id" json:"id"`
+	Category   string `gorm:"column:category;not null;default:''" json:"category"`
+	Difficulty string `gorm:"column:difficulty;not null;default:easy" json:"difficulty"` // easy | hard
+	Text       string `gorm:"column:text;not null" json:"text"`
+	Option1    string `gorm:"column:option1;not null" json:"-"`
+	Option2    string `gorm:"column:option2;not null" json:"-"`
+	Option3    string `gorm:"column:option3;not null" json:"-"`
+	Option4    string `gorm:"column:option4;not null" json:"-"`
+	Correct    int    `gorm:"column:correct;not null" json:"correct"` // 0..3
+	CreatedAt  int64  `gorm:"column:created_at;not null" json:"createdAt"`
 }
 
 func (GameQuestion) TableName() string { return "game_questions" }
+
+// Question difficulty levels.
+const (
+	DifficultyEasy = "easy"
+	DifficultyHard = "hard"
+)
+
+// DifficultyPlan is the easy/hard order of the questions in one game of n
+// questions: blocks of ten go E E E H H E E E E H, then a block of five
+// E E E H H, then a shorter tail (E · E H · E E H · E E E H). So a 5-question
+// game is 3 easy then 2 hard, and a 10-question game is 3 easy, 2 hard,
+// 4 easy, 1 hard.
+func DifficultyPlan(n int) []string {
+	const e, h = DifficultyEasy, DifficultyHard
+	ten := []string{e, e, e, h, h, e, e, e, e, h}
+	five := []string{e, e, e, h, h}
+	tails := [][]string{{}, {e}, {e, h}, {e, e, h}, {e, e, e, h}}
+	plan := make([]string, 0, n)
+	for n-len(plan) >= 10 {
+		plan = append(plan, ten...)
+	}
+	if n-len(plan) >= 5 {
+		plan = append(plan, five...)
+	}
+	return append(plan, tails[n-len(plan)]...)
+}
 
 // Options returns the four answers in their authored order.
 func (q GameQuestion) Options() [4]string {
@@ -63,16 +90,17 @@ const (
 // GameItem is one dealt question, snapshotted (text + shuffled options) so a
 // later edit or delete in the bank never changes a played game.
 type GameItem struct {
-	QID       string    `json:"qid"`
-	Category  string    `json:"category"`
-	Text      string    `json:"text"`
-	Options   [4]string `json:"options"` // display order
-	Correct   int       `json:"correct"` // display index
-	ServedAt  int64     `json:"servedAt"`
-	Answered  bool      `json:"answered"`
-	Choice    int       `json:"choice"` // display index, -1 = time ran out
-	IsCorrect bool      `json:"isCorrect"`
-	Ms        int64     `json:"ms"`
+	QID        string    `json:"qid"`
+	Category   string    `json:"category"`
+	Difficulty string    `json:"difficulty,omitempty"`
+	Text       string    `json:"text"`
+	Options    [4]string `json:"options"` // display order
+	Correct    int       `json:"correct"` // display index
+	ServedAt   int64     `json:"servedAt"`
+	Answered   bool      `json:"answered"`
+	Choice     int       `json:"choice"` // display index, -1 = time ran out
+	IsCorrect  bool      `json:"isCorrect"`
+	Ms         int64     `json:"ms"`
 }
 
 // GameSettings is the admin-tunable quiz configuration (settings key "game").

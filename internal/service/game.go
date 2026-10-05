@@ -49,10 +49,11 @@ type GameService struct {
 	// settings are read on every request; cache them (SaveSettings refreshes)
 	cfg atomic.Pointer[model.GameSettings]
 
-	// The question deck: a shuffled list of bank ids dealt out in order, so
-	// consecutive players get different questions before any repeats.
+	// The question decks: per difficulty, a shuffled list of bank ids dealt out
+	// in order, so consecutive players get different questions before any
+	// repeats.
 	deckMu  sync.Mutex
-	deck    []string
+	decks   map[string][]string // difficulty -> ids
 	deckRev int64
 	bankRev atomic.Int64 // bumped on every bank change; a stale deck is rebuilt
 }
@@ -160,24 +161,26 @@ func (s *GameService) SaveSettings(gs model.GameSettings) (model.GameSettings, e
 
 // QuestionDTO is the admin view of a bank question.
 type QuestionDTO struct {
-	ID        string    `json:"id"`
-	Category  string    `json:"category"`
-	Text      string    `json:"text"`
-	Options   [4]string `json:"options"`
-	Correct   int       `json:"correct"`
-	CreatedAt int64     `json:"createdAt"`
+	ID         string    `json:"id"`
+	Category   string    `json:"category"`
+	Difficulty string    `json:"difficulty"`
+	Text       string    `json:"text"`
+	Options    [4]string `json:"options"`
+	Correct    int       `json:"correct"`
+	CreatedAt  int64     `json:"createdAt"`
 }
 
 // QuestionInput is what the admin editor/import sends.
 type QuestionInput struct {
-	Category string    `json:"category"`
-	Text     string    `json:"text"`
-	Options  [4]string `json:"options"`
-	Correct  int       `json:"correct"`
+	Category   string    `json:"category"`
+	Difficulty string    `json:"difficulty"` // easy | hard (empty = easy)
+	Text       string    `json:"text"`
+	Options    [4]string `json:"options"`
+	Correct    int       `json:"correct"`
 }
 
 func toQuestionDTO(q model.GameQuestion) QuestionDTO {
-	return QuestionDTO{ID: q.ID, Category: q.Category, Text: q.Text, Options: q.Options(), Correct: q.Correct, CreatedAt: q.CreatedAt}
+	return QuestionDTO{ID: q.ID, Category: q.Category, Difficulty: q.Difficulty, Text: q.Text, Options: q.Options(), Correct: q.Correct, CreatedAt: q.CreatedAt}
 }
 
 // normalizeQuestion trims and validates one question.
@@ -186,6 +189,14 @@ func normalizeQuestion(in QuestionInput) (QuestionInput, *apperr.Error) {
 	in.Category = strings.TrimSpace(in.Category)
 	if in.Category == "" {
 		in.Category = model.DefaultGameCategory
+	}
+	switch strings.ToLower(strings.TrimSpace(in.Difficulty)) {
+	case "", "easy", "آسان":
+		in.Difficulty = model.DifficultyEasy
+	case "hard", "سخت":
+		in.Difficulty = model.DifficultyHard
+	default:
+		return in, apperr.InvalidInput("سطح سوال باید «آسان» یا «سخت» باشد.")
 	}
 	if in.Text == "" {
 		return in, apperr.InvalidInput("متن سوال نمی‌تواند خالی باشد.")
@@ -242,7 +253,7 @@ func (s *GameService) CreateQuestion(in QuestionInput) (QuestionDTO, error) {
 	if aerr != nil {
 		return QuestionDTO{}, aerr
 	}
-	q := model.GameQuestion{ID: uuid.NewString(), Category: in.Category, Text: in.Text, Correct: in.Correct, CreatedAt: s.nowMs()}
+	q := model.GameQuestion{ID: uuid.NewString(), Category: in.Category, Difficulty: in.Difficulty, Text: in.Text, Correct: in.Correct, CreatedAt: s.nowMs()}
 	q.SetOptions(in.Options)
 	if err := s.db.Create(&q).Error; err != nil {
 		return QuestionDTO{}, err
@@ -265,11 +276,12 @@ func (s *GameService) UpdateQuestion(id string, in QuestionInput) (QuestionDTO, 
 		}
 		return QuestionDTO{}, err
 	}
-	q.Category, q.Text, q.Correct = in.Category, in.Text, in.Correct
+	q.Category, q.Difficulty, q.Text, q.Correct = in.Category, in.Difficulty, in.Text, in.Correct
 	q.SetOptions(in.Options)
 	if err := s.db.Save(&q).Error; err != nil {
 		return QuestionDTO{}, err
 	}
+	s.bankRev.Add(1) // the difficulty may have moved it to the other deck
 	return toQuestionDTO(q), nil
 }
 
@@ -324,7 +336,7 @@ func (s *GameService) ImportQuestions(in []QuestionInput, replace bool) (added i
 				continue
 			}
 			existing[q.Text] = true
-			r := model.GameQuestion{ID: uuid.NewString(), Category: q.Category, Text: q.Text, Correct: q.Correct, CreatedAt: base - int64(i)}
+			r := model.GameQuestion{ID: uuid.NewString(), Category: q.Category, Difficulty: q.Difficulty, Text: q.Text, Correct: q.Correct, CreatedAt: base - int64(i)}
 			r.SetOptions(q.Options)
 			rows = append(rows, r)
 		}
@@ -343,7 +355,7 @@ func (s *GameService) AddDefaultBank() (added int, err error) {
 	defs := model.DefaultGameQuestions()
 	in := make([]QuestionInput, len(defs))
 	for i, q := range defs {
-		in[i] = QuestionInput{Category: q.Category, Text: q.Text, Options: q.Options(), Correct: q.Correct}
+		in[i] = QuestionInput{Category: q.Category, Difficulty: q.Difficulty, Text: q.Text, Options: q.Options(), Correct: q.Correct}
 	}
 	added, _, err = s.ImportQuestions(in, false)
 	return added, err
@@ -484,6 +496,7 @@ func storeItems(p *model.GamePlayer, items []model.GameItem) {
 type GameQuestionView struct {
 	Index       int       `json:"index"`
 	Category    string    `json:"category"`
+	Difficulty  string    `json:"difficulty"`
 	Text        string    `json:"text"`
 	Options     [4]string `json:"options"`
 	LimitMs     int64     `json:"limitMs"`
@@ -511,13 +524,14 @@ type GameResult struct {
 
 // GameReviewItem is one played question shown on the result screen.
 type GameReviewItem struct {
-	Category  string    `json:"category"`
-	Text      string    `json:"text"`
-	Options   [4]string `json:"options"`
-	Choice    int       `json:"choice"`
-	Correct   int       `json:"correct"`
-	IsCorrect bool      `json:"isCorrect"`
-	Ms        int64     `json:"ms,omitempty"` // admin review only
+	Category   string    `json:"category"`
+	Difficulty string    `json:"difficulty,omitempty"`
+	Text       string    `json:"text"`
+	Options    [4]string `json:"options"`
+	Choice     int       `json:"choice"`
+	Correct    int       `json:"correct"`
+	IsCorrect  bool      `json:"isCorrect"`
+	Ms         int64     `json:"ms,omitempty"` // admin review only
 }
 
 // GamePlayerView is the public part of a player record.
@@ -606,7 +620,7 @@ func (s *GameService) Start(token string) (*GameState, error) {
 				correct = d
 			}
 		}
-		items[i] = model.GameItem{QID: q.ID, Category: q.Category, Text: q.Text, Options: opts, Correct: correct, Choice: -1}
+		items[i] = model.GameItem{QID: q.ID, Category: q.Category, Difficulty: q.Difficulty, Text: q.Text, Options: opts, Correct: correct, Choice: -1}
 	}
 	now := s.nowMs()
 	items[0].ServedAt = now
@@ -705,44 +719,86 @@ func (s *GameService) record(p *model.GamePlayer, items []model.GameItem, choice
 	storeItems(p, items)
 }
 
-// deal draws n distinct questions from the shuffled deck. The deck is every
-// bank id in random order; it is consumed front to back and refilled with a
-// fresh shuffle when it runs low (or after the bank changed), so with a bank
-// of B questions the first B/n players never see a repeated question.
+// deal draws n distinct questions in the easy/hard order of
+// model.DifficultyPlan(n) (e.g. 5 = E E E H H). Each difficulty has its own
+// deck: every bank id of that level in random order, consumed front to back
+// and refilled with a fresh shuffle when it runs low (or after the bank
+// changed), so consecutive players get different questions before any
+// repeat. If the bank lacks enough questions of one level, the other level
+// fills the gap — a game is never short of questions.
 func (s *GameService) deal(n int) ([]model.GameQuestion, error) {
 	s.deckMu.Lock()
 	defer s.deckMu.Unlock()
 
-	if rev := s.bankRev.Load(); rev != s.deckRev {
-		s.deck, s.deckRev = nil, rev
+	if rev := s.bankRev.Load(); rev != s.deckRev || s.decks == nil {
+		s.decks, s.deckRev = map[string][]string{}, rev
 	}
-	refill := func() error {
+	refill := func(level string) error {
 		var ids []string
-		if err := s.db.Model(&model.GameQuestion{}).Pluck("id", &ids).Error; err != nil {
+		if err := s.db.Model(&model.GameQuestion{}).Where("difficulty = ?", level).Pluck("id", &ids).Error; err != nil {
 			return err
 		}
 		mrand.Shuffle(len(ids), func(i, j int) { ids[i], ids[j] = ids[j], ids[i] })
-		s.deck = append(s.deck, ids...)
+		s.decks[level] = append(s.decks[level], ids...)
 		return nil
 	}
-	if len(s.deck) < n {
-		if err := refill(); err != nil {
+	seen := map[string]bool{}
+	// take draws up to k distinct, not-yet-picked ids of one level
+	take := func(level string, k int) ([]string, error) {
+		if len(s.decks[level]) < k {
+			if err := refill(level); err != nil {
+				return nil, err
+			}
+		}
+		got := make([]string, 0, k)
+		rest := s.decks[level][:0:0]
+		for _, id := range s.decks[level] {
+			if len(got) < k && !seen[id] {
+				got = append(got, id)
+				seen[id] = true
+			} else {
+				rest = append(rest, id)
+			}
+		}
+		s.decks[level] = rest
+		return got, nil
+	}
+
+	plan := model.DifficultyPlan(n)
+	need := map[string]int{}
+	for _, lv := range plan {
+		need[lv]++
+	}
+	pools := map[string][]string{}
+	for _, lv := range []string{model.DifficultyEasy, model.DifficultyHard} {
+		ids, err := take(lv, need[lv])
+		if err != nil {
 			return nil, err
 		}
+		pools[lv] = ids
 	}
-	// take n distinct ids (a refill can put an id already near the front)
-	picked := make([]string, 0, n)
-	seen := map[string]bool{}
-	rest := s.deck[:0:0]
-	for _, id := range s.deck {
-		if len(picked) < n && !seen[id] {
-			picked = append(picked, id)
-			seen[id] = true
-		} else {
-			rest = append(rest, id)
+	// a level short of questions borrows from the other one
+	for _, lv := range []string{model.DifficultyEasy, model.DifficultyHard} {
+		other := model.DifficultyHard
+		if lv == model.DifficultyHard {
+			other = model.DifficultyEasy
+		}
+		if short := need[lv] - len(pools[lv]); short > 0 {
+			extra, err := take(other, short)
+			if err != nil {
+				return nil, err
+			}
+			pools[lv] = append(pools[lv], extra...)
 		}
 	}
-	s.deck = rest
+	// lay the ids out in plan order
+	picked := make([]string, 0, n)
+	for _, lv := range plan {
+		if len(pools[lv]) > 0 {
+			picked = append(picked, pools[lv][0])
+			pools[lv] = pools[lv][1:]
+		}
+	}
 	if len(picked) == 0 {
 		return nil, nil
 	}
@@ -821,7 +877,7 @@ func (s *GameService) view(p *model.GamePlayer) *GameState {
 		cur = len(items) - 1
 	}
 	it := items[cur]
-	qv := &GameQuestionView{Index: cur, Category: it.Category, Text: it.Text, Options: it.Options, LimitMs: p.LimitMs}
+	qv := &GameQuestionView{Index: cur, Category: it.Category, Difficulty: it.Difficulty, Text: it.Text, Options: it.Options, LimitMs: p.LimitMs}
 	st.Question = qv
 
 	if it.Answered {
@@ -850,7 +906,7 @@ func (s *GameService) view(p *model.GamePlayer) *GameState {
 func reviewOf(items []model.GameItem) []GameReviewItem {
 	out := make([]GameReviewItem, 0, len(items))
 	for _, it := range items {
-		out = append(out, GameReviewItem{Category: it.Category, Text: it.Text, Options: it.Options, Choice: it.Choice, Correct: it.Correct, IsCorrect: it.IsCorrect, Ms: it.Ms})
+		out = append(out, GameReviewItem{Category: it.Category, Difficulty: it.Difficulty, Text: it.Text, Options: it.Options, Choice: it.Choice, Correct: it.Correct, IsCorrect: it.IsCorrect, Ms: it.Ms})
 	}
 	return out
 }
@@ -889,10 +945,16 @@ type BoardStats struct {
 type Board struct {
 	Settings      model.GameSettings `json:"settings"`
 	QuestionCount int64              `json:"questionCount"`
-	Players       []BoardRow         `json:"players"`
-	Podium        []BoardRow         `json:"podium"`
-	Stats         BoardStats         `json:"stats"`
-	ServerNow     int64              `json:"serverNow"`
+	EasyCount     int64              `json:"easyCount"`
+	HardCount     int64              `json:"hardCount"`
+	// MixedRounds is true when finished players played different rounds
+	// (question count or time per question changed mid-competition) — then
+	// comparing their correct answers is not fair, and the admin is warned.
+	MixedRounds bool       `json:"mixedRounds"`
+	Players     []BoardRow `json:"players"`
+	Podium      []BoardRow `json:"podium"`
+	Stats       BoardStats `json:"stats"`
+	ServerNow   int64      `json:"serverNow"`
 }
 
 // RankFinished orders finished players: more correct answers first, then the
@@ -922,6 +984,11 @@ func (s *GameService) Board() (*Board, error) {
 	}
 	var finished, playing, waiting []BoardRow
 	st := BoardStats{Total: len(players)}
+	type round struct {
+		total int
+		limit int64
+	}
+	rounds := map[round]bool{}
 	var sumScore, sumCorrect int
 	for _, p := range players {
 		r := BoardRow{ID: p.ID, FirstName: p.FirstName, LastName: p.LastName, Phone: p.Phone, Status: p.Status,
@@ -930,6 +997,7 @@ func (s *GameService) Board() (*Board, error) {
 		switch p.Status {
 		case model.GameFinished:
 			finished = append(finished, r)
+			rounds[round{p.Total, p.LimitMs}] = true
 			sumScore += p.Score
 			sumCorrect += p.Correct
 		case model.GamePlaying:
@@ -960,9 +1028,16 @@ func (s *GameService) Board() (*Board, error) {
 		}
 		podium = append(podium, r)
 	}
+	var easy, hard int64
+	s.db.Model(&model.GameQuestion{}).Where("difficulty = ?", model.DifficultyHard).Count(&hard)
+	total := s.QuestionCount()
+	easy = total - hard
 	return &Board{
 		Settings:      s.Settings(),
-		QuestionCount: s.QuestionCount(),
+		QuestionCount: total,
+		EasyCount:     easy,
+		HardCount:     hard,
+		MixedRounds:   len(rounds) > 1,
 		Players:       rows,
 		Podium:        podium,
 		Stats:         st,

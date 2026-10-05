@@ -12,6 +12,7 @@ import {
   deleteGamePlayer,
   deleteAllGamePlayers,
   fmtSecs,
+  difficultyPlan,
   type GameBoard,
   type BoardRow,
   type GameReviewItem,
@@ -374,6 +375,13 @@ function exportCsv() {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000)
 }
 
+/** "۳ آسان + ۲ سخت" for the current count */
+const composition = computed(() => {
+  const plan = difficultyPlan(board.value?.settings.questionsPerGame ?? sform.questionsPerGame)
+  const e = plan.filter((d) => d === 'easy').length
+  return { easy: e, hard: plan.length - e, order: plan.map((d) => (d === 'easy' ? 'آ' : 'س')).join(' ') }
+})
+
 const bankShort = computed(
   () => !!board.value && board.value.questionCount < board.value.settings.questionsPerGame,
 )
@@ -381,6 +389,14 @@ const bankShort = computed(
 
 <template>
   <div class="stack">
+    <a-alert
+      v-if="board?.mixedRounds"
+      type="warning"
+      show-icon
+      message="بازیکنان در دورهای متفاوتی بازی کرده‌اند"
+      description="تعداد سوال یا زمان هر سوال در وسط مسابقه تغییر کرده است؛ مقایسه‌ی جواب‌های درست بین این بازیکنان منصفانه نیست. برای یک مسابقه‌ی منصفانه، تنظیمات را قبل از شروع مشخص کنید و اگر لازم شد با «حذف همه‌ی نتایج» از نو شروع کنید."
+    />
+
     <!-- number of questions per game -->
     <section class="card card-pad">
       <div class="card-hd">
@@ -412,6 +428,13 @@ const bankShort = computed(
           </a-button>
         </div>
       </div>
+
+      <p class="qc-mix">
+        <AppIcon name="list" :size="13" />
+        هر بازی: <b>{{ toFa(composition.easy) }} سوال آسان + {{ toFa(composition.hard) }} سوال سخت</b>
+        <span class="faint">— به این ترتیب: {{ composition.order }}</span>
+        <span class="faint">(بانک: {{ toFa(board?.easyCount ?? 0) }} آسان، {{ toFa(board?.hardCount ?? 0) }} سخت)</span>
+      </p>
 
       <div class="qc-label qc-gap">
         <span>زمان پاسخ به هر سوال</span>
@@ -937,6 +960,14 @@ const bankShort = computed(
 }
 .qc-current {
   color: var(--primary-bright);
+}
+.qc-mix {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  font-size: 0.8rem;
 }
 .qc-label {
   display: flex;

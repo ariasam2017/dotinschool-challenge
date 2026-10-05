@@ -14,6 +14,8 @@ import {
   addDefaultGameQuestions,
   type GameQuestion,
   type GameQuestionInput,
+  type Difficulty,
+  DIFFICULTY_LABEL,
 } from '@/api/game'
 import { toFa } from '@/lib/fa'
 import Chip from '@/components/Chip.vue'
@@ -39,11 +41,15 @@ onMounted(load)
 /* ---------------- filters ---------------- */
 const search = ref('')
 const category = ref<string | undefined>(undefined)
+const level = ref<Difficulty | undefined>(undefined)
+const easyN = computed(() => list.value.filter((q) => q.difficulty !== 'hard').length)
+const hardN = computed(() => list.value.filter((q) => q.difficulty === 'hard').length)
 const categories = computed(() => [...new Set(list.value.map((q) => q.category))].sort())
 const filtered = computed(() => {
   const s = search.value.trim().toLowerCase()
   return list.value.filter((q) => {
     if (category.value && q.category !== category.value) return false
+    if (level.value && (q.difficulty || 'easy') !== level.value) return false
     if (!s) return true
     return q.text.toLowerCase().includes(s) || q.options.some((o) => o.toLowerCase().includes(s))
   })
@@ -57,6 +63,7 @@ const rowSelection = computed(() => ({
 const columns = [
   { title: 'سوال', key: 'text' },
   { title: 'گزینه‌ها', key: 'options', width: 380 },
+  { title: 'سطح', key: 'difficulty', width: 80 },
   { title: 'دسته', key: 'category', width: 120 },
   { title: '', key: 'actions', width: 96 },
 ]
@@ -67,6 +74,7 @@ const editor = reactive({
   saving: false,
   id: '' as string,
   category: 'تکنولوژی',
+  difficulty: 'easy' as Difficulty,
   text: '',
   options: ['', '', '', ''] as string[],
   correct: 0,
@@ -74,12 +82,14 @@ const editor = reactive({
 function openNew() {
   Object.assign(editor, { open: true, id: '', text: '', options: ['', '', '', ''], correct: 0 })
   if (category.value) editor.category = category.value
+  editor.difficulty = level.value || 'easy'
 }
 function openEdit(q: GameQuestion) {
   Object.assign(editor, {
     open: true,
     id: q.id,
     category: q.category,
+    difficulty: q.difficulty || 'easy',
     text: q.text,
     options: [...q.options],
     correct: q.correct,
@@ -88,6 +98,7 @@ function openEdit(q: GameQuestion) {
 async function saveEditor(another = false) {
   const payload: GameQuestionInput = {
     category: editor.category.trim(),
+    difficulty: editor.difficulty,
     text: editor.text.trim(),
     options: editor.options.map((o) => o.trim()) as GameQuestionInput['options'],
     correct: editor.correct,
@@ -161,13 +172,14 @@ function download(name: string, body: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000)
 }
 function exportJson() {
-  const rows = list.value.map(({ category, text, options, correct }) => ({ category, text, options, correct }))
+  const rows = list.value.map(({ category, difficulty, text, options, correct }) => ({ category, difficulty, text, options, correct }))
   download(`game-questions-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ questions: rows }, null, 2), 'application/json')
 }
 function csvTemplate() {
   const body =
-    '﻿سوال,گزینه ۱,گزینه ۲,گزینه ۳,گزینه ۴,شماره گزینه درست (۱ تا ۴),دسته\r\n' +
-    '"کدام شرکت سازنده‌ی اندروید است؟",اپل,گوگل,سامسونگ,مایکروسافت,2,تکنولوژی\r\n'
+    '\ufeffسوال,گزینه ۱,گزینه ۲,گزینه ۳,گزینه ۴,شماره گزینه درست (۱ تا ۴),دسته,سطح (آسان یا سخت)\r\n' +
+    '"کدام شرکت سازنده‌ی اندروید است؟",اپل,گوگل,سامسونگ,مایکروسافت,2,تکنولوژی,آسان\r\n' +
+    '"پورت پیش‌فرض HTTPS کدام است؟",80,21,443,22,3,تکنولوژی,سخت\r\n'
   download('game-questions-template.csv', body, 'text/csv;charset=utf-8')
 }
 
@@ -218,6 +230,7 @@ function fromCsv(text: string): GameQuestionInput[] {
       options: [r[1], r[2], r[3], r[4]].map((o) => (o || '').trim()) as GameQuestionInput['options'],
       correct: n - 1,
       category: (r[6] || '').trim() || 'تکنولوژی',
+      difficulty: /سخت|hard/i.test(r[7] || '') ? 'hard' : 'easy',
     }
   })
 }
@@ -234,6 +247,7 @@ function fromJson(text: string): GameQuestionInput[] {
       options: q.options.map((o: unknown) => String(o ?? '')) as GameQuestionInput['options'],
       correct: Number(q.correct) || 0,
       category: typeof q.category === 'string' ? q.category : 'تکنولوژی',
+      difficulty: q.difficulty === 'hard' || q.difficulty === 'سخت' ? 'hard' : 'easy',
     }
   })
 }
@@ -276,6 +290,8 @@ async function runImport() {
       <div class="card-hd">
         <span class="section-title grow">
           بانک سوالات بازی — <span class="num">{{ toFa(list.length) }}</span> سوال
+          <Chip tone="success">{{ toFa(easyN) }} آسان</Chip>
+          <Chip tone="warning">{{ toFa(hardN) }} سخت</Chip>
         </span>
         <a-button :loading="addingDefaults" @click="addDefaults">
           <template #icon><AppIcon name="database" :size="14" /></template>
@@ -297,6 +313,16 @@ async function runImport() {
           allow-clear
           style="width: 160px"
           :options="categories.map((c) => ({ value: c, label: c }))"
+        />
+        <a-select
+          v-model:value="level"
+          placeholder="همه‌ی سطح‌ها"
+          allow-clear
+          style="width: 130px"
+          :options="[
+            { value: 'easy', label: 'آسان' },
+            { value: 'hard', label: 'سخت' },
+          ]"
         />
         <div class="grow" />
         <span class="faint small">{{ toFa(filtered.length) }} سوال</span>
@@ -341,6 +367,11 @@ async function runImport() {
               </span>
             </div>
           </template>
+          <template v-else-if="column.key === 'difficulty'">
+            <Chip :tone="record.difficulty === 'hard' ? 'warning' : 'success'">
+              {{ DIFFICULTY_LABEL[(record.difficulty || 'easy') as Difficulty] }}
+            </Chip>
+          </template>
           <template v-else-if="column.key === 'category'"><Chip tone="info">{{ record.category }}</Chip></template>
           <template v-else-if="column.key === 'actions'">
             <div class="row-actions">
@@ -372,6 +403,13 @@ async function runImport() {
             placeholder="مثلاً تکنولوژی"
           />
         </label>
+        <div class="f">
+          <span>سطح سوال</span>
+          <a-radio-group v-model:value="editor.difficulty" button-style="solid">
+            <a-radio-button value="easy">آسان</a-radio-button>
+            <a-radio-button value="hard">سخت</a-radio-button>
+          </a-radio-group>
+        </div>
         <label class="f">
           <span>متن سوال</span>
           <a-textarea v-model:value="editor.text" :rows="3" :maxlength="600" show-count placeholder="سوال را بنویسید…" />

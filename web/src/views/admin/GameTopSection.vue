@@ -57,6 +57,13 @@ const showTiming = computed(() => {
 
 <template>
   <div class="stack">
+    <a-alert
+      v-if="board?.mixedRounds"
+      type="warning"
+      show-icon
+      message="بازیکنان در دورهای متفاوتی بازی کرده‌اند"
+      description="تعداد سوال یا زمان هر سوال در وسط مسابقه تغییر کرده؛ این رتبه‌بندی بین آن‌ها منصفانه نیست."
+    />
     <section class="card card-pad">
       <div class="card-hd">
         <span class="section-title grow"><AppIcon name="crown" :size="16" /> ۳ نفر برتر مسابقه</span>

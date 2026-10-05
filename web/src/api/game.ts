@@ -5,9 +5,12 @@ import { apiFetch } from './client'
 export type GamePhase = 'ready' | 'question' | 'reveal' | 'finished'
 export type GameStatus = 'registered' | 'playing' | 'finished'
 
+export type Difficulty = 'easy' | 'hard'
+
 export interface GameQuestionView {
   index: number
   category: string
+  difficulty: Difficulty
   text: string
   options: [string, string, string, string]
   limitMs: number
@@ -31,6 +34,7 @@ export interface GameResult {
 
 export interface GameReviewItem {
   category: string
+  difficulty?: Difficulty
   text: string
   options: [string, string, string, string]
   choice: number // -1 timeout, -2 not answered yet (admin live view)
@@ -95,6 +99,10 @@ export interface BoardRow {
 export interface GameBoard {
   settings: GameSettings
   questionCount: number
+  easyCount: number
+  hardCount: number
+  /** finished players played different rounds (count/time changed mid-competition) */
+  mixedRounds: boolean
   players: BoardRow[]
   podium: BoardRow[]
   stats: {
@@ -111,6 +119,7 @@ export interface GameBoard {
 export interface GameQuestion {
   id: string
   category: string
+  difficulty: Difficulty
   text: string
   options: [string, string, string, string]
   correct: number
@@ -172,6 +181,19 @@ export const importGameQuestions = (questions: GameQuestionInput[], replace: boo
   })
 export const addDefaultGameQuestions = () =>
   apiFetch<{ ok: true; added: number }>('/api/admin/game/questions/defaults', { method: 'POST' })
+
+/** The easy/hard order of an n-question game (mirrors model.DifficultyPlan). */
+export function difficultyPlan(n: number): Difficulty[] {
+  const ten: Difficulty[] = ['easy', 'easy', 'easy', 'hard', 'hard', 'easy', 'easy', 'easy', 'easy', 'hard']
+  const five: Difficulty[] = ['easy', 'easy', 'easy', 'hard', 'hard']
+  const tails: Difficulty[][] = [[], ['easy'], ['easy', 'hard'], ['easy', 'easy', 'hard'], ['easy', 'easy', 'easy', 'hard']]
+  const plan: Difficulty[] = []
+  while (n - plan.length >= 10) plan.push(...ten)
+  if (n - plan.length >= 5) plan.push(...five)
+  plan.push(...tails[n - plan.length])
+  return plan
+}
+export const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: 'آسان', hard: 'سخت' }
 
 /* ---- formatting ---- */
 /** "۱۲٫۴ ثانیه" style seconds from ms, one decimal. */

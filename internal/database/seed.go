@@ -139,6 +139,18 @@ func seedGameBank(db *gorm.DB) error {
 			return err
 		}
 	}
+	// v4: built-in questions carry a difficulty; tag the ones already in an
+	// older database (matched by exact text — admin-written ones stay "easy")
+	var hardTexts []string
+	for _, q := range model.DefaultGameQuestions() {
+		if q.Difficulty == model.DifficultyHard {
+			hardTexts = append(hardTexts, q.Text)
+		}
+	}
+	if err := db.Model(&model.GameQuestion{}).Where("text IN ?", hardTexts).
+		Update("difficulty", model.DifficultyHard).Error; err != nil {
+		return err
+	}
 	raw, _ := json.Marshal(model.GameBankVersion)
 	return db.Save(&model.Setting{Key: keyGameBankVersion, Value: string(raw)}).Error
 }
