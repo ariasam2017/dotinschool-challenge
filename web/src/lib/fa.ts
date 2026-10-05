@@ -31,10 +31,11 @@ export function fmtRemain(ms: number): string {
   return `${toFa(pad2(h))}:${toFa(pad2(m))}:${toFa(pad2(s))}`
 }
 
-/** "+۹۸ ۹۱۲ ۳۴۵ ۶۷۸۹" from a bare "9XXXXXXXXX". */
+/** "+۹۸ ۹۱۲ ۳۴۵ ۶۷۸۹" from a bare "9XXXXXXXXX". Wrapped in Unicode LTR isolate
+ *  marks (LRI…PDI) so RTL text never reorders the groups ("۶۷۸۹ ۳۴۵ ۹۱۲ ۹۸+"). */
 export function fmtPhone(p: string): string {
   if (!/^9\d{9}$/.test(p)) return toFa(p)
-  return `+۹۸ ${toFa(p.slice(0, 3))} ${toFa(p.slice(3, 6))} ${toFa(p.slice(6))}`
+  return `⁦+۹۸ ${toFa(p.slice(0, 3))} ${toFa(p.slice(3, 6))} ${toFa(p.slice(6))}⁩`
 }
 
 /** "HH:MM" local time from an epoch-ms timestamp. */

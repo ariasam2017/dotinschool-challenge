@@ -428,7 +428,7 @@ const saving = ref(false)
 const publishing = ref(false)
 const device = ref<'desktop' | 'mobile'>('desktop')
 const activeTab = ref('settings')
-const previewSrc = ref('/?preview=1')
+const previewSrc = ref('/challenge?preview=1')
 const iframeEl = ref<HTMLIFrameElement | null>(null)
 
 /* The preview iframe fills the pane. Which override LAYER applies (موبایل /
@@ -551,7 +551,7 @@ function sendRetarget(dir: 'up' | 'down'): void {
 }
 
 function reloadPreview(): void {
-  previewSrc.value = '/?preview=1&t=' + Date.now()
+  previewSrc.value = '/challenge?preview=1&t=' + Date.now()
   picking.value = false
 }
 

@@ -1,0 +1,113 @@
+package model
+
+// GameQuestion is one four-option question in the quiz bank. Players are dealt
+// a random subset; the correct option index is never sent to a player before
+// they answer.
+type GameQuestion struct {
+	ID        string `gorm:"primaryKey;column:id" json:"id"`
+	Category  string `gorm:"column:category;not null;default:''" json:"category"`
+	Text      string `gorm:"column:text;not null" json:"text"`
+	Option1   string `gorm:"column:option1;not null" json:"-"`
+	Option2   string `gorm:"column:option2;not null" json:"-"`
+	Option3   string `gorm:"column:option3;not null" json:"-"`
+	Option4   string `gorm:"column:option4;not null" json:"-"`
+	Correct   int    `gorm:"column:correct;not null" json:"correct"` // 0..3
+	CreatedAt int64  `gorm:"column:created_at;not null" json:"createdAt"`
+}
+
+func (GameQuestion) TableName() string { return "game_questions" }
+
+// Options returns the four answers in their authored order.
+func (q GameQuestion) Options() [4]string {
+	return [4]string{q.Option1, q.Option2, q.Option3, q.Option4}
+}
+
+// SetOptions stores the four answers.
+func (q *GameQuestion) SetOptions(o [4]string) {
+	q.Option1, q.Option2, q.Option3, q.Option4 = o[0], o[1], o[2], o[3]
+}
+
+// GamePlayer is one registered quiz player together with their single run.
+// The game is individual and one-shot: a player is dealt Items at start and
+// walks through them in order; the server times every answer.
+type GamePlayer struct {
+	ID         string `gorm:"primaryKey;column:id" json:"id"`
+	Token      string `gorm:"uniqueIndex;column:token;not null" json:"-"`
+	FirstName  string `gorm:"column:first_name;not null" json:"firstName"`
+	LastName   string `gorm:"column:last_name;not null" json:"lastName"`
+	Phone      string `gorm:"uniqueIndex;column:phone;not null" json:"phone"`
+	CreatedAt  int64  `gorm:"column:created_at;not null" json:"createdAt"`
+	Status     string `gorm:"column:status;not null;default:registered" json:"status"`
+	StartedAt  int64  `gorm:"column:started_at;not null;default:0" json:"startedAt"`
+	FinishedAt int64  `gorm:"column:finished_at;not null;default:0" json:"finishedAt"`
+	LimitMs    int64  `gorm:"column:limit_ms;not null;default:0" json:"limitMs"` // per question, fixed at start
+	Current    int    `gorm:"column:current;not null;default:0" json:"current"`
+	Correct    int    `gorm:"column:correct;not null;default:0" json:"correct"`
+	Answered   int    `gorm:"column:answered;not null;default:0" json:"answered"`
+	Total      int    `gorm:"column:total;not null;default:0" json:"total"`
+	TotalMs    int64  `gorm:"column:total_ms;not null;default:0" json:"totalMs"`
+	Score      int    `gorm:"column:score;not null;default:0" json:"score"`
+	// Items is the JSON-encoded []GameItem dealt at start.
+	Items string `gorm:"column:items;not null;default:'[]'" json:"-"`
+}
+
+func (GamePlayer) TableName() string { return "game_players" }
+
+// Game player status values.
+const (
+	GameRegistered = "registered"
+	GamePlaying    = "playing"
+	GameFinished   = "finished"
+)
+
+// GameItem is one dealt question, snapshotted (text + shuffled options) so a
+// later edit or delete in the bank never changes a played game.
+type GameItem struct {
+	QID       string    `json:"qid"`
+	Category  string    `json:"category"`
+	Text      string    `json:"text"`
+	Options   [4]string `json:"options"` // display order
+	Correct   int       `json:"correct"` // display index
+	ServedAt  int64     `json:"servedAt"`
+	Answered  bool      `json:"answered"`
+	Choice    int       `json:"choice"` // display index, -1 = time ran out
+	IsCorrect bool      `json:"isCorrect"`
+	Ms        int64     `json:"ms"`
+}
+
+// GameSettings is the admin-tunable quiz configuration (settings key "game").
+type GameSettings struct {
+	Open               bool   `json:"open"`
+	QuestionsPerGame   int    `json:"questionsPerGame"`
+	SecondsPerQuestion int    `json:"secondsPerQuestion"`
+	FinishMessage      string `json:"finishMessage"`
+
+	// Winner-announcement animation: how long the name roller spins before
+	// each place is revealed (3rd, then 2nd, then 1st), and the pause
+	// between one reveal and the next roll — all in seconds.
+	RevealThirdSec  int `json:"revealThirdSec"`
+	RevealSecondSec int `json:"revealSecondSec"`
+	RevealFirstSec  int `json:"revealFirstSec"`
+	RevealGapSec    int `json:"revealGapSec"`
+
+	// TestMode lets a player wipe their own finished run and play again from
+	// the result screen — for rehearsing before the real competition.
+	TestMode bool `json:"testMode"`
+}
+
+// KeyGameSettings stores GameSettings.
+const KeyGameSettings = "game"
+
+// DefaultGameSettings mirrors Quiz of Kings: three questions, 20 s each.
+func DefaultGameSettings() GameSettings {
+	return GameSettings{
+		Open:               true,
+		QuestionsPerGame:   3,
+		SecondsPerQuestion: 20,
+		FinishMessage:      "بازی‌ات تمام شد و نتیجه ثبت شد! برندگان پس از پایان مسابقه اعلام می‌شوند. ممنون که شرکت کردی 🌟",
+		RevealThirdSec:     6,
+		RevealSecondSec:    9,
+		RevealFirstSec:     15,
+		RevealGapSec:       4,
+	}
+}

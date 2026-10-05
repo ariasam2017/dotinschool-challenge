@@ -39,7 +39,7 @@ interface FetchOpts {
   body?: unknown
 }
 
-async function apiFetch<T = unknown>(path: string, opts: FetchOpts = {}): Promise<T> {
+export async function apiFetch<T = unknown>(path: string, opts: FetchOpts = {}): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const token = adminToken.get()
   if (token) headers['Authorization'] = 'Bearer ' + token

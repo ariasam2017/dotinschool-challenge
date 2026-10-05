@@ -48,7 +48,7 @@ func (s *server) requestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
-		if c.Request.URL.Path == "/api/config" && c.Writer.Status() < 400 {
+		if (c.Request.URL.Path == "/api/config" || c.Request.URL.Path == "/api/admin/game/board") && c.Writer.Status() < 400 {
 			return // the panels poll this every second — don't drown the log
 		}
 		s.log.WithFields(logrus.Fields{

@@ -25,7 +25,14 @@ interface NavGroup {
 }
 const NAV: NavGroup[] = [
   {
-    label: 'رویداد',
+    label: 'بازی',
+    items: [
+      { name: 'admin-game', label: 'نتایج زنده‌ی بازی', icon: 'trophy' },
+      { name: 'admin-game-questions', label: 'بانک سوالات بازی', icon: 'help-circle' },
+    ],
+  },
+  {
+    label: 'چالش برنامه‌نویسی',
     items: [
       { name: 'admin-overview', label: 'نمای کلی رویداد', icon: 'activity' },
       { name: 'admin-schedule', label: 'زمان‌بندی', icon: 'calendar' },

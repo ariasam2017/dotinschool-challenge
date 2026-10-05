@@ -60,6 +60,12 @@ func EnsureDefaults(db *gorm.DB) error {
 	if err := set(model.KeyEventStartsAt, nil); err != nil {
 		return err
 	}
+	if err := set(model.KeyGameSettings, model.DefaultGameSettings()); err != nil {
+		return err
+	}
+	if err := seedGameBank(db); err != nil {
+		return err
+	}
 
 	// Ship a tuned Design Studio layer as the default for a fresh install
 	// (no-op while appearance.default.json is just "{}").
@@ -75,6 +81,66 @@ func EnsureDefaults(db *gorm.DB) error {
 		}
 	}
 	return nil
+}
+
+// keyGameBankSeeded is the legacy "bank loaded once" flag (= version 1);
+// keyGameBankVersion records which built-in bank version this DB has received.
+const (
+	keyGameBankSeeded  = "gameBankSeeded"
+	keyGameBankVersion = "gameBankVersion"
+)
+
+// seedGameBank adds the built-in technology questions this database has not
+// received yet. It runs once per bank version (model.GameBankVersion), so an
+// admin who deletes questions does not get them back on every restart — only
+// when a newer built-in bank ships, and then only questions whose text is not
+// already present.
+func seedGameBank(db *gorm.DB) error {
+	have := 0
+	var row model.Setting
+	if db.Where("key = ?", keyGameBankVersion).First(&row).Error == nil {
+		_ = json.Unmarshal([]byte(row.Value), &have)
+	} else {
+		var legacy int64
+		if err := db.Model(&model.Setting{}).Where("key = ?", keyGameBankSeeded).Count(&legacy).Error; err != nil {
+			return err
+		}
+		if legacy > 0 {
+			have = 1
+		}
+	}
+	if have >= model.GameBankVersion {
+		return nil
+	}
+
+	if err := db.Where("text IN ?", model.RetiredBankTexts).Delete(&model.GameQuestion{}).Error; err != nil {
+		return err
+	}
+	var texts []string
+	if err := db.Model(&model.GameQuestion{}).Pluck("text", &texts).Error; err != nil {
+		return err
+	}
+	existing := make(map[string]bool, len(texts))
+	for _, t := range texts {
+		existing[t] = true
+	}
+	base := nowMs()
+	var rows []model.GameQuestion
+	for i, q := range model.DefaultGameQuestions() {
+		if existing[q.Text] {
+			continue
+		}
+		q.ID = uuid.NewString()
+		q.CreatedAt = base - int64(i)
+		rows = append(rows, q)
+	}
+	if len(rows) > 0 {
+		if err := db.CreateInBatches(rows, 200).Error; err != nil {
+			return err
+		}
+	}
+	raw, _ := json.Marshal(model.GameBankVersion)
+	return db.Save(&model.Setting{Key: keyGameBankVersion, Value: string(raw)}).Error
 }
 
 var namesPool = [][2]string{

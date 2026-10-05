@@ -53,7 +53,7 @@ Add `GOFLAGS=-p=2` if a build/test run OOMs (the 32-bit `go` process is
 address-space-limited; the `windows/amd64` link step is the usual casualty —
 `linux/amd64` always builds and is what Docker actually ships).
 
-Test files: `internal/service/{ai,participant,ratelimit}_test.go`,
+Test files: `internal/service/{ai,game,participant,ratelimit}_test.go`,
 `internal/web/handlers_ai_test.go`. There is **no in-repo HTTP integration
 harness** — endpoint behaviour is checked by building `./cmd/server`, running it
 against a throwaway `DATA_DIR`, and curling it.
@@ -127,6 +127,40 @@ the cross-file business logic that table doesn't spell out:
   admin-login attempts are logged by IP, and `dotinschool fail2ban`
   (`scripts/install.sh`) auto-bans after repeated failures on bare-metal
   installs.
+
+### Quiz game ("Game مدرسه داتین")
+
+A Quiz-of-Kings style individual quiz that is the **user panel's landing page**
+(`/` → `views/game/GameApp.vue`); the coding challenge moved to `/challenge`.
+Admin pages: `admin/game` (live board, default admin route) and
+`admin/game-questions` (bank editor, CSV/JSON import). Backend:
+`service/game.go` + `handlers_game.go`, tables `game_questions` / `game_players`,
+settings key `game`. Registration is name + mobile, **no OTP**; the player token
+is persisted on the row (survives restarts, unlike `SessionService`). The server
+deals a random question subset with shuffled options, **never sends the answer
+key before the answer**, and times each answer from when it served the question
+(`answerGraceMs` latency allowance; an abandoned question times out lazily in
+`State`). Ranking: correct count desc, then total time asc; score =
+100 × correct + up to 99 speed bonus (`ComputeGameScore`); the player API never
+sends time/score back — only the correct count (the admin board has both).
+
+- **Concurrency** (sized for ~40 simultaneous players): per-player *striped*
+  locks (`lockPlayer`, keyed by player id) instead of one global mutex,
+  settings cached in an `atomic.Pointer` (refreshed by `SaveSettings`), and
+  questions dealt from a shuffled **deck** (`deal`) so consecutive players get
+  distinct questions until the bank is exhausted; any bank mutation bumps
+  `bankRev` and the deck is rebuilt. `TestGameFortyConcurrentPlayers` covers it.
+- **Built-in bank** (`model/game_bank.go`, correct answer written first, rotated
+  on seed) is versioned: bump `GameBankVersion` when adding questions and
+  `seedGameBank` adds the missing ones (by exact text) to existing DBs once;
+  list replaced questions in `RetiredBankTexts`. `TestBuiltInBankIsClean`
+  fails on a duplicate or invalid built-in question.
+- **Test mode** (`settings.testMode`) exposes `POST /api/game/replay` so a
+  player can replay from the result screen; refused (403) when off.
+- **Winner reveal** (`components/WinnerReveal.vue` + `lib/revealSound.ts`,
+  Web Audio — no audio files): rolls names per place (3rd→1st) for
+  `reveal{Third,Second,First}Sec`, then holds on "؟" until Enter/tap. The
+  admin board also has a demo mode with made-up players (no DB access).
 
 ### Data-movement paths (all in the admin overview "پشتیبان‌گیری دیتابیس" card)
 

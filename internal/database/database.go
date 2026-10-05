@@ -107,6 +107,12 @@ func Validate(path string, log *logrus.Logger) error {
 	if err == nil {
 		err = db.Model(&model.ClientError{}).Count(&n).Error
 	}
+	if err == nil {
+		err = db.Model(&model.GameQuestion{}).Count(&n).Error
+	}
+	if err == nil {
+		err = db.Model(&model.GamePlayer{}).Count(&n).Error
+	}
 	Close(db)
 	CleanSidecars(path)
 	return err
@@ -120,6 +126,8 @@ func Migrate(db *gorm.DB) error {
 		&model.Participant{},
 		&model.Setting{},
 		&model.ClientError{},
+		&model.GameQuestion{},
+		&model.GamePlayer{},
 	)
 }
 
