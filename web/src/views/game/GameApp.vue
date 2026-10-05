@@ -21,6 +21,7 @@ import {
 } from '@/api/game'
 import { toFa, toEn } from '@/lib/fa'
 import AppIcon from '@/components/AppIcon.vue'
+import dotinLogo from '@/assets/brand/dotin-school-logo-w.svg'
 
 const TOKEN_KEY = 'dotinschool_game_token_v1'
 const REVEAL_MS = 1800 // how long the green/red reveal stays before moving on
@@ -377,7 +378,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
         <!-- registration -->
         <section v-else-if="screen === 'register'" key="register" class="g-panel">
           <div class="g-hero">
-            <span class="g-hero-badge"><AppIcon name="code" :size="34" /></span>
+            <img class="g-hero-logo" :src="dotinLogo" alt="مدرسه داتین" width="108" height="92" />
             <p class="g-kicker">&lt;tech-quiz /&gt;</p>
             <h1>به <b>Game</b> مدرسه داتین خوش آمدی!</h1>
             <p>
@@ -482,15 +483,17 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
           <div v-else-if="q && !showResult" class="g-play">
             <div class="g-hud">
               <span class="g-qnum">سوال {{ toFa(q.index + 1) }} از {{ toFa(st.total) }}</span>
-              <div class="g-dots" aria-hidden="true">
+              <div class="g-dots" :class="{ many: st.progress.length > 6 }" aria-hidden="true">
                 <span
                   v-for="(p, i) in st.progress"
                   :key="i"
                   class="g-dot"
                   :class="[p, { current: i === q.index && p === 'pending' }]"
                 >
-                  <AppIcon v-if="p === 'correct'" name="check" :size="12" />
-                  <AppIcon v-else-if="p === 'wrong'" name="x" :size="12" />
+                  <template v-if="st.progress.length <= 6">
+                    <AppIcon v-if="p === 'correct'" name="check" :size="12" />
+                    <AppIcon v-else-if="p === 'wrong'" name="x" :size="12" />
+                  </template>
                 </span>
               </div>
             </div>
@@ -754,16 +757,12 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   text-align: center;
   padding: 10px 4px 0;
 }
-.g-hero-badge {
-  display: inline-grid;
-  place-items: center;
-  width: 74px;
-  height: 74px;
-  border-radius: 22px;
-  background: linear-gradient(135deg, var(--g-cyan), var(--g-violet));
-  color: #04111f;
-  box-shadow: 0 0 0 6px rgba(34, 211, 238, 0.1), 0 0 34px rgba(34, 211, 238, 0.45);
-  margin-bottom: 10px;
+.g-hero-logo {
+  display: block;
+  width: 108px;
+  height: auto;
+  margin: 4px auto 14px;
+  filter: drop-shadow(0 0 18px rgba(34, 211, 238, 0.45));
   animation: g-float 3.2s ease-in-out infinite;
 }
 .g-kicker {
@@ -1049,6 +1048,21 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 .g-qnum {
   font-weight: 800;
   font-size: 1rem;
+  white-space: nowrap;
+  flex: none;
+}
+/* many questions (e.g. 10+): the dots become one slim segmented bar */
+.g-dots.many {
+  flex: 1;
+  flex-wrap: nowrap;
+  gap: 3px;
+}
+.g-dots.many .g-dot {
+  flex: 1;
+  width: auto;
+  height: 8px;
+  border-radius: 4px;
+  border-width: 1px;
 }
 .g-dots {
   display: flex;

@@ -8,12 +8,12 @@ import { fmtSecs, type BoardRow } from '@/api/game'
 import { toFa } from '@/lib/fa'
 import { createRevealSound, type RevealSound } from '@/lib/revealSound'
 import AppIcon from './AppIcon.vue'
+import dotinLogo from '@/assets/brand/dotin-school-logo-w.svg'
 
 const props = defineProps<{
   podium: BoardRow[] // ranked, up to 3
   names: string[] // every participant, for the roller
   timing: { third: number; second: number; first: number; gap: number } // seconds
-  totalPlayers: number
   /** sample data — shows a "دمو" badge */
   demo?: boolean
 }>()
@@ -212,7 +212,8 @@ onBeforeUnmount(() => {
 
       <header class="wr-top">
         <span class="wr-brand">
-          <AppIcon name="trophy" :size="20" /> اعلام نتایج <b>Game</b> مدرسه داتین
+          <img class="wr-brand-logo" :src="dotinLogo" alt="" width="34" height="29" />
+          اعلام نتایج <b>Game</b> مدرسه داتین
           <span v-if="demo" class="wr-demo">دمو — داده‌ی نمونه</span>
         </span>
         <div class="wr-tools">
@@ -228,12 +229,8 @@ onBeforeUnmount(() => {
       <main class="wr-main">
         <!-- intro -->
         <section v-if="stage === 'intro'" class="wr-intro">
-          <span class="wr-intro-icon"><AppIcon name="trophy" :size="56" /></span>
+          <img class="wr-intro-logo" :src="dotinLogo" alt="مدرسه داتین" width="150" height="128" />
           <h1>لحظه‌ی اعلام برندگان</h1>
-          <p>
-            معرفی {{ toFa(order.length) }} نفر برتر از میان {{ toFa(totalPlayers) }} شرکت‌کننده —
-            به ترتیب نفر سوم، دوم و اول
-          </p>
           <button type="button" class="wr-start" @click="start">
             <AppIcon name="play" :size="22" /> شروع اعلام نتایج
           </button>
@@ -287,6 +284,7 @@ onBeforeUnmount(() => {
 
         <!-- final podium -->
         <section v-else-if="stage === 'final'" class="wr-final">
+          <img class="wr-final-logo" :src="dotinLogo" alt="مدرسه داتین" width="96" height="82" />
           <h2>برندگان Game مدرسه داتین</h2>
           <p class="wr-rule">رتبه‌بندی بر اساس تعداد جواب درست و سپس سرعت پاسخ‌گویی</p>
           <div class="wr-podium">
@@ -436,17 +434,24 @@ onBeforeUnmount(() => {
   text-align: center;
   max-width: 720px;
 }
-.wr-intro-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 120px;
-  height: 120px;
-  border-radius: 36px;
-  background: linear-gradient(135deg, var(--gold), #f97316);
-  color: #1a1204;
-  box-shadow: 0 0 60px rgba(251, 191, 36, 0.45);
-  margin-bottom: 22px;
+.wr-brand-logo {
+  height: 28px;
+  width: auto;
+}
+.wr-intro-logo {
+  display: block;
+  width: clamp(110px, 16vw, 150px);
+  height: auto;
+  margin: 0 auto 22px;
+  filter: drop-shadow(0 0 26px rgba(34, 211, 238, 0.5));
   animation: float 3s ease-in-out infinite;
+}
+.wr-final-logo {
+  display: block;
+  width: clamp(70px, 9vw, 96px);
+  height: auto;
+  margin: 0 auto 10px;
+  filter: drop-shadow(0 0 22px rgba(251, 191, 36, 0.45));
 }
 .wr-intro h1 {
   color: #fff;
@@ -462,7 +467,7 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 26px;
   padding: 16px 40px;
   border: 0;
   border-radius: 18px;

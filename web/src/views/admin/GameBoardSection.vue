@@ -80,6 +80,19 @@ async function saveSettings(patch?: Partial<typeof sform>) {
 function toggleOpen(v: boolean | string | number) {
   void saveSettings({ open: !!v })
 }
+/* questions per game: one-tap presets + a custom count, saved immediately */
+const QC_PRESETS = [3, 5, 10, 15, 20]
+const qcCustom = ref<number | undefined>(undefined)
+async function setQuestionCount(n: number) {
+  const bank = board.value?.questionCount ?? 0
+  if (n < 1 || n > 50) return message.error('تعداد سوال باید بین ۱ تا ۵۰ باشد')
+  if (n > bank) return message.error(`بانک فقط ${toFa(bank)} سوال دارد — اول سوال اضافه کنید`)
+  // keep any other unsaved edits out of this one-click save
+  const s = board.value?.settings
+  if (s) Object.assign(sform, s)
+  await saveSettings({ questionsPerGame: n })
+  qcCustom.value = undefined
+}
 function toggleTestMode(v: boolean | string | number) {
   void saveSettings({ testMode: !!v })
 }
@@ -193,6 +206,34 @@ const rows = computed(() => {
     return `${r.firstName} ${r.lastName}`.toLowerCase().includes(q) || (!!qd && r.phone.includes(qd))
   })
 })
+
+/* ---------------- pagination: 5 players per page ---------------- */
+const PAGE_SIZE = 5
+const page = ref(1)
+const livePage = ref(1)
+const pageOf = <T,>(list: T[], p: number) => list.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE)
+const pagedRows = computed(() => pageOf(rows.value, page.value))
+const pagedLive = computed(() => pageOf(livePlayers.value, livePage.value))
+// a new search/filter starts from page 1
+watch([search, statusFilter], () => (page.value = 1))
+// the live poll can shrink a list — never leave the view on an empty page
+watch(
+  () => rows.value.length,
+  (n) => (page.value = Math.min(page.value, Math.max(1, Math.ceil(n / PAGE_SIZE)))),
+)
+watch(
+  () => livePlayers.value.length,
+  (n) => (livePage.value = Math.min(livePage.value, Math.max(1, Math.ceil(n / PAGE_SIZE)))),
+)
+const tablePagination = computed(() => ({
+  current: page.value,
+  pageSize: PAGE_SIZE,
+  total: rows.value.length,
+  hideOnSinglePage: true,
+  showSizeChanger: false,
+  showTotal: (total: number) => `${toFa(total)} نفر`,
+  onChange: (p: number) => (page.value = p),
+}))
 
 const columns = [
   { title: 'رتبه', key: 'rank', width: 70 },
@@ -329,6 +370,43 @@ const bankShort = computed(
 
 <template>
   <div class="stack">
+    <!-- number of questions per game -->
+    <section class="card card-pad">
+      <div class="card-hd">
+        <span class="section-title grow"><AppIcon name="list" :size="16" /> تعداد سوالات مسابقه</span>
+        <span class="faint small">
+          فعلی: <b class="num qc-current">{{ toFa(board?.settings.questionsPerGame ?? sform.questionsPerGame) }} سوال</b>
+        </span>
+      </div>
+      <div class="qc-row">
+        <button
+          v-for="n in QC_PRESETS"
+          :key="n"
+          type="button"
+          class="qc-btn"
+          :class="{ on: (board?.settings.questionsPerGame ?? sform.questionsPerGame) === n }"
+          :disabled="savingSettings || n > (board?.questionCount ?? 0)"
+          @click="setQuestionCount(n)"
+        >
+          <b class="num">{{ toFa(n) }}</b>
+          <small>سوال</small>
+        </button>
+        <div class="qc-custom">
+          <a-input-number v-model:value="qcCustom" :min="1" :max="50" placeholder="تعداد دلخواه" style="width: 130px" />
+          <a-button :disabled="!qcCustom || savingSettings" :loading="savingSettings" @click="setQuestionCount(qcCustom!)">
+            اعمال
+          </a-button>
+        </div>
+      </div>
+      <p class="faint small qc-note">
+        هر بازیکن این تعداد سوال تصادفی از بانک ({{ toFa(board?.questionCount ?? 0) }} سوال) می‌گیرد.
+        تغییر فقط روی بازی‌هایی اثر دارد که از این به بعد شروع می‌شوند؛ کسی که الان در حال بازی است با همان تعداد قبلی ادامه می‌دهد.
+        <template v-if="board">
+          مدت هر بازی حداکثر {{ toFa(Math.ceil((board.settings.questionsPerGame * board.settings.secondsPerQuestion) / 60)) }} دقیقه است.
+        </template>
+      </p>
+    </section>
+
     <!-- settings -->
     <section class="card card-pad">
       <div class="card-hd">
@@ -339,10 +417,6 @@ const bankShort = computed(
         </span>
       </div>
       <div class="settings-grid">
-        <label class="f">
-          <span>تعداد سوال هر بازی</span>
-          <a-input-number v-model:value="sform.questionsPerGame" :min="1" :max="50" style="width: 100%" @change="markDirty" />
-        </label>
         <label class="f">
           <span>زمان هر سوال (ثانیه)</span>
           <a-input-number v-model:value="sform.secondsPerQuestion" :min="5" :max="300" style="width: 100%" @change="markDirty" />
@@ -467,7 +541,7 @@ const bankShort = computed(
         <Chip>{{ toFa(waitingPlayers.length) }} نفر در انتظار شروع</Chip>
       </div>
       <div v-if="livePlayers.length" class="live-grid">
-        <div v-for="r in livePlayers" :key="r.id" class="live-item">
+        <div v-for="r in pagedLive" :key="r.id" class="live-item">
           <div class="live-top">
             <b>{{ r.firstName }} {{ r.lastName }}</b>
             <span class="phone">{{ phoneText(r.phone) }}</span>
@@ -490,7 +564,16 @@ const bankShort = computed(
           </div>
         </div>
       </div>
-      <div v-else class="empty">الان کسی در حال بازی نیست.</div>
+      <a-pagination
+        v-if="livePlayers.length > PAGE_SIZE"
+        v-model:current="livePage"
+        class="pager"
+        :total="livePlayers.length"
+        :page-size="PAGE_SIZE"
+        :show-size-changer="false"
+        size="small"
+      />
+      <div v-if="!livePlayers.length" class="empty">الان کسی در حال بازی نیست.</div>
       <div v-if="waitingPlayers.length" class="waiting">
         <span class="faint small">ثبت‌نام کرده و هنوز شروع نکرده:</span>
         <Chip v-for="r in waitingPlayers" :key="r.id">{{ r.firstName }} {{ r.lastName }}</Chip>
@@ -528,7 +611,7 @@ const bankShort = computed(
 
       <!-- phones: one card per player instead of the wide table -->
       <div class="m-list">
-        <div v-for="r in rows" :key="r.id" class="m-row" :class="{ top: r.rank && r.rank <= 3 && r.correct > 0 }">
+        <div v-for="r in pagedRows" :key="r.id" class="m-row" :class="{ top: r.rank && r.rank <= 3 && r.correct > 0 }">
           <span class="m-rank">
             <template v-if="r.rank && r.rank <= 3 && r.correct > 0">{{ MEDALS[r.rank - 1] }}</template>
             <template v-else-if="r.rank">{{ toFa(r.rank) }}</template>
@@ -562,6 +645,15 @@ const bankShort = computed(
             </div>
           </div>
         </div>
+        <a-pagination
+          v-if="rows.length > PAGE_SIZE"
+          v-model:current="page"
+          class="pager"
+          :total="rows.length"
+          :page-size="PAGE_SIZE"
+          :show-size-changer="false"
+          size="small"
+        />
         <div v-if="!rows.length" class="empty">هنوز بازیکنی ثبت‌نام نکرده است.</div>
       </div>
 
@@ -571,7 +663,7 @@ const bankShort = computed(
         :data-source="rows"
         row-key="id"
         size="small"
-        :pagination="{ pageSize: 20, hideOnSinglePage: true }"
+        :pagination="tablePagination"
         :scroll="{ x: 1200 }"
         :row-class-name="(r: BoardRow) => (r.rank && r.rank <= 3 ? 'top-row' : '')"
       >
@@ -670,7 +762,6 @@ const bankShort = computed(
       :podium="DEMO_PODIUM"
       :names="DEMO_NAMES"
       :timing="showTiming"
-      :total-players="DEMO_NAMES.length"
       @close="demoOpen = false"
     />
     <WinnerReveal
@@ -678,7 +769,6 @@ const bankShort = computed(
       :podium="podium"
       :names="showNames"
       :timing="showTiming"
-      :total-players="board?.stats.total ?? 0"
       @close="showOpen = false"
     />
 
@@ -760,6 +850,69 @@ const bankShort = computed(
 .settings-grid .wide {
   grid-column: 1 / -1;
 }
+.qc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.qc-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 72px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  line-height: 1.3;
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.qc-btn b {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+.qc-btn small {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+.qc-btn:hover:not(:disabled) {
+  border-color: var(--primary-bright);
+}
+.qc-btn.on {
+  border-color: var(--primary-bright);
+  background: var(--primary-soft);
+  box-shadow: 0 0 0 1px var(--primary-bright);
+}
+.qc-btn.on b {
+  color: var(--primary-bright);
+}
+.qc-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.qc-custom {
+  display: flex;
+  gap: 6px;
+  margin-inline-start: auto;
+}
+.qc-current {
+  color: var(--primary-bright);
+}
+.qc-note {
+  margin: var(--space-3) 0 0;
+}
+@media (max-width: 700px) {
+  .qc-btn {
+    flex: 1;
+    min-width: 0;
+  }
+  .qc-custom {
+    width: 100%;
+    margin-inline-start: 0;
+  }
+}
 .test-box {
   display: flex;
   align-items: flex-start;
@@ -776,6 +929,11 @@ const bankShort = computed(
 }
 .test-box p {
   margin: 4px 0 0;
+}
+.pager {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
 }
 .m-list {
   display: none;

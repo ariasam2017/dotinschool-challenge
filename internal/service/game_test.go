@@ -307,3 +307,43 @@ func TestBuiltInBankIsClean(t *testing.T) {
 		}
 	}
 }
+
+// The admin can set any count (e.g. 3, 5, 10): new games get exactly that many
+// distinct questions, while a game already in progress keeps its own count.
+func TestGameQuestionCountSetting(t *testing.T) {
+	g, _ := gameSvc(t)
+	early, _, _ := g.Register("a", "b", "9121111111")
+	if st, _ := g.Start(early.Token); st.Total != 3 {
+		t.Fatalf("default game has %d questions, want 3", st.Total)
+	}
+	for _, n := range []int{5, 10} {
+		gs := g.Settings()
+		gs.QuestionsPerGame = n
+		if _, err := g.SaveSettings(gs); err != nil {
+			t.Fatal(err)
+		}
+		p, _, _ := g.Register("n", "f", fmt.Sprintf("91222222%02d", n))
+		st, err := g.Start(p.Token)
+		if err != nil || st.Total != n || len(st.Progress) != n {
+			t.Fatalf("n=%d: start gave total=%d err=%v", n, st.Total, err)
+		}
+		seen := map[string]bool{}
+		for q := 0; q < n; q++ {
+			if seen[st.Question.Text] {
+				t.Fatalf("n=%d: question repeated inside one game", n)
+			}
+			seen[st.Question.Text] = true
+			st, _ = g.Answer(p.Token, q, 0)
+			if q < n-1 {
+				st, _ = g.Next(p.Token)
+			}
+		}
+		if st.Phase != "finished" || st.Result.Total != n {
+			t.Fatalf("n=%d: ended %s with total %d", n, st.Phase, st.Result.Total)
+		}
+	}
+	// the player who started before the change still has 3
+	if st, _ := g.State(early.Token); st.Total != 3 {
+		t.Fatalf("in-progress game changed to %d questions", st.Total)
+	}
+}
