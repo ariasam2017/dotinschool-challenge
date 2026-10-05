@@ -786,13 +786,17 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 .g-hero p {
   color: var(--g-dim);
   font-size: 0.95rem;
-  margin: 0;
+  max-width: 400px;
+  margin: 0 auto;
 }
 .g-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 20px 18px;
+  gap: 12px;
+  width: 100%;
+  max-width: 380px; /* a slim card, not the full column, on wide screens */
+  margin: 0 auto;
+  padding: 22px 20px 20px;
 }
 .g-field {
   display: flex;
@@ -806,7 +810,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 }
 .g-field input {
   width: 100%;
-  height: 52px;
+  height: 48px;
   padding: 0 16px;
   border-radius: 14px;
   border: 1px solid var(--g-line);
