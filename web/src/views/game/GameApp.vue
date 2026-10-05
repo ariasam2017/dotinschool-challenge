@@ -539,7 +539,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
           <!-- result: only how many were right; the answers stay on screen -->
           <div v-else-if="phase === 'finished' && st.result" class="g-result">
             <div class="g-card g-result-card">
-              <span class="g-trophy"><AppIcon name="trophy" :size="44" /></span>
+              <img class="g-result-logo" :src="dotinLogo" alt="مدرسه داتین" width="96" height="82" />
               <h2>بازی تمام شد، {{ st.player.firstName }}!</h2>
               <div class="g-score-ring" :style="{ '--pct': (st.result.total ? (st.result.correct / st.result.total) * 100 : 0) + '%' }">
                 <span class="g-score-num">{{ toFa(st.result.correct) }}</span>
@@ -1343,16 +1343,12 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   padding: 26px 18px 22px;
   animation: g-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.g-trophy {
-  display: inline-grid;
-  place-items: center;
-  width: 80px;
-  height: 80px;
-  border-radius: 24px;
-  background: linear-gradient(135deg, #ffa24a, var(--g-orange));
-  color: #021a0f;
-  box-shadow: 0 0 34px rgba(60, 207, 141, 0.45);
-  margin-bottom: 12px;
+.g-result-logo {
+  display: block;
+  width: 96px;
+  height: auto;
+  margin: 0 auto 14px;
+  filter: drop-shadow(0 0 18px rgba(60, 207, 141, 0.45));
   animation: g-float 3.2s ease-in-out infinite;
 }
 .g-result-card h2 {
