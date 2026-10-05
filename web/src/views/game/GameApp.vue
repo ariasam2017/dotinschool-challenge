@@ -463,7 +463,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
             <div class="g-card g-rules">
               <h2><AppIcon name="help-circle" :size="20" /> قوانین بازی</h2>
               <ul>
-                <li><AppIcon name="list" :size="18" /><span><b>{{ toFa(qCount) }}</b> سوال چهارگزینه‌ای از حوزه‌ی تکنولوژی، به‌صورت تصادفی</span></li>
+                <li><AppIcon name="list" :size="18" /><span><b>{{ toFa(qCount) }}</b> سوال چهارگزینه‌ای از حوزه‌ی تکنولوژی</span></li>
                 <li><AppIcon name="clock" :size="18" /><span>برای هر سوال <b>{{ toFa(qSecs) }}</b> ثانیه وقت داری</span></li>
                 <li><AppIcon name="zap" :size="18" /><span>رتبه با تعداد جواب درست و سرعت پاسخ‌گویی تعیین می‌شود</span></li>
                 <li><AppIcon name="target" :size="18" /><span>فقط یک بار می‌توانی بازی کنی — با دقت انتخاب کن!</span></li>
