@@ -11,7 +11,6 @@ export type Difficulty = 'easy' | 'hard'
 export interface GameQuestionView {
   index: number
   category: string
-  difficulty: Difficulty
   text: string
   options: [string, string, string, string]
   limitMs: number

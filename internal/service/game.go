@@ -545,11 +545,12 @@ func storeItems(p *model.GamePlayer, items []model.GameItem) {
 
 // ---- the game loop ----------------------------------------------------------
 
-// GameQuestionView is the question as a player sees it (no answer key).
+// GameQuestionView is the question as a player sees it: no answer key, and
+// no difficulty either — a player must not know whether a question is easy
+// or hard while answering it.
 type GameQuestionView struct {
 	Index       int       `json:"index"`
 	Category    string    `json:"category"`
-	Difficulty  string    `json:"difficulty"`
 	Text        string    `json:"text"`
 	Options     [4]string `json:"options"`
 	LimitMs     int64     `json:"limitMs"`
@@ -956,7 +957,7 @@ func (s *GameService) view(p *model.GamePlayer) *GameState {
 		cur = len(items) - 1
 	}
 	it := items[cur]
-	qv := &GameQuestionView{Index: cur, Category: it.Category, Difficulty: it.Difficulty, Text: it.Text, Options: it.Options, LimitMs: p.LimitMs}
+	qv := &GameQuestionView{Index: cur, Category: it.Category, Text: it.Text, Options: it.Options, LimitMs: p.LimitMs}
 	st.Question = qv
 
 	if it.Answered {

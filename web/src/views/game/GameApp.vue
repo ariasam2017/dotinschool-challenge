@@ -573,10 +573,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
             <Transition name="g-pop" mode="out-in">
               <div :key="q.index" class="g-qcard">
                 <span class="g-cat">
-                  <AppIcon name="cpu" :size="13" /> {{ q.category }}
-                  <span class="g-level" :class="q.difficulty === 'hard' ? 'hard' : 'easy'">
-                    {{ q.difficulty === 'hard' ? 'سخت' : 'آسان' }}
-                  </span>
+                  <AppIcon :name="q.category === 'برنامه‌نویسی' ? 'code' : 'cpu'" :size="13" /> {{ q.category }}
                 </span>
                 <p class="g-qtext">{{ q.text }}</p>
               </div>
@@ -1449,21 +1446,6 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   font-weight: 800;
   white-space: nowrap;
   box-shadow: 0 0 14px rgba(246, 139, 31, 0.35);
-}
-.g-level {
-  margin-inline-start: 4px;
-  padding: 0 8px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  line-height: 1.6;
-}
-.g-level.easy {
-  background: rgba(60, 207, 141, 0.18);
-  color: #9be7c4;
-}
-.g-level.hard {
-  background: rgba(244, 63, 94, 0.2);
-  color: #fda4af;
 }
 .g-qtext {
   margin: 0;

@@ -196,7 +196,7 @@ var techBank = []BankQuestion{
 
 // GameBankVersion is bumped whenever questions are added to the built-in
 // bank, so existing databases receive the new ones once on the next boot.
-const GameBankVersion = 5 // v5: the programming category (100 questions)
+const GameBankVersion = 6 // v6: 230 more programming questions
 
 // RetiredBankTexts are built-in questions replaced by a corrected version
 // (v3: an ambiguous distractor and an imprecise wording). On upgrade, rows
@@ -213,11 +213,14 @@ func DefaultGameQuestions() []GameQuestion {
 		BankQuestion
 		category string
 	}
-	all := make([]entry, 0, len(techBank)+len(programmingBank))
+	all := make([]entry, 0, len(techBank)+len(programmingBank)+len(programmingBankV6))
 	for _, b := range techBank {
 		all = append(all, entry{b, DefaultGameCategory})
 	}
 	for _, b := range programmingBank {
+		all = append(all, entry{b, ProgrammingGameCategory})
+	}
+	for _, b := range programmingBankV6 {
 		all = append(all, entry{b, ProgrammingGameCategory})
 	}
 	out := make([]GameQuestion, 0, len(all))

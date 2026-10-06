@@ -3,6 +3,7 @@ package service
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -681,5 +682,40 @@ func TestGameReportXLSX(t *testing.T) {
 	// 2 finished games × 10 answers + the header row
 	if n := strings.Count(read("xl/worksheets/sheet3.xml"), "<row "); n != 21 {
 		t.Errorf("answers sheet has %d rows, want 21", n)
+	}
+}
+
+// While a game is running the player never learns a question's difficulty —
+// not on screen and not in the API response either.
+func TestPlayerNeverSeesDifficulty(t *testing.T) {
+	g, _ := gameSvc(t)
+	enableMix(t, g, model.DefaultGameMix())
+	p, _, _ := g.Register("n", "f", "9138000000")
+	st, err := g.Start(p.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for q := 0; q < st.Total; q++ {
+		raw, _ := json.Marshal(st)
+		if strings.Contains(string(raw), "difficulty") {
+			t.Fatalf("question %d: player state leaks the difficulty: %s", q+1, raw)
+		}
+		st, _ = g.Answer(p.Token, q, 0)
+		if raw, _ = json.Marshal(st); st.Phase != "finished" && strings.Contains(string(raw), "difficulty") {
+			t.Fatalf("question %d reveal leaks the difficulty", q+1)
+		}
+		if q < st.Total-1 {
+			st, _ = g.Next(p.Token)
+		}
+	}
+}
+
+// Bank v6 brings the programming category to 330 questions.
+func TestProgrammingBankSize(t *testing.T) {
+	g, _ := gameSvc(t)
+	var n int64
+	g.db.Model(&model.GameQuestion{}).Where("category = ?", model.ProgrammingGameCategory).Count(&n)
+	if n != 330 {
+		t.Fatalf("programming category has %d questions, want 330", n)
 	}
 }
