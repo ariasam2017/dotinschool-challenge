@@ -16,8 +16,10 @@ const props = defineProps<{
   timing: { third: number; second: number; first: number; gap: number } // seconds
   /** sample data — shows a "دمو" badge */
   demo?: boolean
+  /** the parent is downloading the Excel report */
+  reportLoading?: boolean
 }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; report: [] }>()
 
 const MEDALS = ['🥇', '🥈', '🥉']
 const PLACE = ['نفر اول', 'نفر دوم', 'نفر سوم']
@@ -312,6 +314,9 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div class="wr-final-actions">
+            <button v-if="!demo" type="button" class="wr-ghost" :disabled="reportLoading" @click="emit('report')">
+              <AppIcon name="download" :size="16" /> {{ reportLoading ? 'در حال آماده‌سازی…' : 'گزارش کامل Excel' }}
+            </button>
             <button type="button" class="wr-ghost" @click="replay"><AppIcon name="rotate-ccw" :size="16" /> اجرای دوباره</button>
             <button type="button" class="wr-ghost" @click="close">بستن</button>
           </div>

@@ -196,7 +196,7 @@ var techBank = []BankQuestion{
 
 // GameBankVersion is bumped whenever questions are added to the built-in
 // bank, so existing databases receive the new ones once on the next boot.
-const GameBankVersion = 4 // v4: every built-in question carries a difficulty
+const GameBankVersion = 5 // v5: the programming category (100 questions)
 
 // RetiredBankTexts are built-in questions replaced by a corrected version
 // (v3: an ambiguous distractor and an imprecise wording). On upgrade, rows
@@ -206,11 +206,22 @@ var RetiredBankTexts = []string{
 	"کدام زبان برنامه‌نویسی در مرورگرها برای تعاملی کردن صفحات وب اجرا می‌شود؟",
 }
 
-// DefaultGameQuestions returns the built-in bank with the correct answer
+// DefaultGameQuestions returns the built-in bank (technology + programming) with the correct answer
 // rotated into a varied position. CreatedAt/ID are left for the caller.
 func DefaultGameQuestions() []GameQuestion {
-	out := make([]GameQuestion, 0, len(techBank))
-	for i, b := range techBank {
+	type entry struct {
+		BankQuestion
+		category string
+	}
+	all := make([]entry, 0, len(techBank)+len(programmingBank))
+	for _, b := range techBank {
+		all = append(all, entry{b, DefaultGameCategory})
+	}
+	for _, b := range programmingBank {
+		all = append(all, entry{b, ProgrammingGameCategory})
+	}
+	out := make([]GameQuestion, 0, len(all))
+	for i, b := range all {
 		pos := (i * 3) % 4
 		var opts [4]string
 		// place the correct answer at pos, the distractors after it in order
@@ -223,7 +234,7 @@ func DefaultGameQuestions() []GameQuestion {
 			opts[j] = b.Options[k]
 			k++
 		}
-		q := GameQuestion{Category: DefaultGameCategory, Difficulty: b.Level, Text: b.Text, Correct: pos}
+		q := GameQuestion{Category: b.category, Difficulty: b.Level, Text: b.Text, Correct: pos}
 		q.SetOptions(opts)
 		out = append(out, q)
 	}

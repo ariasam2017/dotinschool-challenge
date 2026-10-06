@@ -1,7 +1,11 @@
 package service
 
 import (
+	"archive/zip"
+	"bytes"
 	"fmt"
+	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -35,7 +39,26 @@ func gameSvc(t *testing.T) (*GameService, *time.Time) {
 	if _, err := g.AddDefaultBank(); err != nil {
 		t.Fatalf("bank: %v", err)
 	}
+	// most tests exercise the plain "n questions from the whole bank" mode;
+	// the category mix (on by default) has its own tests below
+	gs := g.Settings()
+	gs.MixOn = false
+	gs.QuestionsPerGame = model.DefaultGameSettings().QuestionsPerGame
+	if _, err := g.SaveSettings(gs); err != nil {
+		t.Fatalf("settings: %v", err)
+	}
 	return g, &clock
+}
+
+func enableMix(t *testing.T, g *GameService, mix []model.GameMix) model.GameSettings {
+	t.Helper()
+	gs := g.Settings()
+	gs.MixOn, gs.Mix = true, mix
+	saved, err := g.SaveSettings(gs)
+	if err != nil {
+		t.Fatalf("enable mix: %v", err)
+	}
+	return saved
 }
 
 func TestNormalizePhone(t *testing.T) {
@@ -476,5 +499,187 @@ func TestBoardFlagsMixedRounds(t *testing.T) {
 	play("9135000002")
 	if b, _ := g.Board(); !b.MixedRounds {
 		t.Fatal("3- and 5-question games finished — must be flagged")
+	}
+}
+
+// The competition default: 10 questions = 6 programming (3 easy + 3 hard)
+// and 4 technology (2 easy + 2 hard), easy first, categories alternating.
+func TestDefaultMixPlan(t *testing.T) {
+	def := model.DefaultGameSettings()
+	if !def.MixOn {
+		t.Fatal("the category mix must be on by default")
+	}
+	short := map[string]string{model.ProgrammingGameCategory: "P", model.DefaultGameCategory: "T"}
+	got := ""
+	for _, sl := range def.GamePlan() {
+		got += short[sl.Category] + map[string]string{model.DifficultyEasy: "e", model.DifficultyHard: "h"}[sl.Difficulty] + " "
+	}
+	if want := "Pe Te Pe Te Pe Ph Th Ph Th Ph "; got != want {
+		t.Fatalf("plan = %q, want %q", got, want)
+	}
+}
+
+// Every mixed game holds exactly the configured share of each category and
+// level, in plan order, with no repeated question.
+func TestGameDealsByCategoryMix(t *testing.T) {
+	g, _ := gameSvc(t)
+	gs := enableMix(t, g, model.DefaultGameMix())
+	if gs.QuestionsPerGame != 10 {
+		t.Fatalf("questionsPerGame = %d, want the mix total 10", gs.QuestionsPerGame)
+	}
+	plan := gs.GamePlan()
+	for k := 0; k < 30; k++ {
+		p, _, _ := g.Register("n", "f", fmt.Sprintf("9136000%03d", k))
+		st, err := g.Start(p.Token)
+		if err != nil || st.Total != 10 {
+			t.Fatalf("game %d: total %d err %v", k, st.Total, err)
+		}
+		var row model.GamePlayer
+		g.db.Where("id = ?", p.ID).First(&row)
+		count := map[model.GameSlot]int{}
+		seen := map[string]bool{}
+		for i, it := range loadItems(&row) {
+			if it.Category != plan[i].Category || it.Difficulty != plan[i].Difficulty {
+				t.Fatalf("game %d question %d is %s/%s, want %s/%s", k, i+1, it.Category, it.Difficulty, plan[i].Category, plan[i].Difficulty)
+			}
+			if seen[it.QID] {
+				t.Fatalf("game %d repeats a question", k)
+			}
+			seen[it.QID] = true
+			count[model.GameSlot{Category: it.Category, Difficulty: it.Difficulty}]++
+		}
+		want := map[model.GameSlot]int{
+			{Category: model.ProgrammingGameCategory, Difficulty: model.DifficultyEasy}: 3,
+			{Category: model.ProgrammingGameCategory, Difficulty: model.DifficultyHard}: 3,
+			{Category: model.DefaultGameCategory, Difficulty: model.DifficultyEasy}:     2,
+			{Category: model.DefaultGameCategory, Difficulty: model.DifficultyHard}:     2,
+		}
+		for sl, n := range want {
+			if count[sl] != n {
+				t.Fatalf("game %d has %d %s/%s questions, want %d", k, count[sl], sl.Category, sl.Difficulty, n)
+			}
+		}
+	}
+}
+
+// A category without enough questions still yields a full game.
+func TestMixFallsBackWhenACategoryIsShort(t *testing.T) {
+	g, _ := gameSvc(t)
+	enableMix(t, g, []model.GameMix{{Category: "ناموجود", Easy: 2, Hard: 1}, {Category: model.DefaultGameCategory, Easy: 1, Hard: 1}})
+	p, _, _ := g.Register("n", "f", "9137000000")
+	st, err := g.Start(p.Token)
+	if err != nil || st.Total != 5 {
+		t.Fatalf("got %d questions, err %v; want 5", st.Total, err)
+	}
+	var row model.GamePlayer
+	g.db.Where("id = ?", p.ID).First(&row)
+	if items := loadItems(&row); len(items) != 5 {
+		t.Fatalf("dealt %d items, want 5", len(items))
+	}
+}
+
+func TestMixValidation(t *testing.T) {
+	g, _ := gameSvc(t)
+	bad := [][]model.GameMix{
+		{},
+		{{Category: "", Easy: 1}},
+		{{Category: "a", Easy: 1}, {Category: "a", Hard: 1}},
+		{{Category: "a", Easy: -1, Hard: 2}},
+		{{Category: "a", Easy: 30}, {Category: "b", Hard: 30}},
+	}
+	for i, mix := range bad {
+		gs := g.Settings()
+		gs.MixOn, gs.Mix = true, mix
+		if _, err := g.SaveSettings(gs); err == nil {
+			t.Errorf("case %d: mix %+v must be rejected", i, mix)
+		}
+	}
+	// zero rows are dropped, and turning the mix off restores the free count
+	gs := enableMix(t, g, []model.GameMix{{Category: "a", Easy: 2, Hard: 1}, {Category: "b"}})
+	if len(gs.Mix) != 1 || gs.QuestionsPerGame != 3 {
+		t.Fatalf("got %+v", gs)
+	}
+	gs.MixOn, gs.QuestionsPerGame = false, 7
+	if gs, _ = g.SaveSettings(gs); gs.QuestionsPerGame != 7 || len(gs.GamePlan()) != 7 {
+		t.Fatalf("mix off: %+v", gs)
+	}
+}
+
+func TestGregorianToJalali(t *testing.T) {
+	cases := map[[3]int][3]int{
+		{2026, 10, 6}: {1405, 7, 14},
+		{2026, 3, 21}: {1405, 1, 1},
+		{2025, 3, 20}: {1403, 12, 30},
+		{2000, 1, 1}:  {1378, 10, 11},
+	}
+	for g, want := range cases {
+		y, m, d := gregorianToJalali(g[0], g[1], g[2])
+		if [3]int{y, m, d} != want {
+			t.Errorf("%v -> %d/%d/%d, want %v", g, y, m, d, want)
+		}
+	}
+}
+
+// The report is a valid workbook holding every player and every answer.
+func TestGameReportXLSX(t *testing.T) {
+	g, clock := gameSvc(t)
+	enableMix(t, g, model.DefaultGameMix())
+	play := func(first, phone string, right int) {
+		p, _, _ := g.Register(first, "تست", phone)
+		st, _ := g.Start(p.Token)
+		var row model.GamePlayer
+		g.db.Where("id = ?", p.ID).First(&row)
+		items := loadItems(&row)
+		for q := 0; q < st.Total; q++ {
+			choice := (items[q].Correct + 1) % 4
+			if q < right {
+				choice = items[q].Correct
+			}
+			*clock = clock.Add(3 * time.Second)
+			g.Answer(p.Token, q, choice)
+			if q < st.Total-1 {
+				g.Next(p.Token)
+			}
+		}
+	}
+	play("سارا", "9121110001", 8)
+	play("رضا", "9121110002", 5)
+	g.Register("منتظر", "تست", "9121110003")
+
+	data, err := g.ReportXLSX()
+	if err != nil {
+		t.Fatal(err)
+	}
+	z, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatalf("not an xlsx: %v", err)
+	}
+	read := func(name string) string {
+		for _, f := range z.File {
+			if f.Name == name {
+				r, _ := f.Open()
+				b, _ := io.ReadAll(r)
+				r.Close()
+				return string(b)
+			}
+		}
+		t.Fatalf("missing %s", name)
+		return ""
+	}
+	if wb := read("xl/workbook.xml"); !strings.Contains(wb, "رتبه‌بندی") || !strings.Contains(wb, "پاسخ‌ها") {
+		t.Fatalf("sheets missing: %s", wb)
+	}
+	ranking := read("xl/worksheets/sheet2.xml")
+	for _, want := range []string{"سارا", "رضا", "منتظر", "09121110001", "درست در برنامه‌نویسی"} {
+		if !strings.Contains(ranking, want) {
+			t.Errorf("ranking lacks %q", want)
+		}
+	}
+	if strings.Index(ranking, "سارا") > strings.Index(ranking, "رضا") {
+		t.Error("the better player must be listed first")
+	}
+	// 2 finished games × 10 answers + the header row
+	if n := strings.Count(read("xl/worksheets/sheet3.xml"), "<row "); n != 21 {
+		t.Errorf("answers sheet has %d rows, want 21", n)
 	}
 }

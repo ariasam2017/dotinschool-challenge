@@ -119,9 +119,12 @@ func (s *server) handleGameBoard(c *gin.Context) {
 	c.JSON(http.StatusOK, b)
 }
 
-// PUT /api/admin/game/settings
+// PUT /api/admin/game/settings — a partial body is merged onto the current
+// settings, so a field the client does not send (e.g. an older panel that
+// knows nothing of the category mix) keeps its value instead of resetting.
 func (s *server) handlePutGameSettings(c *gin.Context) {
-	var body model.GameSettings
+	body := s.svc.Game.Settings()
+	body.Mix = append([]model.GameMix(nil), body.Mix...) // never decode into the cached slice
 	if err := bindJSON(c, &body); err != nil {
 		fail(c, err)
 		return
@@ -274,4 +277,17 @@ func (s *server) handleAddDefaultGameQuestions(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "added": added})
+}
+
+// GET /api/admin/game/report — the full results report as an Excel workbook.
+func (s *server) handleGameReport(c *gin.Context) {
+	data, err := s.svc.Game.ReportXLSX()
+	if err != nil {
+		s.failWith(c, err)
+		return
+	}
+	filename := "game-report-" + time.Now().Format("2006-01-02-1504") + ".xlsx"
+	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Header("Cache-Control", "no-store")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }

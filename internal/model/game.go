@@ -121,12 +121,97 @@ type GameSettings struct {
 	// TestMode lets a player wipe their own finished run and play again from
 	// the result screen — for rehearsing before the real competition.
 	TestMode bool `json:"testMode"`
+
+	// SocialDelaySec is how long a player sees their own result before the
+	// "follow us" screen (logo + social links) takes over.
+	SocialDelaySec int `json:"socialDelaySec"`
+
+	// MixOn deals every game from Mix — a fixed number of easy and hard
+	// questions per category — instead of QuestionsPerGame questions from the
+	// whole bank. While it is on, QuestionsPerGame is the sum of Mix.
+	MixOn bool      `json:"mixOn"`
+	Mix   []GameMix `json:"mix"`
+}
+
+// GameMix is one category's share of a game.
+type GameMix struct {
+	Category string `json:"category"`
+	Easy     int    `json:"easy"`
+	Hard     int    `json:"hard"`
+}
+
+// DefaultGameMix is the competition recipe: 10 questions = 6 programming
+// (3 easy + 3 hard) and 4 technology (2 easy + 2 hard).
+func DefaultGameMix() []GameMix {
+	return []GameMix{
+		{Category: ProgrammingGameCategory, Easy: 3, Hard: 3},
+		{Category: DefaultGameCategory, Easy: 2, Hard: 2},
+	}
+}
+
+// MixTotal is the number of questions one game of this mix has.
+func MixTotal(mix []GameMix) int {
+	n := 0
+	for _, m := range mix {
+		n += m.Easy + m.Hard
+	}
+	return n
+}
+
+// GameSlot is one question position of a game: which category and level it
+// is drawn from. An empty Category means "any category".
+type GameSlot struct {
+	Category   string
+	Difficulty string
+}
+
+// MixPlan is the question order of a mixed game: every easy question first,
+// then every hard one, and inside each level the categories take turns in
+// Mix order. The default mix gives
+// P·E T·E P·E T·E P·E  P·H T·H P·H T·H P·H (P = programming, T = technology).
+func MixPlan(mix []GameMix) []GameSlot {
+	plan := make([]GameSlot, 0, MixTotal(mix))
+	for _, lv := range []string{DifficultyEasy, DifficultyHard} {
+		left := make([]int, len(mix))
+		for i, m := range mix {
+			left[i] = m.Easy
+			if lv == DifficultyHard {
+				left[i] = m.Hard
+			}
+		}
+		for more := true; more; {
+			more = false
+			for i, m := range mix {
+				if left[i] > 0 {
+					plan = append(plan, GameSlot{Category: m.Category, Difficulty: lv})
+					left[i]--
+					more = true
+				}
+			}
+		}
+	}
+	return plan
+}
+
+// GamePlan is the slot list of one game under these settings: the mix when
+// it is on, otherwise DifficultyPlan(QuestionsPerGame) over every category.
+func (gs GameSettings) GamePlan() []GameSlot {
+	if gs.MixOn && MixTotal(gs.Mix) > 0 {
+		return MixPlan(gs.Mix)
+	}
+	levels := DifficultyPlan(gs.QuestionsPerGame)
+	plan := make([]GameSlot, len(levels))
+	for i, lv := range levels {
+		plan[i] = GameSlot{Difficulty: lv}
+	}
+	return plan
 }
 
 // KeyGameSettings stores GameSettings.
 const KeyGameSettings = "game"
 
-// DefaultGameSettings mirrors Quiz of Kings: three questions, 20 s each.
+// DefaultGameSettings: 20 s per question, and the 10-question category mix
+// (QuestionsPerGame 3 is the count used once the admin turns the mix off).
 func DefaultGameSettings() GameSettings {
 	return GameSettings{
 		Open:               true,
@@ -137,5 +222,8 @@ func DefaultGameSettings() GameSettings {
 		RevealSecondSec:    9,
 		RevealFirstSec:     15,
 		RevealGapSec:       4,
+		SocialDelaySec:     8,
+		MixOn:              true,
+		Mix:                DefaultGameMix(),
 	}
 }

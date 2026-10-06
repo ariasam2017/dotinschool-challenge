@@ -49,11 +49,11 @@ type GameService struct {
 	// settings are read on every request; cache them (SaveSettings refreshes)
 	cfg atomic.Pointer[model.GameSettings]
 
-	// The question decks: per difficulty, a shuffled list of bank ids dealt out
-	// in order, so consecutive players get different questions before any
-	// repeats.
+	// The question decks: per (category, difficulty) slot kind, a shuffled
+	// list of bank ids dealt out in order, so consecutive players get
+	// different questions before any repeats.
 	deckMu  sync.Mutex
-	decks   map[string][]string // difficulty -> ids
+	decks   map[string][]string // category + "|" + difficulty -> ids
 	deckRev int64
 	bankRev atomic.Int64 // bumped on every bank change; a stale deck is rebuilt
 }
@@ -111,6 +111,13 @@ func (s *GameService) loadSettings() model.GameSettings {
 	if gs.SecondsPerQuestion < 5 {
 		gs.SecondsPerQuestion = model.DefaultGameSettings().SecondsPerQuestion
 	}
+	if gs.MixOn {
+		if n := model.MixTotal(gs.Mix); n > 0 {
+			gs.QuestionsPerGame = n
+		} else {
+			gs.MixOn = false
+		}
+	}
 	// settings saved before the reveal animation existed have zeros here
 	def := model.DefaultGameSettings()
 	for _, f := range []struct {
@@ -121,6 +128,7 @@ func (s *GameService) loadSettings() model.GameSettings {
 		{&gs.RevealSecondSec, def.RevealSecondSec},
 		{&gs.RevealFirstSec, def.RevealFirstSec},
 		{&gs.RevealGapSec, def.RevealGapSec},
+		{&gs.SocialDelaySec, def.SocialDelaySec},
 	} {
 		if *f.v <= 0 {
 			*f.v = f.d
@@ -131,6 +139,17 @@ func (s *GameService) loadSettings() model.GameSettings {
 
 // SaveSettings validates and stores the game settings.
 func (s *GameService) SaveSettings(gs model.GameSettings) (model.GameSettings, error) {
+	mix, err := normalizeMix(gs.Mix)
+	if err != nil {
+		return gs, err
+	}
+	gs.Mix = mix
+	if gs.MixOn {
+		if len(mix) == 0 {
+			return gs, apperr.InvalidInput("برای ترکیب سوالات دست‌کم یک دسته مشخص کنید.")
+		}
+		gs.QuestionsPerGame = model.MixTotal(mix)
+	}
 	if gs.QuestionsPerGame < 1 || gs.QuestionsPerGame > 50 {
 		return gs, apperr.InvalidInput("تعداد سوال هر بازی باید بین ۱ تا ۵۰ باشد.")
 	}
@@ -145,6 +164,12 @@ func (s *GameService) SaveSettings(gs model.GameSettings) (model.GameSettings, e
 	if gs.RevealGapSec < 0 || gs.RevealGapSec > 60 {
 		return gs, apperr.InvalidInput("مکث بین معرفی نفرات باید بین ۰ تا ۶۰ ثانیه باشد.")
 	}
+	if gs.SocialDelaySec == 0 {
+		gs.SocialDelaySec = model.DefaultGameSettings().SocialDelaySec
+	}
+	if gs.SocialDelaySec < 2 || gs.SocialDelaySec > 120 {
+		return gs, apperr.InvalidInput("زمان نمایش نتیجه باید بین ۲ تا ۱۲۰ ثانیه باشد.")
+	}
 	gs.FinishMessage = strings.TrimSpace(gs.FinishMessage)
 	if len([]rune(gs.FinishMessage)) > 500 {
 		return gs, apperr.InvalidInput("پیام پایان بازی حداکثر ۵۰۰ کاراکتر است.")
@@ -155,6 +180,34 @@ func (s *GameService) SaveSettings(gs model.GameSettings) (model.GameSettings, e
 	fresh := s.loadSettings()
 	s.cfg.Store(&fresh)
 	return fresh, nil
+}
+
+// normalizeMix trims and validates the per-category mix; rows with no
+// questions are dropped.
+func normalizeMix(in []model.GameMix) ([]model.GameMix, *apperr.Error) {
+	out := make([]model.GameMix, 0, len(in))
+	seen := map[string]bool{}
+	for _, m := range in {
+		m.Category = strings.TrimSpace(m.Category)
+		if m.Easy < 0 || m.Hard < 0 || m.Easy > 50 || m.Hard > 50 {
+			return nil, apperr.InvalidInput("تعداد سوال هر سطح در ترکیب باید بین ۰ تا ۵۰ باشد.")
+		}
+		if m.Easy+m.Hard == 0 {
+			continue
+		}
+		if m.Category == "" {
+			return nil, apperr.InvalidInput("دسته‌ی هر ردیف ترکیب سوالات را مشخص کنید.")
+		}
+		if len([]rune(m.Category)) > 40 {
+			return nil, apperr.InvalidInput("نام دسته حداکثر ۴۰ کاراکتر است.")
+		}
+		if seen[m.Category] {
+			return nil, apperr.InvalidInput("هر دسته فقط یک بار در ترکیب سوالات می‌آید.")
+		}
+		seen[m.Category] = true
+		out = append(out, m)
+	}
+	return out, nil
 }
 
 // ---- question bank ----------------------------------------------------------
@@ -350,7 +403,7 @@ func (s *GameService) ImportQuestions(in []QuestionInput, replace bool) (added i
 	return added, skipped, err
 }
 
-// AddDefaultBank adds every built-in technology question not already present.
+// AddDefaultBank adds every built-in (technology + programming) question not already present.
 func (s *GameService) AddDefaultBank() (added int, err error) {
 	defs := model.DefaultGameQuestions()
 	in := make([]QuestionInput, len(defs))
@@ -549,6 +602,7 @@ type GameState struct {
 	Phase              string            `json:"phase"` // ready | question | reveal | finished
 	Open               bool              `json:"open"`
 	TestMode           bool              `json:"testMode"`
+	SocialDelaySec     int               `json:"socialDelaySec"`
 	QuestionsPerGame   int               `json:"questionsPerGame"`
 	SecondsPerQuestion int               `json:"secondsPerQuestion"`
 	Total              int               `json:"total"`
@@ -598,7 +652,7 @@ func (s *GameService) Start(token string) (*GameState, error) {
 		return nil, apperr.New(423, "GAME_CLOSED", "بازی هنوز توسط مدیر باز نشده — کمی بعد دوباره تلاش کن.")
 	}
 
-	bank, err := s.deal(gs.QuestionsPerGame)
+	bank, err := s.deal(gs.GamePlan())
 	if err != nil {
 		return nil, err
 	}
@@ -719,40 +773,49 @@ func (s *GameService) record(p *model.GamePlayer, items []model.GameItem, choice
 	storeItems(p, items)
 }
 
-// deal draws n distinct questions in the easy/hard order of
-// model.DifficultyPlan(n) (e.g. 5 = E E E H H). Each difficulty has its own
-// deck: every bank id of that level in random order, consumed front to back
-// and refilled with a fresh shuffle when it runs low (or after the bank
-// changed), so consecutive players get different questions before any
-// repeat. If the bank lacks enough questions of one level, the other level
-// fills the gap — a game is never short of questions.
-func (s *GameService) deal(n int) ([]model.GameQuestion, error) {
+// deal draws one distinct question per plan slot, in plan order. A slot is a
+// (category, difficulty) pair — the admin's category mix — or just a
+// difficulty when the mix is off (e.g. 5 = E E E H H, see
+// model.DifficultyPlan). Each slot kind has its own deck: every matching bank
+// id in random order, consumed front to back and refilled with a fresh
+// shuffle when it runs low (or after the bank changed), so consecutive
+// players get different questions before any repeat. A slot whose deck is
+// short borrows, in order, from the same category's other level, then from
+// any category at the same level, then from anything — a game is never short
+// of questions.
+func (s *GameService) deal(plan []model.GameSlot) ([]model.GameQuestion, error) {
 	s.deckMu.Lock()
 	defer s.deckMu.Unlock()
 
 	if rev := s.bankRev.Load(); rev != s.deckRev || s.decks == nil {
 		s.decks, s.deckRev = map[string][]string{}, rev
 	}
-	refill := func(level string) error {
+	key := func(sl model.GameSlot) string { return sl.Category + "|" + sl.Difficulty }
+	refill := func(sl model.GameSlot) error {
+		q := s.db.Model(&model.GameQuestion{}).Where("difficulty = ?", sl.Difficulty)
+		if sl.Category != "" {
+			q = q.Where("category = ?", sl.Category)
+		}
 		var ids []string
-		if err := s.db.Model(&model.GameQuestion{}).Where("difficulty = ?", level).Pluck("id", &ids).Error; err != nil {
+		if err := q.Pluck("id", &ids).Error; err != nil {
 			return err
 		}
 		mrand.Shuffle(len(ids), func(i, j int) { ids[i], ids[j] = ids[j], ids[i] })
-		s.decks[level] = append(s.decks[level], ids...)
+		s.decks[key(sl)] = append(s.decks[key(sl)], ids...)
 		return nil
 	}
 	seen := map[string]bool{}
-	// take draws up to k distinct, not-yet-picked ids of one level
-	take := func(level string, k int) ([]string, error) {
-		if len(s.decks[level]) < k {
-			if err := refill(level); err != nil {
+	// take draws up to k distinct, not-yet-picked ids of one slot kind
+	take := func(sl model.GameSlot, k int) ([]string, error) {
+		kk := key(sl)
+		if len(s.decks[kk]) < k {
+			if err := refill(sl); err != nil {
 				return nil, err
 			}
 		}
 		got := make([]string, 0, k)
-		rest := s.decks[level][:0:0]
-		for _, id := range s.decks[level] {
+		rest := s.decks[kk][:0:0]
+		for _, id := range s.decks[kk] {
 			if len(got) < k && !seen[id] {
 				got = append(got, id)
 				seen[id] = true
@@ -760,43 +823,58 @@ func (s *GameService) deal(n int) ([]model.GameQuestion, error) {
 				rest = append(rest, id)
 			}
 		}
-		s.decks[level] = rest
+		s.decks[kk] = rest
 		return got, nil
 	}
+	otherLevel := func(lv string) string {
+		if lv == model.DifficultyHard {
+			return model.DifficultyEasy
+		}
+		return model.DifficultyHard
+	}
 
-	plan := model.DifficultyPlan(n)
 	need := map[string]int{}
-	for _, lv := range plan {
-		need[lv]++
+	var kinds []model.GameSlot // distinct slot kinds, first-seen order
+	for _, sl := range plan {
+		if need[key(sl)] == 0 {
+			kinds = append(kinds, sl)
+		}
+		need[key(sl)]++
 	}
 	pools := map[string][]string{}
-	for _, lv := range []string{model.DifficultyEasy, model.DifficultyHard} {
-		ids, err := take(lv, need[lv])
+	for _, sl := range kinds {
+		ids, err := take(sl, need[key(sl)])
 		if err != nil {
 			return nil, err
 		}
-		pools[lv] = ids
+		pools[key(sl)] = ids
 	}
-	// a level short of questions borrows from the other one
-	for _, lv := range []string{model.DifficultyEasy, model.DifficultyHard} {
-		other := model.DifficultyHard
-		if lv == model.DifficultyHard {
-			other = model.DifficultyEasy
+	// a slot kind short of questions borrows from its fallbacks
+	for _, sl := range kinds {
+		fallbacks := []model.GameSlot{{Category: sl.Category, Difficulty: otherLevel(sl.Difficulty)}}
+		if sl.Category != "" {
+			fallbacks = append(fallbacks,
+				model.GameSlot{Difficulty: sl.Difficulty},
+				model.GameSlot{Difficulty: otherLevel(sl.Difficulty)})
 		}
-		if short := need[lv] - len(pools[lv]); short > 0 {
-			extra, err := take(other, short)
+		for _, fb := range fallbacks {
+			short := need[key(sl)] - len(pools[key(sl)])
+			if short <= 0 {
+				break
+			}
+			extra, err := take(fb, short)
 			if err != nil {
 				return nil, err
 			}
-			pools[lv] = append(pools[lv], extra...)
+			pools[key(sl)] = append(pools[key(sl)], extra...)
 		}
 	}
 	// lay the ids out in plan order
-	picked := make([]string, 0, n)
-	for _, lv := range plan {
-		if len(pools[lv]) > 0 {
-			picked = append(picked, pools[lv][0])
-			pools[lv] = pools[lv][1:]
+	picked := make([]string, 0, len(plan))
+	for _, sl := range plan {
+		if p := pools[key(sl)]; len(p) > 0 {
+			picked = append(picked, p[0])
+			pools[key(sl)] = p[1:]
 		}
 	}
 	if len(picked) == 0 {
@@ -848,6 +926,7 @@ func (s *GameService) view(p *model.GamePlayer) *GameState {
 		Player:             GamePlayerView{ID: p.ID, FirstName: p.FirstName, LastName: p.LastName, Phone: p.Phone, Status: p.Status},
 		Open:               gs.Open,
 		TestMode:           gs.TestMode,
+		SocialDelaySec:     gs.SocialDelaySec,
 		QuestionsPerGame:   gs.QuestionsPerGame,
 		SecondsPerQuestion: gs.SecondsPerQuestion,
 		Total:              p.Total,
@@ -947,6 +1026,9 @@ type Board struct {
 	QuestionCount int64              `json:"questionCount"`
 	EasyCount     int64              `json:"easyCount"`
 	HardCount     int64              `json:"hardCount"`
+	// Categories is the bank's easy/hard stock per category, so the admin
+	// can see whether the category mix has enough questions.
+	Categories []CategoryStock `json:"categories"`
 	// MixedRounds is true when finished players played different rounds
 	// (question count or time per question changed mid-competition) — then
 	// comparing their correct answers is not fair, and the admin is warned.
@@ -955,6 +1037,40 @@ type Board struct {
 	Podium      []BoardRow `json:"podium"`
 	Stats       BoardStats `json:"stats"`
 	ServerNow   int64      `json:"serverNow"`
+}
+
+// CategoryStock counts one category's questions per level.
+type CategoryStock struct {
+	Category string `json:"category"`
+	Easy     int64  `json:"easy"`
+	Hard     int64  `json:"hard"`
+}
+
+// categoryStock groups the bank by category and level.
+func (s *GameService) categoryStock() []CategoryStock {
+	var rows []struct {
+		Category   string
+		Difficulty string
+		N          int64
+	}
+	s.db.Model(&model.GameQuestion{}).Select("category, difficulty, COUNT(*) AS n").
+		Group("category, difficulty").Order("category").Scan(&rows)
+	out := []CategoryStock{}
+	at := map[string]int{}
+	for _, r := range rows {
+		i, ok := at[r.Category]
+		if !ok {
+			i = len(out)
+			at[r.Category] = i
+			out = append(out, CategoryStock{Category: r.Category})
+		}
+		if r.Difficulty == model.DifficultyHard {
+			out[i].Hard += r.N
+		} else {
+			out[i].Easy += r.N
+		}
+	}
+	return out
 }
 
 // RankFinished orders finished players: more correct answers first, then the
@@ -1037,6 +1153,7 @@ func (s *GameService) Board() (*Board, error) {
 		QuestionCount: total,
 		EasyCount:     easy,
 		HardCount:     hard,
+		Categories:    s.categoryStock(),
 		MixedRounds:   len(rounds) > 1,
 		Players:       rows,
 		Podium:        podium,

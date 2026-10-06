@@ -90,7 +90,7 @@ const (
 	keyGameBankVersion = "gameBankVersion"
 )
 
-// seedGameBank adds the built-in technology questions this database has not
+// seedGameBank adds the built-in technology/programming questions this database has not
 // received yet. It runs once per bank version (model.GameBankVersion), so an
 // admin who deletes questions does not get them back on every restart — only
 // when a newer built-in bank ships, and then only questions whose text is not

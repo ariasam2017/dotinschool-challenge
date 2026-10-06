@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Quiz question bank: author four-option questions, bulk import/export
-// (JSON or Excel CSV), and load the built-in technology bank. Every player is
+// (JSON or Excel CSV), and load the built-in technology + programming banks. Every player is
 // dealt a random subset, so a bigger bank means fewer repeats between players.
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
@@ -42,9 +42,29 @@ onMounted(load)
 const search = ref('')
 const category = ref<string | undefined>(undefined)
 const level = ref<Difficulty | undefined>(undefined)
+/** the toolbar switch: همه / آسان / سخت */
+const levelPick = computed({
+  get: () => level.value ?? 'all',
+  set: (v: string) => (level.value = v === 'all' ? undefined : (v as Difficulty)),
+})
 const easyN = computed(() => list.value.filter((q) => q.difficulty !== 'hard').length)
 const hardN = computed(() => list.value.filter((q) => q.difficulty === 'hard').length)
-const categories = computed(() => [...new Set(list.value.map((q) => q.category))].sort())
+/** built-in categories always get a tab, even before their bank is loaded */
+const BUILTIN_CATEGORIES = ['تکنولوژی', 'برنامه‌نویسی']
+const categories = computed(() => {
+  const extra = [...new Set(list.value.map((q) => q.category))].filter((c) => !BUILTIN_CATEGORIES.includes(c)).sort()
+  return [...BUILTIN_CATEGORIES, ...extra]
+})
+const categoryCount = computed(() => {
+  const m: Record<string, number> = {}
+  for (const q of list.value) m[q.category] = (m[q.category] || 0) + 1
+  return m
+})
+/** the category tabs: '' = همه */
+const categoryTab = computed({
+  get: () => category.value ?? '',
+  set: (v: string) => (category.value = v || undefined),
+})
 const filtered = computed(() => {
   const s = search.value.trim().toLowerCase()
   return list.value.filter((q) => {
@@ -152,7 +172,7 @@ async function addDefaults() {
   try {
     const r = await addDefaultGameQuestions()
     await load()
-    message.success(r.added ? `${toFa(r.added)} سوال تکنولوژی به بانک اضافه شد` : 'همه‌ی سوالات پیش‌فرض از قبل در بانک هستند')
+    message.success(r.added ? `${toFa(r.added)} سوال پیش‌فرض به بانک اضافه شد` : 'همه‌ی سوالات پیش‌فرض از قبل در بانک هستند')
   } catch (e) {
     admin.toastError(e, 'انجام نشد')
   } finally {
@@ -295,7 +315,7 @@ async function runImport() {
         </span>
         <a-button :loading="addingDefaults" @click="addDefaults">
           <template #icon><AppIcon name="database" :size="14" /></template>
-          افزودن بانک سوالات تکنولوژی
+          افزودن بانک سوالات پیش‌فرض
         </a-button>
         <a-button type="primary" @click="openNew">
           <template #icon><AppIcon name="plus" :size="14" /></template>
@@ -303,27 +323,27 @@ async function runImport() {
         </a-button>
       </div>
 
+      <a-tabs v-model:activeKey="categoryTab" class="cat-tabs">
+        <a-tab-pane key="">
+          <template #tab>همه <span class="tab-n num">{{ toFa(list.length) }}</span></template>
+        </a-tab-pane>
+        <a-tab-pane v-for="c in categories" :key="c">
+          <template #tab>
+            <AppIcon :name="c === 'برنامه‌نویسی' ? 'code' : 'cpu'" :size="14" />
+            {{ c }} <span class="tab-n num">{{ toFa(categoryCount[c] || 0) }}</span>
+          </template>
+        </a-tab-pane>
+      </a-tabs>
+
       <div class="toolbar">
         <a-input v-model:value="search" placeholder="جست‌وجو در سوال و گزینه‌ها" allow-clear style="max-width: 300px">
           <template #prefix><AppIcon name="search" :size="15" /></template>
         </a-input>
-        <a-select
-          v-model:value="category"
-          placeholder="همه‌ی دسته‌ها"
-          allow-clear
-          style="width: 160px"
-          :options="categories.map((c) => ({ value: c, label: c }))"
-        />
-        <a-select
-          v-model:value="level"
-          placeholder="همه‌ی سطح‌ها"
-          allow-clear
-          style="width: 130px"
-          :options="[
-            { value: 'easy', label: 'آسان' },
-            { value: 'hard', label: 'سخت' },
-          ]"
-        />
+        <a-radio-group v-model:value="levelPick" button-style="solid" class="level-switch">
+          <a-radio-button value="all">همه ({{ toFa(list.length) }})</a-radio-button>
+          <a-radio-button value="easy">آسان ({{ toFa(easyN) }})</a-radio-button>
+          <a-radio-button value="hard">سخت ({{ toFa(hardN) }})</a-radio-button>
+        </a-radio-group>
         <div class="grow" />
         <span class="faint small">{{ toFa(filtered.length) }} سوال</span>
         <a-dropdown>
@@ -386,7 +406,7 @@ async function runImport() {
         </template>
         <template #emptyText>
           <div class="empty">
-            سوالی پیدا نشد. با «سوال جدید» یا «افزودن بانک سوالات تکنولوژی» شروع کنید.
+            سوالی پیدا نشد. با «سوال جدید» یا «افزودن بانک سوالات پیش‌فرض» شروع کنید.
           </div>
         </template>
       </a-table>
@@ -464,6 +484,21 @@ async function runImport() {
 </template>
 
 <style scoped>
+.cat-tabs :deep(.ant-tabs-nav) {
+  margin-bottom: var(--space-3);
+}
+.cat-tabs :deep(.ant-tabs-tab-btn) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tab-n {
+  font-size: 0.72rem;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-dim);
+}
 .toolbar {
   display: flex;
   flex-wrap: wrap;

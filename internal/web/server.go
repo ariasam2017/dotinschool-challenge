@@ -138,6 +138,7 @@ func (s *server) mountAPI(r *gin.Engine) {
 		admin.GET("/admin/sms-status", s.handleSMSStatus)
 		admin.POST("/admin/sms-test", s.handleSMSTest)
 		admin.GET("/admin/game/board", s.handleGameBoard)
+		admin.GET("/admin/game/report", s.handleGameReport)
 		admin.PUT("/admin/game/settings", s.handlePutGameSettings)
 		admin.GET("/admin/game/players/:id", s.handleGamePlayerReview)
 		admin.POST("/admin/game/players/:id/reset", s.handleGameResetPlayer)

@@ -13,6 +13,10 @@ import {
   deleteAllGamePlayers,
   fmtSecs,
   difficultyPlan,
+  downloadGameReport,
+  mixPlan,
+  DIFFICULTY_LABEL,
+  type GameMix,
   type GameBoard,
   type BoardRow,
   type GameReviewItem,
@@ -31,6 +35,7 @@ async function refresh() {
   try {
     board.value = await gameBoard()
     if (!settingsDirty.value) syncSettingsForm()
+    if (!mixDirty.value) syncMixDraft()
   } catch (e) {
     admin.handleAuthError(e)
   }
@@ -53,6 +58,9 @@ const sform = reactive({
   revealFirstSec: 15,
   revealGapSec: 4,
   testMode: false,
+  socialDelaySec: 8,
+  mixOn: true,
+  mix: [] as GameMix[],
 })
 const settingsDirty = ref(false)
 const savingSettings = ref(false)
@@ -105,6 +113,56 @@ async function setQuestionCount(n: number) {
   await saveSettings({ questionsPerGame: n })
   qcCustom.value = undefined
 }
+/* ---------------- category mix ---------------- */
+// the draft the admin edits; synced from the server while untouched
+const mixDraft = ref<GameMix[]>([])
+const mixDirty = ref(false)
+function syncMixDraft() {
+  const m = board.value?.settings.mix
+  if (m) mixDraft.value = m.map((r) => ({ ...r }))
+}
+function cancelMix() {
+  mixDirty.value = false
+  syncMixDraft()
+}
+const mixOn = computed(() => board.value?.settings.mixOn ?? sform.mixOn)
+const mixTotal = computed(() => mixDraft.value.reduce((n, r) => n + (r.easy || 0) + (r.hard || 0), 0))
+const stockOf = (cat: string) => board.value?.categories?.find((c) => c.category === cat) ?? { easy: 0, hard: 0 }
+const categoryOptions = computed(() => {
+  const used = new Set(mixDraft.value.map((r) => r.category))
+  return (board.value?.categories ?? []).map((c) => ({
+    value: c.category,
+    label: `${c.category} (${toFa(c.easy)} آسان، ${toFa(c.hard)} سخت)`,
+    disabled: used.has(c.category),
+  }))
+})
+/** the order every player gets the questions in */
+const mixOrder = computed(() => mixPlan(mixDraft.value.filter((r) => r.category)))
+function addMixRow() {
+  const free = categoryOptions.value.find((o) => !o.disabled)
+  mixDraft.value.push({ category: free?.value ?? '', easy: 1, hard: 1 })
+  mixDirty.value = true
+}
+function removeMixRow(i: number) {
+  mixDraft.value.splice(i, 1)
+  mixDirty.value = true
+}
+async function saveMix(on = mixOn.value) {
+  const mix = mixDraft.value.map((r) => ({ category: r.category, easy: r.easy || 0, hard: r.hard || 0 }))
+  if (on) {
+    if (mix.some((r) => !r.category && r.easy + r.hard > 0)) return message.error('دسته‌ی هر ردیف را انتخاب کنید')
+    if (mixTotal.value < 1 || mixTotal.value > 50) return message.error('جمع سوالات ترکیب باید بین ۱ تا ۵۰ باشد')
+  }
+  const s = board.value?.settings
+  if (s) Object.assign(sform, s)
+  await saveSettings({ mixOn: on, mix })
+  mixDirty.value = false
+  syncMixDraft()
+}
+function toggleMix(v: boolean | string | number) {
+  void saveMix(!!v)
+}
+
 function toggleTestMode(v: boolean | string | number) {
   void saveSettings({ testMode: !!v })
 }
@@ -345,34 +403,18 @@ function confirmDeleteAll() {
   })
 }
 
-/* ---------------- CSV export ---------------- */
-function exportCsv() {
-  const list = board.value?.players ?? []
-  const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`
-  const head = ['رتبه', 'نام', 'نام خانوادگی', 'موبایل', 'وضعیت', 'جواب درست', 'تعداد سوال', 'زمان پاسخ (ثانیه)', 'امتیاز']
-  const lines = list.map((r) =>
-    [
-      r.rank || '',
-      r.firstName,
-      r.lastName,
-      '0' + r.phone,
-      r.status === 'finished' ? 'پایان' : r.status === 'playing' ? 'در حال بازی' : 'ثبت‌نام',
-      r.correct,
-      r.total,
-      (r.totalMs / 1000).toFixed(1),
-      r.score,
-    ]
-      .map(esc)
-      .join(','),
-  )
-  const blob = new Blob(['﻿' + [head.map(esc).join(','), ...lines].join('\r\n')], {
-    type: 'text/csv;charset=utf-8',
-  })
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `game-results-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+/* ---------------- full Excel report ---------------- */
+const reportLoading = ref(false)
+async function exportReport() {
+  reportLoading.value = true
+  try {
+    await downloadGameReport()
+    message.success('گزارش کامل Excel دانلود شد')
+  } catch (e) {
+    admin.toastError(e, 'دریافت گزارش ناموفق بود')
+  } finally {
+    reportLoading.value = false
+  }
 }
 
 /** "۳ آسان + ۲ سخت" for the current count */
@@ -402,6 +444,66 @@ const bankShort = computed(
       <div class="card-hd">
         <span class="section-title grow"><AppIcon name="list" :size="16" /> سوالات مسابقه</span>
       </div>
+      <div class="mix-switch">
+        <a-switch :checked="mixOn" :loading="savingSettings" @change="toggleMix" />
+        <div>
+          <b>ترکیب ثابت سوالات بر اساس دسته</b>
+          <div class="faint small">
+            هر بازیکن دقیقاً همین تعداد سوال آسان و سخت از هر دسته می‌گیرد — اول همه‌ی آسان‌ها، بعد سخت‌ها، دسته‌ها یکی‌درمیان.
+          </div>
+        </div>
+      </div>
+
+      <template v-if="mixOn">
+        <div class="mix-table">
+          <div class="mix-head">
+            <span>دسته</span><span>آسان</span><span>سخت</span><span>جمع</span><span />
+          </div>
+          <div v-for="(r, i) in mixDraft" :key="i" class="mix-row">
+            <a-select
+              v-model:value="r.category"
+              :options="categoryOptions"
+              placeholder="انتخاب دسته"
+              @change="mixDirty = true"
+            />
+            <div class="mix-cell">
+              <a-input-number v-model:value="r.easy" :min="0" :max="50" @change="mixDirty = true" />
+              <span v-if="r.category && r.easy > stockOf(r.category).easy" class="mix-warn">
+                بانک فقط {{ toFa(stockOf(r.category).easy) }} آسان دارد
+              </span>
+            </div>
+            <div class="mix-cell">
+              <a-input-number v-model:value="r.hard" :min="0" :max="50" @change="mixDirty = true" />
+              <span v-if="r.category && r.hard > stockOf(r.category).hard" class="mix-warn">
+                بانک فقط {{ toFa(stockOf(r.category).hard) }} سخت دارد
+              </span>
+            </div>
+            <b class="num">{{ toFa((r.easy || 0) + (r.hard || 0)) }}</b>
+            <a-button size="small" danger :disabled="mixDraft.length < 2" @click="removeMixRow(i)">
+              <template #icon><AppIcon name="trash" :size="13" /></template>
+            </a-button>
+          </div>
+        </div>
+        <div class="mix-actions">
+          <a-button size="small" :disabled="categoryOptions.every((o) => o.disabled)" @click="addMixRow">
+            <template #icon><AppIcon name="plus" :size="13" /></template>
+            افزودن دسته
+          </a-button>
+          <span class="grow" />
+          <span>جمع هر بازی: <b class="num qc-current">{{ toFa(mixTotal) }} سوال</b></span>
+          <a-button v-if="mixDirty" size="small" @click="cancelMix">انصراف</a-button>
+          <a-button type="primary" size="small" :disabled="!mixDirty" :loading="savingSettings" @click="saveMix()">
+            ذخیره‌ی ترکیب
+          </a-button>
+        </div>
+        <ol class="mix-order">
+          <li v-for="(sl, i) in mixOrder" :key="i" :class="sl.difficulty">
+            {{ toFa(i + 1) }}. {{ sl.category }} · {{ DIFFICULTY_LABEL[sl.difficulty] }}
+          </li>
+        </ol>
+      </template>
+
+      <template v-else>
       <div class="qc-label">
         <span>تعداد سوال هر بازی</span>
         <span class="faint small">
@@ -435,6 +537,7 @@ const bankShort = computed(
         <span class="faint">— به این ترتیب: {{ composition.order }}</span>
         <span class="faint">(بانک: {{ toFa(board?.easyCount ?? 0) }} آسان، {{ toFa(board?.hardCount ?? 0) }} سخت)</span>
       </p>
+      </template>
 
       <div class="qc-label qc-gap">
         <span>زمان پاسخ به هر سوال</span>
@@ -492,6 +595,10 @@ const bankShort = computed(
           </div>
           <a-switch :checked="sform.testMode" :loading="savingSettings" @change="toggleTestMode" />
         </div>
+        <label class="f wide">
+          <span>مدت نمایش نتیجه به بازیکن پیش از صفحه‌ی شبکه‌های اجتماعی (ثانیه)</span>
+          <a-input-number v-model:value="sform.socialDelaySec" :min="2" :max="120" addon-after="ثانیه" style="width: 220px" @change="markDirty" />
+        </label>
         <label class="f wide">
           <span>پیام پایان بازی (به بازیکن نمایش داده می‌شود)</span>
           <a-textarea v-model:value="sform.finishMessage" :rows="2" :maxlength="500" @change="markDirty" />
@@ -660,9 +767,9 @@ const bankShort = computed(
         />
         <div class="grow" />
         <span class="faint small">{{ toFa(rows.length) }} نفر</span>
-        <a-button size="small" :disabled="!board?.players.length" @click="exportCsv">
+        <a-button size="small" type="primary" :disabled="!board?.players.length" :loading="reportLoading" @click="exportReport">
           <template #icon><AppIcon name="download" :size="13" /></template>
-          خروجی Excel (CSV)
+          گزارش کامل Excel
         </a-button>
         <a-button size="small" danger :disabled="!board?.players.length" @click="confirmDeleteAll">
           <template #icon><AppIcon name="trash" :size="13" /></template>
@@ -830,7 +937,9 @@ const bankShort = computed(
       :podium="podium"
       :names="showNames"
       :timing="showTiming"
+      :report-loading="reportLoading"
       @close="showOpen = false"
+      @report="exportReport"
     />
 
     <!-- winners announcement (big, for a projector) -->
@@ -910,6 +1019,83 @@ const bankShort = computed(
 }
 .settings-grid .wide {
   grid-column: 1 / -1;
+}
+.mix-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: var(--space-4);
+}
+.mix-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mix-head,
+.mix-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 2fr) 1fr 1fr 48px 36px;
+  gap: 8px;
+  align-items: start;
+}
+.mix-head {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.mix-row > b {
+  padding-top: 5px;
+  text-align: center;
+}
+.mix-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mix-cell :deep(.ant-input-number) {
+  width: 100%;
+}
+.mix-warn {
+  font-size: 0.72rem;
+  color: var(--warning);
+}
+.mix-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
+.mix-order {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.mix-order li {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: var(--success-soft);
+  color: var(--success);
+}
+.mix-order li.hard {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+@media (max-width: 700px) {
+  .mix-head {
+    display: none;
+  }
+  .mix-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .mix-row > .ant-select {
+    grid-column: 1 / -1;
+  }
 }
 .qc-row {
   display: flex;

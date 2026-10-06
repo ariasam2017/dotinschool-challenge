@@ -5,7 +5,7 @@
 // the moment it served the question, and only reveals the right option after
 // the player has answered. This screen just renders GameState and keeps a
 // local countdown in sync with the server's remainingMs.
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { ApiError } from '@/api/client'
 import {
@@ -121,6 +121,69 @@ const reveal = computed(() => st.value?.reveal ?? null)
 /** "finished" shows the result page only after the last reveal has played. */
 const showResult = ref(false)
 
+/* ---- after the result: the "follow us" screen ---- */
+// The player sees their own result for socialDelaySec, then the logo + social
+// links take over. "مشاهده‌ی نتیجه" brings the result back and stops the switch.
+const showSocial = ref(false)
+let socialDismissed = false
+let socialTimer: number | undefined
+watch(showResult, (on) => {
+  clearTimeout(socialTimer)
+  if (!on) {
+    showSocial.value = false
+    return
+  }
+  if (socialDismissed) return
+  const delay = (st.value?.socialDelaySec || 8) * 1000
+  socialTimer = window.setTimeout(() => (showSocial.value = true), delay)
+})
+function backToResult() {
+  socialDismissed = true
+  clearTimeout(socialTimer)
+  showSocial.value = false
+}
+
+interface Social {
+  key: string
+  name: string
+  url: string
+  icon: string // inner SVG markup, 24x24 viewBox (static, trusted)
+}
+// Instagram/Telegram/X/LinkedIn use their standard marks; Bale has no openly
+// published mark, so it gets a chat bubble in its style.
+const SOCIALS: Social[] = [
+  {
+    key: 'instagram',
+    name: 'اینستاگرام',
+    url: 'https://instagram.com/dotinschool',
+    icon: '<rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.4" cy="6.6" r="1.3" fill="currentColor"/>',
+  },
+  {
+    key: 'bale',
+    name: 'بله',
+    url: 'https://ble.ir/dotinschool',
+    icon: '<path fill="currentColor" d="M12 2.5c5.3 0 9.5 3.9 9.5 8.8s-4.2 8.8-9.5 8.8c-1.2 0-2.4-.2-3.5-.6L3.6 21.3l1.3-4.3C3.4 15.4 2.5 13.5 2.5 11.3 2.5 6.4 6.7 2.5 12 2.5Z"/><path fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="m7.8 11.6 2.9 2.8 5.6-5.6"/>',
+  },
+  {
+    key: 'telegram',
+    name: 'تلگرام',
+    url: 'https://t.me/DotinSchool',
+    icon: '<path fill="currentColor" d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/>',
+  },
+  {
+    key: 'x',
+    name: 'ایکس',
+    url: 'https://x.com/dotinschool',
+    icon: '<path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>',
+  },
+  {
+    key: 'linkedin',
+    name: 'لینکدین',
+    url: 'https://zaya.link/linkedin',
+    icon: '<path fill="currentColor" d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 1 1 0-4.125 2.062 2.062 0 0 1 0 4.125zm1.782 13.019H3.555V9h3.564v11.452z"/>',
+  },
+]
+
 const limitMs = computed(() => q.value?.limitMs || (st.value?.secondsPerQuestion ?? 20) * 1000)
 const timePct = computed(() => Math.max(0, Math.min(100, (leftMs.value / limitMs.value) * 100)))
 const timeTone = computed(() => (timePct.value > 50 ? 'ok' : timePct.value > 25 ? 'warn' : 'danger'))
@@ -223,6 +286,9 @@ async function choose(i: number) {
 /** Test mode only: wipe this run and go back to the lobby. */
 async function replay() {
   if (!token.value || busy.value) return
+  socialDismissed = false
+  clearTimeout(socialTimer)
+  showSocial.value = false
   busy.value = true
   const ok = await call(() => gameReplay(token.value!))
   busy.value = false
@@ -331,6 +397,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(socialTimer)
   stopTick()
   clearTimeout(advanceTimer)
   clearTimeout(welcomeTimer)
@@ -382,7 +449,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
             <p class="g-kicker">&lt;tech-quiz /&gt;</p>
             <h1>به <b>Game</b> مدرسه داتین خوش آمدی!</h1>
             <p>
-              {{ toFa(qCount) }} سوال چهارگزینه‌ای تکنولوژی، هر سوال {{ toFa(qSecs) }} ثانیه.
+              {{ toFa(qCount) }} سوال چهارگزینه‌ای تکنولوژی و برنامه‌نویسی، هر سوال {{ toFa(qSecs) }} ثانیه.
               درست‌تر و سریع‌تر جواب بده تا نفر اول شوی.
             </p>
           </div>
@@ -463,7 +530,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
             <div class="g-card g-rules">
               <h2><AppIcon name="help-circle" :size="20" /> قوانین بازی</h2>
               <ul>
-                <li><AppIcon name="list" :size="18" /><span><b>{{ toFa(qCount) }}</b> سوال چهارگزینه‌ای از حوزه‌ی تکنولوژی</span></li>
+                <li><AppIcon name="list" :size="18" /><span><b>{{ toFa(qCount) }}</b> سوال چهارگزینه‌ای از حوزه‌ی تکنولوژی و برنامه‌نویسی</span></li>
                 <li><AppIcon name="clock" :size="18" /><span>برای هر سوال <b>{{ toFa(qSecs) }}</b> ثانیه وقت داری</span></li>
                 <li><AppIcon name="zap" :size="18" /><span>رتبه با تعداد جواب درست و سرعت پاسخ‌گویی تعیین می‌شود</span></li>
                 <li><AppIcon name="target" :size="18" /><span>فقط یک بار می‌توانی بازی کنی — با دقت انتخاب کن!</span></li>
@@ -539,6 +606,38 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
                 <AppIcon :name="feedback.icon" :size="20" /> {{ feedback.text }}
               </p>
             </Transition>
+          </div>
+
+          <!-- after a few seconds: logo + social links -->
+          <div v-else-if="phase === 'finished' && showSocial" class="g-social">
+            <img class="g-social-logo" :src="dotinLogo" alt="مدرسه داتین" width="140" height="120" />
+            <h2>ممنون که در <b>Game</b> مدرسه داتین شرکت کردی!</h2>
+            <p>ما را در شبکه‌های اجتماعی دنبال کن تا از نتایج و رویدادهای بعدی باخبر شوی</p>
+            <div class="g-social-grid">
+              <a
+                v-for="(sl, i) in SOCIALS"
+                :key="sl.key"
+                :href="sl.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="g-social-link"
+                :class="'s-' + sl.key"
+                :style="{ animationDelay: 0.35 + i * 0.09 + 's' }"
+              >
+                <span class="g-social-ico">
+                  <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" v-html="sl.icon" />
+                </span>
+                <span class="g-social-name">{{ sl.name }}</span>
+              </a>
+            </div>
+            <div class="g-social-actions">
+              <button type="button" class="g-btn g-btn-ghost" @click="backToResult">
+                <AppIcon name="list" :size="18" /> مشاهده‌ی دوباره‌ی نتیجه
+              </button>
+              <button v-if="st.testMode" type="button" class="g-btn g-btn-replay" :disabled="busy" @click="replay">
+                <AppIcon name="rotate-ccw" :size="18" /> بازی دوباره (حالت تست)
+              </button>
+            </div>
           </div>
 
           <!-- result: only how many were right; the answers stay on screen -->
@@ -918,6 +1017,145 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   font-size: 0.72rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* ---------- follow-us screen ---------- */
+.g-social {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 20px 0 10px;
+  text-align: center;
+}
+.g-social-logo {
+  width: 140px;
+  height: auto;
+  filter: drop-shadow(0 0 26px rgba(60, 207, 141, 0.5));
+  animation: g-logo-in 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both, g-float 3.2s ease-in-out 0.9s infinite;
+}
+.g-social h2 {
+  color: var(--g-text);
+  font-size: 1.3rem;
+  font-weight: 900;
+  margin: 6px 0 0;
+  animation: g-rise 0.6s 0.2s both;
+}
+.g-social h2 b {
+  font-family: var(--g-mono);
+  color: var(--g-orange);
+}
+.g-social p {
+  color: var(--g-dim);
+  font-size: 0.92rem;
+  max-width: 340px;
+  margin: 0;
+  animation: g-rise 0.6s 0.3s both;
+}
+.g-social-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  margin-top: 10px;
+}
+.g-social-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--g-text);
+  text-decoration: none;
+  animation: g-pop-up 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.g-social-link:hover {
+  opacity: 1;
+}
+.g-social-ico {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s;
+}
+.g-social-link:active .g-social-ico {
+  transform: scale(0.92);
+}
+@media (hover: hover) {
+  .g-social-link:hover .g-social-ico {
+    transform: translateY(-4px);
+  }
+}
+.s-instagram .g-social-ico {
+  background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
+}
+.s-bale .g-social-ico {
+  background: linear-gradient(135deg, #3ddc97, #00a86b);
+}
+.s-telegram .g-social-ico {
+  background: linear-gradient(135deg, #37aee2, #1e96c8);
+}
+.s-x .g-social-ico {
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.s-linkedin .g-social-ico {
+  background: #0a66c2;
+}
+.g-social-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--g-dim);
+}
+.g-social-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 380px;
+  margin-top: 18px;
+  animation: g-rise 0.6s 0.9s both;
+}
+.g-btn-ghost {
+  background: var(--g-glass);
+  border: 1px solid var(--g-line);
+  color: var(--g-text);
+}
+@keyframes g-logo-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) rotate(-8deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes g-pop-up {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 360px) {
+  .g-social-grid {
+    gap: 6px;
+  }
+  .g-social-ico {
+    width: 50px;
+    height: 50px;
+    border-radius: 15px;
+  }
 }
 
 /* ---------- welcome ---------- */
