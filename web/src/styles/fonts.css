@@ -1,5 +1,25 @@
 /* Self-hosted fonts — no CDN, works fully offline and under a strict CSP. */
 
+/* IRANYekanX (Pro, v4.000) — Thin 100 … Black 900. A weight is only
+   downloaded by a browser when some text actually uses it. */
+@font-face {
+  font-family: 'IRANYekanX';
+  src: url('@/assets/fonts/IRANYekanX-Thin.woff2') format('woff2');
+  font-weight: 100;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IRANYekanX';
+  src: url('@/assets/fonts/IRANYekanX-UltraLight.woff2') format('woff2');
+  font-weight: 200;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IRANYekanX';
+  src: url('@/assets/fonts/IRANYekanX-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-display: swap;
+}
 @font-face {
   font-family: 'IRANYekanX';
   src: url('@/assets/fonts/IRANYekanX-Regular.woff2') format('woff2');
