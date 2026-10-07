@@ -884,7 +884,9 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 }
 .g-hero h1 {
   color: var(--g-text);
-  font-size: 1.4rem;
+  /* one line on every screen: shrink with the viewport instead of wrapping */
+  font-size: clamp(0.95rem, 4.6vw, 1.4rem);
+  white-space: nowrap;
   font-weight: 800;
   margin: 0 0 8px;
 }
