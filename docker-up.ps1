@@ -263,13 +263,19 @@ Say "host port: $port"
 Say "compiling the linux binary on the host (first run may take ~1 min)"
 New-Item -ItemType Directory -Force -Path dist | Out-Null
 $ver = (& git describe --tags --always --dirty 2>$null); if (-not $ver) { $ver = 'dev' }
+# Remove the previous binary first: if this compile fails, the old file must
+# not be packaged silently (that shipped a stale build that "never updated").
+Remove-Item dist/dotinschool_linux_amd64 -Force -ErrorAction SilentlyContinue
 $env:GOOS = 'linux'; $env:GOARCH = 'amd64'; $env:CGO_ENABLED = '0'
 try {
   & $go build -trimpath -ldflags="-s -w -X main.version=$ver" -o dist/dotinschool_linux_amd64 ./cmd/server
+  $goExit = $LASTEXITCODE
 } finally {
   Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
 }
-if (-not (Test-Path dist/dotinschool_linux_amd64)) { Die "go build failed." }
+if ($goExit -ne 0 -or -not (Test-Path dist/dotinschool_linux_amd64)) {
+  Die "go build failed (see the errors above) - nothing was deployed. Alternative that needs no Go on this PC: docker compose up -d --build"
+}
 
 # ---- 6. build image + start stack ----
 # This Dockerfile only copies the already-compiled binary in (no `go build`
