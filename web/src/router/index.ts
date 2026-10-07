@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { APP_MODE, ROUTER_BASE } from '@/lib/mode'
 
-const GAME_TITLE = 'Game مدرسه داتین'
+const GAME_TITLE = 'لیگ قهرمانان برنامه‌نویسی'
 
 const userRoutes: RouteRecordRaw[] = [
   // The quiz game is the landing page; the coding challenge lives beside it.

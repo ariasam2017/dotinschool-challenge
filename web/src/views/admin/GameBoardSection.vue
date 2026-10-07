@@ -945,7 +945,7 @@ const bankShort = computed(
     <!-- winners announcement (big, for a projector) -->
     <a-modal v-model:open="announceOpen" :footer="null" width="860px" centered :title="null" class="announce-modal">
       <div class="announce">
-        <h2><AppIcon name="trophy" :size="26" /> برندگان Game مدرسه داتین</h2>
+        <h2><AppIcon name="trophy" :size="26" /> برندگان لیگ قهرمانان برنامه‌نویسی</h2>
         <p class="announce-rule">
           رتبه‌بندی بر اساس <b>تعداد جواب درست</b> و سپس <b>سرعت پاسخ‌گویی</b> (زمان کمتر) انجام شده است
         </p>

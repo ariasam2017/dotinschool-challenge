@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Game مدرسه داتین — a Quiz-of-Kings style individual quiz, built mobile-first.
+// لیگ قهرمانان برنامه‌نویسی — a Quiz-of-Kings style individual quiz, built mobile-first.
 //
 // The server owns every rule: it deals the questions, times each answer from
 // the moment it served the question, and only reveals the right option after
@@ -421,7 +421,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
     <header class="g-top">
       <div class="g-logo">
         <span class="g-logo-mark"><AppIcon name="cpu" :size="20" /></span>
-        <span class="g-logo-text"><b>Game</b> مدرسه داتین</span>
+        <span class="g-logo-text"><b>لیگ قهرمانان</b> برنامه‌نویسی</span>
         <span v-if="st?.testMode" class="g-test-badge">حالت تست</span>
       </div>
       <button
@@ -446,8 +446,8 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
         <section v-else-if="screen === 'register'" key="register" class="g-panel">
           <div class="g-hero">
             <img class="g-hero-logo" :src="dotinLogo" alt="مدرسه داتین" width="108" height="92" />
-            <p class="g-kicker">&lt;tech-quiz /&gt;</p>
-            <h1>به <b>Game</b> مدرسه داتین خوش آمدی!</h1>
+            <p class="g-kicker">&lt;PCL /&gt;</p>
+            <h1>به <b>لیگ قهرمانان</b> برنامه‌نویسی خوش آمدی!</h1>
             <p>
               {{ toFa(qCount) }} سوال چهارگزینه‌ای تکنولوژی و برنامه‌نویسی، هر سوال {{ toFa(qSecs) }} ثانیه.
               درست‌تر و سریع‌تر جواب بده تا نفر اول شوی.
@@ -608,7 +608,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
           <!-- after a few seconds: logo + social links -->
           <div v-else-if="phase === 'finished' && showSocial" class="g-social">
             <img class="g-social-logo" :src="dotinLogo" alt="مدرسه داتین" width="140" height="120" />
-            <h2>ممنون که در <b>Game</b> مدرسه داتین شرکت کردی!</h2>
+            <h2>ممنون که در <b>لیگ قهرمانان</b> برنامه‌نویسی شرکت کردی!</h2>
             <p>ما را در شبکه‌های اجتماعی دنبال کن تا از نتایج و رویدادهای بعدی باخبر شوی</p>
             <div class="g-social-grid">
               <a
@@ -707,7 +707,10 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   --g-ok: #10b981;
   --g-bad: #f43f5e;
   --g-warn: #f68b1f;
-  --g-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* accent text (logo "Game", kicker, option letters, phone field) uses the
+     same IRANYekanX as everything else, so Persian never falls back to a
+     system font */
+  --g-mono: var(--font-ui);
 
   position: relative;
   min-height: 100dvh;

@@ -128,7 +128,7 @@ the cross-file business logic that table doesn't spell out:
   (`scripts/install.sh`) auto-bans after repeated failures on bare-metal
   installs.
 
-### Quiz game ("Game مدرسه داتین")
+### Quiz game ("لیگ قهرمانان برنامه‌نویسی")
 
 A Quiz-of-Kings style individual quiz that is the **user panel's landing page**
 (`/` → `views/game/GameApp.vue`); the coding challenge moved to `/challenge`.

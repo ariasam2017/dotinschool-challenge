@@ -140,7 +140,7 @@ func (s *GameService) ReportXLSX() ([]byte, error) {
 	label := func(s string) xlsx.Cell { return xlsx.Cell{V: s, S: xlsx.Bold} }
 
 	sum := [][]any{
-		{xlsx.Cell{V: "گزارش کامل Game مدرسه داتین", S: xlsx.Title}},
+		{xlsx.Cell{V: "گزارش کامل لیگ قهرمانان برنامه‌نویسی", S: xlsx.Title}},
 		{label("زمان تهیه‌ی گزارش"), jalaliDateTime(now)},
 		{},
 		{label("تعداد ثبت‌نام"), len(players)},

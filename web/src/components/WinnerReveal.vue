@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
       <header class="wr-top">
         <span class="wr-brand">
           <img class="wr-brand-logo" :src="dotinLogo" alt="" width="34" height="29" />
-          اعلام نتایج <b>Game</b> مدرسه داتین
+          اعلام نتایج <b>لیگ قهرمانان</b> برنامه‌نویسی
           <span v-if="demo" class="wr-demo">دمو — داده‌ی نمونه</span>
         </span>
         <div class="wr-tools">
@@ -300,7 +300,7 @@ onBeforeUnmount(() => {
         <!-- final podium -->
         <section v-else-if="stage === 'final'" class="wr-final">
           <img class="wr-final-logo" :src="dotinLogo" alt="مدرسه داتین" width="96" height="82" />
-          <h2>برندگان Game مدرسه داتین</h2>
+          <h2>برندگان لیگ قهرمانان برنامه‌نویسی</h2>
           <p class="wr-rule">رتبه‌بندی بر اساس تعداد جواب درست و سپس سرعت پاسخ‌گویی</p>
           <div class="wr-podium">
             <div v-for="p in [1, 0, 2].filter((i) => podium[i])" :key="p" class="wr-col" :class="'c' + (p + 1)">
@@ -414,7 +414,6 @@ onBeforeUnmount(() => {
 }
 .wr-brand b {
   color: var(--cyan);
-  font-family: var(--font-mono);
 }
 .wr-demo {
   padding: 2px 10px;
