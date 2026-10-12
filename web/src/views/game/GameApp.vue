@@ -463,7 +463,6 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
                 type="text"
                 autocomplete="given-name"
                 maxlength="60"
-                placeholder="مثلاً علی"
                 enterkeyhint="next"
               />
             </label>
@@ -474,7 +473,6 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
                 type="text"
                 autocomplete="family-name"
                 maxlength="60"
-                placeholder="مثلاً رضایی"
                 enterkeyhint="next"
               />
             </label>
@@ -487,7 +485,6 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
                 inputmode="numeric"
                 autocomplete="tel-national"
                 maxlength="14"
-                placeholder="09121234567"
                 enterkeyhint="go"
               />
             </label>
@@ -1050,7 +1047,9 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
 }
 .g-social h2 {
   color: var(--g-text);
-  font-size: 1.3rem;
+  /* one line on every screen: shrink with the viewport instead of wrapping */
+  font-size: clamp(0.72rem, 3.9vw, 1.3rem);
+  white-space: nowrap;
   font-weight: 900;
   margin: 6px 0 0;
   animation: g-rise 0.6s 0.2s both;
