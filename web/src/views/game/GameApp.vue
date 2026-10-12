@@ -647,7 +647,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
                 <span class="g-score-num">{{ toFa(st.result.correct) }}</span>
                 <span class="g-score-of">از {{ toFa(st.result.total) }}</span>
               </div>
-              <p class="g-score-lbl">درست جواب دادی!</p>
+              <p class="g-score-lbl">سوال رو درست جواب دادی!</p>
               <p class="g-finish-msg">{{ st.result.finishMessage }}</p>
             </div>
 
@@ -656,7 +656,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
               <template v-else><AppIcon name="rotate-ccw" :size="20" /> بازی دوباره (حالت تست)</template>
             </button>
 
-            <h3 class="g-review-title"><AppIcon name="list" :size="16" /> پاسخ‌های تو</h3>
+            <h3 class="g-review-title"><AppIcon name="list" :size="16" /> پاسخ‌های شما</h3>
             <div v-for="(r, qi) in st.review || []" :key="qi" class="g-card g-review">
               <div class="g-review-hd">
                 <span class="g-review-n">سوال {{ toFa(qi + 1) }}</span>
