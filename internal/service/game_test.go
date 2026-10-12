@@ -43,6 +43,7 @@ func gameSvc(t *testing.T) (*GameService, *time.Time) {
 	// most tests exercise the plain "n questions from the whole bank" mode;
 	// the category mix (on by default) has its own tests below
 	gs := g.Settings()
+	gs.Open = true // closed by default; tests play an opened game
 	gs.MixOn = false
 	gs.QuestionsPerGame = model.DefaultGameSettings().QuestionsPerGame
 	if _, err := g.SaveSettings(gs); err != nil {
@@ -206,14 +207,26 @@ func TestGameClosedAndRanking(t *testing.T) {
 	if gs.RevealFirstSec != 15 || gs.RevealGapSec != 4 {
 		t.Fatalf("reveal defaults not filled: %+v", gs)
 	}
-	gs.Open = false
+	if model.DefaultGameSettings().Open {
+		t.Fatal("a fresh install must start with the game closed")
+	}
 	gs.QuestionsPerGame = 1
 	if _, err := g.SaveSettings(gs); err != nil {
 		t.Fatal(err)
 	}
-	p, _, _ := g.Register("a", "b", "9120000001")
+	p, _, _ := g.Register("a", "b", "9120000001") // registered while open
+	gs.Open = false
+	if _, err := g.SaveSettings(gs); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := g.Start(p.Token); err == nil {
 		t.Fatal("start must fail while the game is closed")
+	}
+	if _, _, err := g.Register("new", "player", "9120000999"); err == nil {
+		t.Fatal("a new player must not register while the game is closed")
+	}
+	if back, created, err := g.Register("a", "b", "9120000001"); err != nil || created || back.ID != p.ID {
+		t.Fatalf("a returning player must still sign in while closed: %v", err)
 	}
 	gs.Open = true
 	g.SaveSettings(gs)

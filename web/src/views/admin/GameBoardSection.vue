@@ -89,6 +89,19 @@ async function saveSettings(patch?: Partial<typeof sform>) {
 function toggleOpen(v: boolean | string | number) {
   void saveSettings({ open: !!v })
 }
+/* the big start / close control at the top of the page */
+function confirmOpen(open: boolean) {
+  Modal.confirm({
+    title: open ? 'شروع بازی' : 'بستن بازی',
+    content: open
+      ? 'بازی همین حالا برای همه باز می‌شود و کسانی که روی صفحه‌ی انتظار هستند، چند ثانیه بعد خودکار وارد ثبت‌نام می‌شوند.'
+      : 'کسی دیگر نمی‌تواند ثبت‌نام یا بازی را شروع کند و صفحه‌ی انتظار نمایش داده می‌شود. کسانی که الان وسط بازی هستند، بازی‌شان را تمام می‌کنند.',
+    okText: open ? 'بله، شروع کن' : 'بله، ببند',
+    okButtonProps: open ? {} : { danger: true },
+    cancelText: 'انصراف',
+    onOk: () => saveSettings({ open }),
+  })
+}
 /* questions per game: one-tap presets + a custom count, saved immediately */
 const QC_PRESETS = [3, 5, 10, 15, 20]
 const qcCustom = ref<number | undefined>(undefined)
@@ -438,6 +451,27 @@ const bankShort = computed(
       message="بازیکنان در دورهای متفاوتی بازی کرده‌اند"
       description="تعداد سوال یا زمان هر سوال در وسط مسابقه تغییر کرده است؛ مقایسه‌ی جواب‌های درست بین این بازیکنان منصفانه نیست. برای یک مسابقه‌ی منصفانه، تنظیمات را قبل از شروع مشخص کنید و اگر لازم شد با «حذف همه‌ی نتایج» از نو شروع کنید."
     />
+
+    <!-- start / close the game for everyone -->
+    <section class="card card-pad gate" :class="sform.open ? 'is-open' : 'is-closed'">
+      <span class="gate-ico"><AppIcon :name="sform.open ? 'play' : 'clock'" :size="26" /></span>
+      <div class="grow">
+        <b class="gate-title">{{ sform.open ? 'بازی در جریان است' : 'بازی بسته است' }}</b>
+        <p class="faint small">
+          <template v-if="sform.open">بازیکنان می‌توانند ثبت‌نام کنند و بازی را شروع کنند.</template>
+          <template v-else>
+            بازیکنان فقط صفحه‌ی انتظار با لوگو را می‌بینند. با «شروع بازی»، همه چند ثانیه بعد خودکار وارد می‌شوند.
+            <template v-if="waitingPlayers.length"> ({{ toFa(waitingPlayers.length) }} نفر ثبت‌نام‌کرده منتظرند)</template>
+          </template>
+        </p>
+      </div>
+      <a-button v-if="!sform.open" type="primary" size="large" class="gate-btn" :loading="savingSettings" @click="confirmOpen(true)">
+        <AppIcon name="play" :size="18" /> شروع بازی
+      </a-button>
+      <a-button v-else danger size="large" class="gate-btn" :loading="savingSettings" @click="confirmOpen(false)">
+        <AppIcon name="pause" :size="18" /> بستن بازی
+      </a-button>
+    </section>
 
     <!-- number of questions per game -->
     <section class="card card-pad">
@@ -994,6 +1028,42 @@ const bankShort = computed(
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+.gate {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  border-inline-start: 4px solid var(--warning, #f68b1f);
+}
+.gate.is-open {
+  border-inline-start-color: var(--success);
+}
+.gate-ico {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--warning, #f68b1f) 15%, transparent);
+  color: var(--warning, #f68b1f);
+}
+.gate.is-open .gate-ico {
+  background: color-mix(in srgb, var(--success) 15%, transparent);
+  color: var(--success);
+}
+.gate-title {
+  font-size: 1.05rem;
+}
+.gate .faint {
+  margin: 4px 0 0;
+}
+.gate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 150px;
+  justify-content: center;
 }
 .open-toggle {
   display: inline-flex;

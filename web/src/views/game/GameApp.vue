@@ -25,6 +25,7 @@ import dotinLogo from '@/assets/brand/dotin-school-logo-w.svg'
 
 const TOKEN_KEY = 'dotinschool_game_token_v1'
 const REVEAL_MS = 1800 // how long the green/red reveal stays before moving on
+const INFO_POLL_MS = 2000 // how fast a waiting page notices the admin opened the game
 const LETTERS = ['A', 'B', 'C', 'D']
 
 const tokenStore = {
@@ -89,6 +90,11 @@ async function register() {
     screen.value = 'welcome'
     welcomeTimer = window.setTimeout(enterGame, 3200)
   } catch (e) {
+    if (e instanceof ApiError && e.status === 423) {
+      if (info.value) info.value = { ...info.value, open: false }
+      ensureInfoPolling(true)
+      return
+    }
     formError.value = e instanceof Error ? e.message : 'ثبت‌نام انجام نشد، دوباره تلاش کن.'
   } finally {
     registering.value = false
@@ -309,11 +315,13 @@ function ensureInfoPolling(on: boolean) {
     infoPoller = window.setInterval(async () => {
       try {
         info.value = await gameInfo()
-        if (info.value.open && st.value && !st.value.open) await resync()
+        if (!info.value.open) return
+        if (st.value && !st.value.open) await resync()
+        else if (!token.value) ensureInfoPolling(false)
       } catch {
         /* transient */
       }
-    }, 4000)
+    }, INFO_POLL_MS)
   } else if (!on && infoPoller !== undefined) {
     clearInterval(infoPoller)
     infoPoller = undefined
@@ -370,12 +378,14 @@ function onVisible() {
 
 onMounted(async () => {
   document.addEventListener('visibilitychange', onVisible)
-  gameInfo()
+  const infoReady = gameInfo()
     .then((i) => (info.value = i))
     .catch(() => {})
   const t = tokenStore.get()
   if (!t) {
+    await infoReady
     screen.value = 'register'
+    ensureInfoPolling(info.value?.open === false)
     return
   }
   token.value = t
@@ -407,6 +417,10 @@ onBeforeUnmount(() => {
 const qCount = computed(() => st.value?.questionsPerGame ?? info.value?.questionsPerGame ?? 3)
 const qSecs = computed(() => st.value?.secondsPerQuestion ?? info.value?.secondsPerQuestion ?? 20)
 const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ?? true))
+/** Closed game: a new visitor, or a registered player still in the lobby, sees only the logo. */
+const waiting = computed(
+  () => !gameOpen.value && (screen.value === 'register' || (screen.value === 'game' && phase.value === 'ready')),
+)
 </script>
 
 <template>
@@ -440,6 +454,15 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
         <div v-if="screen === 'boot'" key="boot" class="g-center">
           <span class="g-spinner" aria-label="در حال بارگذاری" />
         </div>
+
+        <!-- closed: the admin has not started the game yet -->
+        <section v-else-if="waiting" key="waiting" class="g-center g-waiting">
+          <img class="g-waiting-logo" :src="dotinLogo" alt="مدرسه داتین" width="150" height="128" />
+          <p class="g-kicker">&lt;PCL /&gt;</p>
+          <h1><b>لیگ قهرمانان</b> برنامه‌نویسی</h1>
+          <p class="g-waiting-text">بازی به‌زودی شروع می‌شود. همین صفحه را باز نگه دار؛ به‌محض شروع، خودکار وارد می‌شوی.</p>
+          <span class="g-waiting-dots" aria-label="در انتظار شروع بازی"><i /><i /><i /></span>
+        </section>
 
         <!-- registration -->
         <section v-else-if="screen === 'register'" key="register" class="g-panel">
@@ -897,6 +920,77 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   font-size: 0.95rem;
   max-width: 400px;
   margin: 0 auto;
+}
+/* ---------- waiting for the admin to open the game ---------- */
+.g-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+}
+.g-waiting-logo {
+  width: 150px;
+  height: auto;
+  margin-bottom: 14px;
+  filter: drop-shadow(0 0 22px rgba(60, 207, 141, 0.5));
+  animation: g-float 3.2s ease-in-out infinite;
+}
+.g-waiting h1 {
+  color: var(--g-text);
+  font-size: clamp(1rem, 5vw, 1.45rem);
+  white-space: nowrap;
+  font-weight: 900;
+  margin: 0;
+}
+.g-waiting h1 b {
+  font-family: var(--g-mono);
+  color: var(--g-orange);
+}
+.g-waiting-text {
+  color: var(--g-dim);
+  font-size: 0.95rem;
+  line-height: 1.9;
+  max-width: 340px;
+  margin: 6px auto 0;
+}
+.g-waiting-dots {
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+.g-waiting-dots i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--g-ok);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+  animation: g-wait-dot 1.2s ease-in-out infinite;
+}
+.g-waiting-dots i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.g-waiting-dots i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes g-wait-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .g-waiting-logo,
+  .g-waiting-dots i {
+    animation: none;
+  }
 }
 .g-hero-rules {
   color: var(--g-dim);

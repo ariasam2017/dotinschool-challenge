@@ -221,7 +221,7 @@ var LegacyFinishMessages = []string{
 // (QuestionsPerGame 3 is the count used once the admin turns the mix off).
 func DefaultGameSettings() GameSettings {
 	return GameSettings{
-		Open:               true,
+		Open:               false, // closed until the admin starts the game from the panel
 		QuestionsPerGame:   3,
 		SecondsPerQuestion: 20,
 		FinishMessage:      "بازی به اتمام رسید و نتیجه‌ات ثبت شد! رتبه‌های برتر بعد از پایان رقابت اعلام می‌شن. خوشحالیم که در لیگ قهرمانان برنامه‌نویسی شرکت کردی! 🌟",

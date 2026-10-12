@@ -499,6 +499,11 @@ func (s *GameService) Register(first, last, phone string) (p *model.GamePlayer, 
 		return nil, false, apperr.New(http.StatusConflict, "PHONE_TAKEN",
 			"این شماره موبایل قبلاً با نام دیگری در بازی ثبت شده است.")
 	}
+	// a returning player may sign back in (e.g. to see their result) while the
+	// game is closed, but nobody new gets in until the admin opens it
+	if errors.Is(err, gorm.ErrRecordNotFound) && !s.Settings().Open {
+		return nil, false, apperr.New(423, "GAME_CLOSED", "بازی هنوز شروع نشده — همین صفحه را باز نگه دار، به‌محض شروع وارد می‌شوی.")
+	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, false, err
 	}
