@@ -244,7 +244,7 @@ func toQuestionDTO(q model.GameQuestion) QuestionDTO {
 
 // normalizeQuestion trims and validates one question.
 func normalizeQuestion(in QuestionInput) (QuestionInput, *apperr.Error) {
-	in.Text = strings.TrimSpace(in.Text)
+	in.Text = model.CleanFaText(strings.TrimSpace(in.Text))
 	in.Category = strings.TrimSpace(in.Category)
 	if in.Category == "" {
 		in.Category = model.DefaultGameCategory
@@ -268,7 +268,7 @@ func normalizeQuestion(in QuestionInput) (QuestionInput, *apperr.Error) {
 	}
 	seen := map[string]bool{}
 	for i := range in.Options {
-		in.Options[i] = strings.TrimSpace(in.Options[i])
+		in.Options[i] = model.CleanFaText(strings.TrimSpace(in.Options[i]))
 		if in.Options[i] == "" {
 			return in, apperr.InvalidInput("هر چهار گزینه باید پر شوند.")
 		}

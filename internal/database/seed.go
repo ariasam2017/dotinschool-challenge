@@ -116,6 +116,11 @@ func seedGameBank(db *gorm.DB) error {
 	if err := db.Where("text IN ?", model.RetiredBankTexts).Delete(&model.GameQuestion{}).Error; err != nil {
 		return err
 	}
+	if have < 7 {
+		if err := cleanFaQuestions(db); err != nil {
+			return err
+		}
+	}
 	var texts []string
 	if err := db.Model(&model.GameQuestion{}).Pluck("text", &texts).Error; err != nil {
 		return err
@@ -153,6 +158,40 @@ func seedGameBank(db *gorm.DB) error {
 	}
 	raw, _ := json.Marshal(model.GameBankVersion)
 	return db.Save(&model.Setting{Key: keyGameBankVersion, Value: string(raw)}).Error
+}
+
+// cleanFaQuestions (v7) rewrites every stored question — built-in and
+// admin-written — with model.CleanFaText, in place, so ids and played results
+// stay valid. A question whose options would collide after cleaning is left
+// as is rather than made ambiguous.
+func cleanFaQuestions(db *gorm.DB) error {
+	var rows []model.GameQuestion
+	if err := db.Find(&rows).Error; err != nil {
+		return err
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		for _, q := range rows {
+			if !model.CleanFaQuestion(&q) {
+				continue
+			}
+			opts := q.Options()
+			seen := map[string]bool{}
+			dup := false
+			for _, o := range opts {
+				dup = dup || seen[o]
+				seen[o] = true
+			}
+			if dup {
+				continue
+			}
+			if err := tx.Model(&model.GameQuestion{}).Where("id = ?", q.ID).Updates(map[string]any{
+				"text": q.Text, "option1": opts[0], "option2": opts[1], "option3": opts[2], "option4": opts[3],
+			}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 var namesPool = [][2]string{
