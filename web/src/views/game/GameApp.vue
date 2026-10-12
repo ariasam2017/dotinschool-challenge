@@ -446,11 +446,13 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
           <div class="g-hero">
             <img class="g-hero-logo" :src="dotinLogo" alt="مدرسه داتین" width="108" height="92" />
             <p class="g-kicker">&lt;PCL /&gt;</p>
-            <h1>به <b>لیگ قهرمانان</b> برنامه‌نویسی خوش آمدی!</h1>
-            <p>
-              {{ toFa(qCount) }} سوال چهارگزینه‌ای تکنولوژی و برنامه‌نویسی، هر سوال {{ toFa(qSecs) }} ثانیه.
-              درست‌تر و سریع‌تر جواب بده تا نفر اول شوی.
-            </p>
+            <h1>برای <b>رقابت</b> آماده‌ای؟</h1>
+            <p>{{ toFa(qCount) }} سوال چهارگزینه‌ای از دنیای تکنولوژی و برنامه‌نویسی در انتظارت هست!</p>
+            <ul class="g-hero-rules">
+              <li>برای جواب دادن به هر سوال {{ toFa(qSecs) }} ثانیه وقت داری.</li>
+              <li>رتبه نهایی‌ات به تعداد جواب‌های درست و سرعت پاسخ‌گویی‌ات بستگی داره.</li>
+              <li>فقط یک بار می‌تونی بازی کنی؛ پس با دقت انتخاب کن!</li>
+            </ul>
           </div>
 
           <form class="g-card g-form" novalidate @submit.prevent="register">
@@ -898,6 +900,15 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
   font-size: 0.95rem;
   max-width: 400px;
   margin: 0 auto;
+}
+.g-hero-rules {
+  color: var(--g-dim);
+  font-size: 0.92rem;
+  line-height: 1.8;
+  text-align: start;
+  max-width: 400px;
+  margin: 8px auto 0;
+  padding-inline-start: 1.2em;
 }
 .g-form {
   display: flex;
