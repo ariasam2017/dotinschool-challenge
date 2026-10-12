@@ -609,8 +609,8 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
           <!-- after a few seconds: logo + social links -->
           <div v-else-if="phase === 'finished' && showSocial" class="g-social">
             <img class="g-social-logo" :src="dotinLogo" alt="مدرسه داتین" width="140" height="120" />
-            <h2>ممنون که در <b>لیگ قهرمانان</b> برنامه‌نویسی شرکت کردی!</h2>
-            <p>ما را در شبکه‌های اجتماعی دنبال کن تا از نتایج و رویدادهای بعدی باخبر شوی</p>
+            <h2>ورودت به <b>لیگ قهرمانان</b> برنامه‌نویسی رو تبریک می‌گیم!</h2>
+            <p>ما رو در شبکه‌های اجتماعی دنبال کن، تا از نتیجه‌ی مسابقه و رویدادهای بعدی باخبر بشی.</p>
             <div class="g-social-grid">
               <a
                 v-for="(sl, i) in SOCIALS"
@@ -642,12 +642,12 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
           <div v-else-if="phase === 'finished' && st.result" class="g-result">
             <div class="g-card g-result-card">
               <img class="g-result-logo" :src="dotinLogo" alt="مدرسه داتین" width="96" height="82" />
-              <h2>بازی تمام شد، {{ st.player.firstName }}!</h2>
+              <h2>{{ st.player.firstName }} عزیز، بازی تمام شد</h2>
               <div class="g-score-ring" :style="{ '--pct': (st.result.total ? (st.result.correct / st.result.total) * 100 : 0) + '%' }">
                 <span class="g-score-num">{{ toFa(st.result.correct) }}</span>
                 <span class="g-score-of">از {{ toFa(st.result.total) }}</span>
               </div>
-              <p class="g-score-lbl">جواب درست</p>
+              <p class="g-score-lbl">درست جواب دادی!</p>
               <p class="g-finish-msg">{{ st.result.finishMessage }}</p>
             </div>
 

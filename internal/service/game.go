@@ -118,8 +118,14 @@ func (s *GameService) loadSettings() model.GameSettings {
 			gs.MixOn = false
 		}
 	}
-	// settings saved before the reveal animation existed have zeros here
 	def := model.DefaultGameSettings()
+	// an untouched old built-in finish message follows the current default
+	for _, legacy := range model.LegacyFinishMessages {
+		if gs.FinishMessage == legacy {
+			gs.FinishMessage = def.FinishMessage
+		}
+	}
+	// settings saved before the reveal animation existed have zeros here
 	for _, f := range []struct {
 		v *int
 		d int

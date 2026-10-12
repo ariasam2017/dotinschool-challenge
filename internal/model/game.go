@@ -210,6 +210,13 @@ func (gs GameSettings) GamePlan() []GameSlot {
 // KeyGameSettings stores GameSettings.
 const KeyGameSettings = "game"
 
+// LegacyFinishMessages are earlier built-in defaults of FinishMessage. A
+// stored value still equal to one of them was never customised by the admin,
+// so it is upgraded to the current default when settings are loaded.
+var LegacyFinishMessages = []string{
+	"بازی‌ات تمام شد و نتیجه ثبت شد! برندگان پس از پایان مسابقه اعلام می‌شوند. ممنون که شرکت کردی 🌟",
+}
+
 // DefaultGameSettings: 20 s per question, and the 10-question category mix
 // (QuestionsPerGame 3 is the count used once the admin turns the mix off).
 func DefaultGameSettings() GameSettings {
@@ -217,7 +224,7 @@ func DefaultGameSettings() GameSettings {
 		Open:               true,
 		QuestionsPerGame:   3,
 		SecondsPerQuestion: 20,
-		FinishMessage:      "بازی‌ات تمام شد و نتیجه ثبت شد! برندگان پس از پایان مسابقه اعلام می‌شوند. ممنون که شرکت کردی 🌟",
+		FinishMessage:      "بازی به اتمام رسید و نتیجه‌ات ثبت شد! رتبه‌های برتر بعد از پایان رقابت اعلام می‌شن. خوشحالیم که در لیگ قهرمانان برنامه‌نویسی شرکت کردی! 🌟",
 		RevealThirdSec:     6,
 		RevealSecondSec:    9,
 		RevealFirstSec:     15,
