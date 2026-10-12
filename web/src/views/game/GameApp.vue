@@ -627,7 +627,7 @@ const gameOpen = computed(() => (info.value?.open ?? true) && (st.value?.open ??
             </div>
             <div class="g-social-actions">
               <button type="button" class="g-btn g-btn-ghost" @click="backToResult">
-                <AppIcon name="list" :size="18" /> مشاهده‌ی دوباره‌ی نتیجه
+                <AppIcon name="list" :size="18" /> مشاهده دوباره نتیجه
               </button>
               <button v-if="st.testMode" type="button" class="g-btn g-btn-replay" :disabled="busy" @click="replay">
                 <AppIcon name="rotate-ccw" :size="18" /> بازی دوباره (حالت تست)
