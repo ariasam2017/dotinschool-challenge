@@ -300,7 +300,7 @@ onBeforeUnmount(() => {
         <!-- final podium -->
         <section v-else-if="stage === 'final'" class="wr-final">
           <img class="wr-final-logo" :src="dotinLogo" alt="مدرسه داتین" width="96" height="82" />
-          <h2>برندگان لیگ قهرمانان برنامه‌نویسی</h2>
+          <h2>برندگان <span class="wr-league">لیگ قهرمانان</span> برنامه‌نویسی</h2>
           <div class="wr-podium">
             <div v-for="p in [1, 0, 2].filter((i) => podium[i])" :key="p" class="wr-col" :class="'c' + (p + 1)">
               <span class="wr-col-medal">{{ MEDALS[p] }}</span>
@@ -708,6 +708,9 @@ onBeforeUnmount(() => {
   font-size: clamp(1.6rem, 4vw, 2.6rem);
   font-weight: 900;
   margin-bottom: 30px;
+}
+.wr-league {
+  color: var(--gold);
 }
 .wr-podium {
   display: flex;
