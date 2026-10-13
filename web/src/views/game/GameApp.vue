@@ -25,7 +25,7 @@ import dotinLogo from '@/assets/brand/dotin-school-logo-w.svg'
 
 const TOKEN_KEY = 'dotinschool_game_token_v1'
 const REVEAL_MS = 1800 // how long the green/red reveal stays before moving on
-const INFO_POLL_MS = 2000 // how fast a waiting page notices the admin opened the game
+const INFO_POLL_MS = 1000 // how fast a waiting page notices the admin opened the game
 const LETTERS = ['A', 'B', 'C', 'D']
 
 const tokenStore = {
@@ -147,6 +147,11 @@ function backToResult() {
   socialDismissed = true
   clearTimeout(socialTimer)
   showSocial.value = false
+}
+/** The result page's own button: jump to the social screen right away. */
+function openSocial() {
+  clearTimeout(socialTimer)
+  showSocial.value = true
 }
 
 interface Social {
@@ -310,21 +315,41 @@ async function resync() {
   await call(() => gameState(token.value!))
 }
 
+// One lobby check: has the admin opened the game? If so, the waiting screen
+// gives way on its own — the register form for a new visitor, the start
+// button for a registered player — with no page refresh.
+let infoChecking = false
+async function checkInfo() {
+  if (infoChecking) return
+  infoChecking = true
+  try {
+    info.value = await gameInfo()
+    if (!info.value.open) return
+    if (st.value && !st.value.open) await resync()
+    else if (!token.value) ensureInfoPolling(false)
+  } catch {
+    /* transient */
+  } finally {
+    infoChecking = false
+  }
+}
+
+// A phone that locked its screen or backgrounded the tab freezes (or heavily
+// throttles) the poll timer, so check at once the moment the page is back.
+function onWake() {
+  if (infoPoller !== undefined && document.visibilityState === 'visible') void checkInfo()
+}
+
 function ensureInfoPolling(on: boolean) {
   if (on && infoPoller === undefined) {
-    infoPoller = window.setInterval(async () => {
-      try {
-        info.value = await gameInfo()
-        if (!info.value.open) return
-        if (st.value && !st.value.open) await resync()
-        else if (!token.value) ensureInfoPolling(false)
-      } catch {
-        /* transient */
-      }
-    }, INFO_POLL_MS)
+    infoPoller = window.setInterval(checkInfo, INFO_POLL_MS)
+    window.addEventListener('focus', onWake)
+    window.addEventListener('online', onWake)
   } else if (!on && infoPoller !== undefined) {
     clearInterval(infoPoller)
     infoPoller = undefined
+    window.removeEventListener('focus', onWake)
+    window.removeEventListener('online', onWake)
   }
 }
 
@@ -371,6 +396,7 @@ function confirmExit() {
 }
 
 function onVisible() {
+  onWake()
   if (document.visibilityState === 'visible' && screen.value === 'game' && phase.value === 'question' && picked.value === null) {
     void resync()
   }
@@ -385,7 +411,8 @@ onMounted(async () => {
   if (!t) {
     await infoReady
     screen.value = 'register'
-    ensureInfoPolling(info.value?.open === false)
+    // keep checking unless we know the game is open (a failed first fetch too)
+    ensureInfoPolling(info.value?.open !== true)
     return
   }
   token.value = t
@@ -670,6 +697,10 @@ const waiting = computed(
               <p class="g-score-lbl">سوال رو درست جواب دادی!</p>
               <p class="g-finish-msg">{{ st.result.finishMessage }}</p>
             </div>
+
+            <button type="button" class="g-btn g-btn-primary" @click="openSocial">
+              <AppIcon name="users" :size="20" /> شبکه‌های اجتماعی ما
+            </button>
 
             <button v-if="st.testMode" type="button" class="g-btn g-btn-replay" :disabled="busy" @click="replay">
               <span v-if="busy" class="g-spinner sm" />
