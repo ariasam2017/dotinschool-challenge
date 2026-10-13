@@ -175,7 +175,7 @@ func (a *AIService) Chat(messages []ChatMessage, override *AIRuntimeConfig) (*Ch
 
 	endpoint := strings.TrimRight(orDefault(cfg.BaseURL, AIDefaultBaseURL), "/") + "/chat/completions"
 	if _, err := url.ParseRequestURI(endpoint); err != nil {
-		return nil, apperr.New(400, "AI_BAD_URL", "آدرس پایه‌ی سرویس نامعتبر است: "+cfg.BaseURL)
+		return nil, apperr.New(400, "AI_BAD_URL", "آدرس پایه سرویس نامعتبر است: "+cfg.BaseURL)
 	}
 
 	payload, _ := json.Marshal(map[string]any{
@@ -229,7 +229,7 @@ func (a *AIService) Chat(messages []ChatMessage, override *AIRuntimeConfig) (*Ch
 			strings.Contains(low, "invalid model") ||
 			(strings.Contains(low, "model") && strings.Contains(low, "does not exist")) {
 			return nil, apperr.New(502, "AI_MODEL_UNAVAILABLE",
-				"مدل «"+orDefault(cfg.Model, AIDefaultModel)+"» روی این سرویس در دسترس نیست — «نام مدل» را در تنظیمات بررسی کنید (مثلاً gpt-4o-mini).")
+				"مدل «"+orDefault(cfg.Model, AIDefaultModel)+"» روی این سرویس در دسترس نیست — «نام مدل» را در تنظیمات بررسی کنید (مثلا gpt-4o-mini).")
 		}
 		if msg == "" {
 			msg = fmt.Sprintf("سرویس هوش مصنوعی خطا داد (کد %d).", res.StatusCode)

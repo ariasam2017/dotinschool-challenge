@@ -201,7 +201,7 @@ async function doImportParticipants(ev: Event) {
   const n = Array.isArray(parsed?.participants) ? parsed.participants.length : 0
   if (
     !confirm(
-      `همهٔ شرکت‌کنندگان فعلی این سامانه پاک و با ${toFa(n)} شرکت‌کنندهٔ این فایل جایگزین می‌شوند. ` +
+      `همه شرکت‌کنندگان فعلی این سامانه پاک و با ${toFa(n)} شرکت‌کننده این فایل جایگزین می‌شوند. ` +
         'سرویس ری‌استارت نمی‌شود. ادامه می‌دهید؟',
     )
   ) {
@@ -287,7 +287,7 @@ async function saveSmsSettingsForm() {
     message.success('تنظیمات پیامک ذخیره شد')
     await refreshSmsStatus()
   } catch (e) {
-    admin.toastError(e, 'خطا در ذخیرهٔ تنظیمات پیامک')
+    admin.toastError(e, 'خطا در ذخیره تنظیمات پیامک')
   } finally {
     smsSettingsSaving.value = false
   }
@@ -301,7 +301,7 @@ onMounted(() => {
 async function sendTestSms() {
   const phone = smsForm.phone.replace(/\D/g, '').replace(/^98/, '').replace(/^0/, '')
   if (!/^9\d{9}$/.test(phone)) {
-    message.error('شمارهٔ موبایل معتبر وارد کنید (مثل ۹۱۲۳۴۵۶۷۸۹)')
+    message.error('شماره موبایل معتبر وارد کنید (مثل ۹۱۲۳۴۵۶۷۸۹)')
     return
   }
   smsSending.value = true
@@ -349,7 +349,7 @@ async function doUpdate() {
         tone="primary"
         :trend="recentReg > 0 ? 'up' : 'flat'"
         :trend-text="recentReg > 0 ? toFa(recentReg) : ''"
-        :trend-title="recentReg > 0 ? `${toFa(recentReg)} ثبت‌نام در ۱۵ دقیقهٔ اخیر` : 'در ۱۵ دقیقهٔ اخیر ثبت‌نام تازه‌ای نبوده'"
+        :trend-title="recentReg > 0 ? `${toFa(recentReg)} ثبت‌نام در ۱۵ دقیقه اخیر` : 'در ۱۵ دقیقه اخیر ثبت‌نام تازه‌ای نبوده'"
       >
         <template #chart>
           <MiniAreaChart :data="regSeries" :height="42" color="var(--primary)" />
@@ -375,14 +375,14 @@ async function doUpdate() {
         label="میانگین امتیاز"
         :value="stats.avg"
         tone="accent"
-        sub="میانگین نمرهٔ همهٔ کاربرانِ نمره‌خورده (از ۱۰۰)"
+        sub="میانگین نمره همه کاربرانِ نمره‌خورده (از ۱۰۰)"
       />
     </div>
 
     <p class="faint grid-note">
-      این چهار کارت وضعیت زندهٔ رویداد را نشان می‌دهند و هر ۳ ثانیه به‌روزرسانی می‌شوند؛ با هر تغییر،
+      این چهار کارت وضعیت زنده رویداد را نشان می‌دهند و هر ۳ ثانیه به‌روزرسانی می‌شوند؛ با هر تغییر،
       عدد به‌صورت شمارشی جابه‌جا می‌شود و کارت یک لحظه برجسته می‌شود. نمودار زیر «ثبت‌نامی» شمار تجمعی
-      ثبت‌نام‌ها را در ۱۲ بازهٔ زمانیِ برابر رسم می‌کند: بالا رفتنِ خط یعنی ثبت‌نام تازه، و بخش صافِ خط
+      ثبت‌نام‌ها را در ۱۲ بازه زمانیِ برابر رسم می‌کند: بالا رفتنِ خط یعنی ثبت‌نام تازه، و بخش صافِ خط
       یعنی در آن بازه کسی ثبت‌نام نکرده است.
     </p>
 
@@ -461,7 +461,7 @@ async function doUpdate() {
           کل دیتابیس در یک فایل SQLite است. دانلود با روش امن <code>VACUUM INTO</code> انجام می‌شود.
           این بکاپ را می‌توانید روی یک سرور تازه و خام هم بازیابی کنید: پیش از جایگزینی، فایل باز و
           بررسی می‌شود و اگر سالم یا سازگار نباشد بازیابی انجام نمی‌شود و داده‌های فعلی دست‌نخورده
-          می‌ماند. یک نسخهٔ ایمن از دیتابیس فعلی هم قبل از جایگزینی نگه داشته می‌شود، بعد سرویس
+          می‌ماند. یک نسخه ایمن از دیتابیس فعلی هم قبل از جایگزینی نگه داشته می‌شود، بعد سرویس
           ری‌استارت می‌شود.
         </p>
         <div class="row-wrap">
@@ -471,7 +471,7 @@ async function doUpdate() {
         </div>
         <p class="faint hint warn-note">
           <AppIcon name="alert-triangle" :size="13" />
-          برای نتیجهٔ مطمئن، بهتر است سرور مبدأ و مقصد روی یک نسخه از سامانه باشند. برای جابه‌جایی فقط
+          برای نتیجه مطمئن، بهتر است سرور مبدأ و مقصد روی یک نسخه از سامانه باشند. برای جابه‌جایی فقط
           شرکت‌کنندگان بدون ری‌استارت، از «انتقال شرکت‌کنندگان» پایین استفاده کنید.
         </p>
 
@@ -479,7 +479,7 @@ async function doUpdate() {
         <div class="card-hd"><span class="section-title">انتقال شرکت‌کنندگان (بین سرورها)</span></div>
         <p class="faint hint">
           فقط ردیف‌های شرکت‌کنندگان را به‌صورت یک فایل <code>.json</code> جابه‌جا می‌کند — تعداد
-          ثبت‌نامی‌ها، در حال حل‌ها و ارسال‌شده‌ها منتقل می‌شود. «ورودی» جدول شرکت‌کنندگان سامانهٔ
+          ثبت‌نامی‌ها، در حال حل‌ها و ارسال‌شده‌ها منتقل می‌شود. «ورودی» جدول شرکت‌کنندگان سامانه
           مقصد را <b>کامل پاک و جایگزین</b> می‌کند و سرویس ری‌استارت نمی‌شود.
         </p>
         <div class="row-wrap">
@@ -563,7 +563,7 @@ async function doUpdate() {
           <a-input v-model:value="smsSettingsForm.adminNotifyPattern" dir="ltr" placeholder="پیش‌فرض .env" />
         </label>
         <label class="sms-field">
-          <span>شمارهٔ ادمین (اختیاری)</span>
+          <span>شماره ادمین (اختیاری)</span>
           <a-input v-model:value="smsSettingsForm.adminPhone" dir="ltr" placeholder="9XXXXXXXXX" />
         </label>
       </div>
@@ -579,14 +579,14 @@ async function doUpdate() {
         <span>خط فرستنده مؤثر: <code dir="ltr">{{ sms.sender || '—' }}</code></span>
         <span>پترن ثبت‌نام مؤثر: <code dir="ltr">{{ sms.registerPattern || '—' }}</code></span>
         <span>پترن ورود مؤثر: <code dir="ltr">{{ sms.loginPattern || '—' }}</code></span>
-        <span>شمارهٔ ادمین مؤثر: <code dir="ltr">{{ sms.adminPhone || '—' }}</code></span>
+        <span>شماره ادمین مؤثر: <code dir="ltr">{{ sms.adminPhone || '—' }}</code></span>
         <span>نوع Authorization مؤثر: <code dir="ltr">{{ sms.authScheme }}</code></span>
         <span>منبع تنظیمات: <code dir="ltr">{{ sms.source === 'panel' ? 'پنل' : sms.source === 'env' ? '.env' : '—' }}</code></span>
       </div>
 
       <div class="row-wrap" style="margin-top: 12px; align-items: flex-end">
         <label class="sms-field">
-          <span>شمارهٔ آزمایشی</span>
+          <span>شماره آزمایشی</span>
           <a-input v-model:value="smsForm.phone" dir="ltr" placeholder="9123456789" style="width: 180px" />
         </label>
         <label class="sms-field">

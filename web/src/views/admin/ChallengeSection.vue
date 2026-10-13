@@ -12,7 +12,7 @@ const admin = useAdminStore()
 const eStore = useEventStore()
 
 const DEFAULT_SUBMIT_MESSAGE =
-  'کدت با موفقیت ثبت شد. پس از بررسی مدیر سامانه، نتیجه‌ی چالش به شما اعلام خواهد شد.'
+  'کدت با موفقیت ثبت شد. پس از بررسی مدیر سامانه، نتیجه چالش به شما اعلام خواهد شد.'
 
 const form = reactive<Challenge>({
   title: '',
@@ -69,7 +69,7 @@ async function onImage(ev: Event) {
   const file = (ev.target as HTMLInputElement).files?.[0]
   if (!file) return
   if (!file.type.startsWith('image/')) {
-    message.error('لطفاً یک فایل تصویری انتخاب کنید')
+    message.error('لطفا یک فایل تصویری انتخاب کنید')
     ;(ev.target as HTMLInputElement).value = ''
     return
   }
@@ -95,7 +95,7 @@ async function saveChallenge() {
     await eStore.refresh()
     message.success('چالش ذخیره و برای کاربران منتشر شد')
   } catch (e) {
-    admin.toastError(e, 'خطا در ذخیره‌ی چالش')
+    admin.toastError(e, 'خطا در ذخیره چالش')
   } finally {
     savingAll.value = false
   }
@@ -110,7 +110,7 @@ async function saveSubmitMessage() {
     await eStore.refresh()
     message.success('پیام پس از ارسال به‌روزرسانی و منتشر شد')
   } catch (e) {
-    admin.toastError(e, 'خطا در ذخیره‌ی پیام')
+    admin.toastError(e, 'خطا در ذخیره پیام')
   } finally {
     savingMsg.value = false
   }

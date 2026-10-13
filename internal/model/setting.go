@@ -46,7 +46,7 @@ const (
 
 // DefaultSubmitMessage is shown to an entrant after a successful submission,
 // in place of any score. The admin can override it from the challenge editor.
-const DefaultSubmitMessage = "کدت با موفقیت ثبت شد. پس از بررسی مدیر سامانه، نتیجه‌ی چالش به شما اعلام خواهد شد."
+const DefaultSubmitMessage = "کدت با موفقیت ثبت شد. پس از بررسی مدیر سامانه، نتیجه چالش به شما اعلام خواهد شد."
 
 // DefaultChallenge seeds a fresh database.
 func DefaultChallenge() Challenge {
@@ -54,7 +54,7 @@ func DefaultChallenge() Challenge {
 		Title:         "جمع دوتایی — Two Sum",
 		Diff:          DiffMedium,
 		Tag:           "آرایه‌ها و هش",
-		Desc:          "یک آرایه از اعداد صحیح به نام nums و یک عدد هدف به نام target در اختیار دارید. اندیس دو عضوی از آرایه را برگردانید که مجموع آن‌ها برابر با target باشد.\n\nفرض کنید هر ورودی دقیقاً یک پاسخ دارد و نمی‌توانید از یک عضو دوبار استفاده کنید.",
+		Desc:          "یک آرایه از اعداد صحیح به نام nums و یک عدد هدف به نام target در اختیار دارید. اندیس دو عضوی از آرایه را برگردانید که مجموع آن‌ها برابر با target باشد.\n\nفرض کنید هر ورودی دقیقا یک پاسخ دارد و نمی‌توانید از یک عضو دوبار استفاده کنید.",
 		SampleIn:      "nums = [2, 7, 11, 15], target = 9",
 		SampleOut:     "[0, 1]",
 		Image:         nil,

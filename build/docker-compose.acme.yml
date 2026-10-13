@@ -9,6 +9,15 @@
 #   docker compose -f build/docker-compose.yml -f build/docker-compose.acme.yml up -d
 
 services:
+  app:
+    environment:
+      # Caddy reaches the app from the compose network, so trust its forwarding
+      # headers from there — otherwise every visitor shares Caddy's IP and one
+      # attacker can use up the login/OTP rate limits for everyone. Published
+      # ports on Linux keep the real public source IP, which these private
+      # ranges never match, so a direct visitor still can't spoof theirs.
+      - TRUSTED_PROXIES=172.16.0.0/12,10.0.0.0/8
+
   caddy:
     image: caddy:2-alpine
     container_name: dotinschool-caddy

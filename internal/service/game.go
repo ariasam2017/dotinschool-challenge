@@ -202,7 +202,7 @@ func normalizeMix(in []model.GameMix) ([]model.GameMix, *apperr.Error) {
 			continue
 		}
 		if m.Category == "" {
-			return nil, apperr.InvalidInput("دسته‌ی هر ردیف ترکیب سوالات را مشخص کنید.")
+			return nil, apperr.InvalidInput("دسته هر ردیف ترکیب سوالات را مشخص کنید.")
 		}
 		if len([]rune(m.Category)) > 40 {
 			return nil, apperr.InvalidInput("نام دسته حداکثر ۴۰ کاراکتر است.")
@@ -281,7 +281,7 @@ func normalizeQuestion(in QuestionInput) (QuestionInput, *apperr.Error) {
 		seen[in.Options[i]] = true
 	}
 	if in.Correct < 0 || in.Correct > 3 {
-		return in, apperr.InvalidInput("گزینه‌ی درست را مشخص کنید.")
+		return in, apperr.InvalidInput("گزینه درست را مشخص کنید.")
 	}
 	return in, nil
 }
@@ -368,7 +368,7 @@ func (s *GameService) ImportQuestions(in []QuestionInput, replace bool) (added i
 	for i, q := range in {
 		n, aerr := normalizeQuestion(q)
 		if aerr != nil {
-			return 0, 0, apperr.InvalidInput("سوال شماره‌ی " + strconv.Itoa(i+1) + ": " + aerr.Message)
+			return 0, 0, apperr.InvalidInput("سوال شماره " + strconv.Itoa(i+1) + ": " + aerr.Message)
 		}
 		clean = append(clean, n)
 	}
@@ -477,14 +477,14 @@ func newToken() string {
 func (s *GameService) Register(first, last, phone string) (p *model.GamePlayer, created bool, err error) {
 	first, last = strings.TrimSpace(first), strings.TrimSpace(last)
 	if first == "" || last == "" {
-		return nil, false, apperr.InvalidInput("لطفاً نام و نام خانوادگی را کامل وارد کنید.")
+		return nil, false, apperr.InvalidInput("لطفا نام و نام خانوادگی را کامل وارد کنید.")
 	}
 	if len([]rune(first)) > 60 || len([]rune(last)) > 60 {
 		return nil, false, apperr.InvalidInput("طول نام یا نام خانوادگی بیش از حد مجاز است.")
 	}
 	norm := NormalizePhone(phone)
 	if norm == "" {
-		return nil, false, apperr.New(400, "INVALID_PHONE", "شماره موبایل معتبر نیست — مثلاً ۰۹۱۲۱۲۳۴۵۶۷")
+		return nil, false, apperr.New(400, "INVALID_PHONE", "شماره موبایل معتبر نیست — مثلا ۰۹۱۲۱۲۳۴۵۶۷")
 	}
 
 	s.regMu.Lock()
@@ -497,7 +497,7 @@ func (s *GameService) Register(first, last, phone string) (p *model.GamePlayer, 
 			return &existing, false, nil
 		}
 		return nil, false, apperr.New(http.StatusConflict, "PHONE_TAKEN",
-			"این شماره موبایل قبلاً با نام دیگری در بازی ثبت شده است.")
+			"این شماره موبایل قبلا با نام دیگری در بازی ثبت شده است.")
 	}
 	// a returning player may sign back in (e.g. to see their result) while the
 	// game is closed, but nobody new gets in until the admin opens it
@@ -540,7 +540,7 @@ func (s *GameService) byToken(token string) (*model.GamePlayer, error) {
 }
 
 func gameSessionErr() *apperr.Error {
-	return apperr.New(401, "GAME_SESSION_EXPIRED", "نشست بازی شما معتبر نیست — لطفاً دوباره ثبت‌نام کنید.")
+	return apperr.New(401, "GAME_SESSION_EXPIRED", "نشست بازی شما معتبر نیست — لطفا دوباره ثبت‌نام کنید.")
 }
 
 func loadItems(p *model.GamePlayer) []model.GameItem {

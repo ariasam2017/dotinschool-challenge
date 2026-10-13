@@ -4,6 +4,8 @@
 package web
 
 import (
+	"net"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
@@ -43,7 +45,7 @@ func NewRouter(opts Options) *gin.Engine {
 	s := &server{cfg: opts.Config, svc: opts.Services, log: opts.Log, version: firstNonEmpty(opts.Version, "dev")}
 
 	r := gin.New()
-	configureProxyTrust(r)
+	configureProxyTrust(r, opts.Config.TrustedProxies)
 
 	r.Use(s.recovery())
 	r.Use(s.requestLogger())
@@ -58,14 +60,24 @@ func NewRouter(opts Options) *gin.Engine {
 	return r
 }
 
-// configureProxyTrust decides where c.ClientIP() comes from. Only loopback is a
-// trusted proxy (a local Caddy, or cloudflared for "dotinschool tunnel"). Behind
-// the Cloudflare Tunnel every request arrives from cloudflared on loopback and
-// CF-Connecting-IP carries the real visitor — without it, all VPN players would
-// share one IP for rate limiting and fail2ban. Forwarding headers are ignored
-// from anyone else, so a direct visitor cannot spoof their IP with them.
-func configureProxyTrust(r *gin.Engine) {
-	_ = r.SetTrustedProxies([]string{"127.0.0.1", "::1"})
+// configureProxyTrust decides where c.ClientIP() comes from. Loopback is always
+// a trusted proxy (a local Caddy, or cloudflared for "dotinschool tunnel").
+// Behind the Cloudflare Tunnel every request arrives from cloudflared on
+// loopback and CF-Connecting-IP carries the real visitor — without it, all VPN
+// players would share one IP for rate limiting and fail2ban. extra (the
+// TRUSTED_PROXIES env) adds the Docker network a Caddy container reaches the
+// app from; without it every visitor behind that Caddy shares Caddy's address,
+// so one attacker could exhaust the admin-login / OTP limits for everyone.
+// Forwarding headers are ignored from anyone else, so a direct visitor cannot
+// spoof their IP with them.
+func configureProxyTrust(r *gin.Engine, extra []string) {
+	trusted := []string{"127.0.0.1", "::1"}
+	for _, p := range extra {
+		if _, _, err := net.ParseCIDR(p); err == nil || net.ParseIP(p) != nil {
+			trusted = append(trusted, p)
+		}
+	}
+	_ = r.SetTrustedProxies(trusted)
 	r.RemoteIPHeaders = []string{"CF-Connecting-IP", "X-Forwarded-For", "X-Real-IP"}
 }
 

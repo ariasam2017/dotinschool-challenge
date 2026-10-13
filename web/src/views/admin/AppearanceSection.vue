@@ -34,7 +34,7 @@ const COLOR_LABELS: Record<string, string> = {
   primary: 'رنگ اصلی (برند)',
   'primary-hover': 'رنگ اصلی — حالت هاور',
   accent: 'رنگ تأکید',
-  bg: 'پس‌زمینه‌ی صفحه',
+  bg: 'پس‌زمینه صفحه',
   surface: 'سطح کارت‌ها',
   'surface-2': 'سطح ثانویه',
   text: 'متن اصلی',
@@ -578,7 +578,7 @@ async function saveDraft(): Promise<void> {
     savedDraftJson.value = currentJson.value
     message.success('پیش‌نویس ذخیره شد — روی پنل کاربر هنوز اعمال نشده')
   } catch (e) {
-    message.error(e instanceof Error ? e.message : 'ذخیره‌ی پیش‌نویس ناموفق بود')
+    message.error(e instanceof Error ? e.message : 'ذخیره پیش‌نویس ناموفق بود')
   } finally {
     saving.value = false
   }
@@ -587,7 +587,7 @@ async function saveDraft(): Promise<void> {
 function doPublish(): void {
   Modal.confirm({
     title: 'انتشار طراحی',
-    content: 'تغییرات همین حالا برای همه‌ی کاربران پنل کاربر اعمال می‌شود (ظرف چند ثانیه).',
+    content: 'تغییرات همین حالا برای همه کاربران پنل کاربر اعمال می‌شود (ظرف چند ثانیه).',
     okText: 'انتشار',
     cancelText: 'انصراف',
     onOk: async () => {
@@ -597,7 +597,7 @@ function doPublish(): void {
         await publishAppearance()
         savedDraftJson.value = currentJson.value
         publishedJson.value = savedDraftJson.value
-        message.success('منتشر شد — کاربران تا چند ثانیه‌ی دیگر تغییر را می‌بینند')
+        message.success('منتشر شد — کاربران تا چند ثانیه دیگر تغییر را می‌بینند')
       } catch (e) {
         message.error(e instanceof Error ? e.message : 'انتشار ناموفق بود')
       } finally {
@@ -609,8 +609,8 @@ function doPublish(): void {
 
 function doRevert(): void {
   Modal.confirm({
-    title: 'برگرداندن به نسخه‌ی منتشرشده',
-    content: 'همه‌ی تغییرات ذخیره‌نشده و پیش‌نویس دور ریخته می‌شود.',
+    title: 'برگرداندن به نسخه منتشرشده',
+    content: 'همه تغییرات ذخیره‌نشده و پیش‌نویس دور ریخته می‌شود.',
     okText: 'برگردان',
     cancelText: 'انصراف',
     okType: 'danger',
@@ -621,7 +621,7 @@ function doRevert(): void {
         savedDraftJson.value = currentJson.value
         publishedJson.value = savedDraftJson.value
         reloadPreview()
-        message.success('به نسخه‌ی منتشرشده برگشت')
+        message.success('به نسخه منتشرشده برگشت')
       } catch (e) {
         message.error(e instanceof Error ? e.message : 'عملیات ناموفق بود')
       }
@@ -632,7 +632,7 @@ function doRevert(): void {
 function doReset(): void {
   Modal.confirm({
     title: 'بازنشانی به طراحی پیش‌فرض',
-    content: 'همه‌ی سفارشی‌سازی‌ها (پیش‌نویس و منتشرشده) پاک می‌شود و سامانه به طراحی اصلی برمی‌گردد.',
+    content: 'همه سفارشی‌سازی‌ها (پیش‌نویس و منتشرشده) پاک می‌شود و سامانه به طراحی اصلی برمی‌گردد.',
     okText: 'بازنشانی',
     cancelText: 'انصراف',
     okType: 'danger',
@@ -802,7 +802,7 @@ onBeforeUnmount(() => {
                     <span class="row-lbl">گِردی گوشه‌ها</span>
                     <span class="row-ctl">
                       <a-input v-model:value="form.shared.radius" size="small"
-                        placeholder="مثلاً 12px" allow-clear />
+                        placeholder="مثلا 12px" allow-clear />
                     </span>
                   </label>
                   <label class="row">
@@ -818,7 +818,7 @@ onBeforeUnmount(() => {
                 </div>
               </a-collapse-panel>
 
-              <a-collapse-panel key="hero" header="هیرو — صفحه‌ی ورود کاربر">
+              <a-collapse-panel key="hero" header="هیرو — صفحه ورود کاربر">
                 <div class="rows">
                   <label class="row">
                     <span class="row-lbl">عنوان</span>
@@ -842,8 +842,8 @@ onBeforeUnmount(() => {
                     <span class="row-lbl">یادداشت زیر فرم</span>
                     <span class="row-ctl">
                       <a-textarea v-model:value="form.hero.note" size="small" :rows="2"
-                        placeholder="نشستت روی این مرورگر سپرده می‌شود؛ دفعهٔ بعد بدون کد وارد می‌شوی." allow-clear />
-                      <span class="css-hint faint">خطِ کوچکِ زیر دکمه‌های ورود/ثبت‌نام. خالی بگذار تا اصلاً نمایش داده نشود.</span>
+                        placeholder="نشستت روی این مرورگر سپرده می‌شود؛ دفعه بعد بدون کد وارد می‌شوی." allow-clear />
+                      <span class="css-hint faint">خطِ کوچکِ زیر دکمه‌های ورود/ثبت‌نام. خالی بگذار تا اصلا نمایش داده نشود.</span>
                     </span>
                   </label>
                   <label class="row">
@@ -861,13 +861,13 @@ onBeforeUnmount(() => {
                     <span class="row-lbl">پس‌زمینه (رنگ/گرادیان)</span>
                     <span class="row-ctl">
                       <a-input v-model:value="form.hero.background" size="small"
-                        placeholder="مثلاً linear-gradient(...)" allow-clear />
+                        placeholder="مثلا linear-gradient(...)" allow-clear />
                     </span>
                   </label>
                   <label class="row">
                     <span class="row-lbl">حداقل ارتفاع</span>
                     <span class="row-ctl">
-                      <a-input v-model:value="form.hero.minHeight" size="small" placeholder="مثلاً 70vh"
+                      <a-input v-model:value="form.hero.minHeight" size="small" placeholder="مثلا 70vh"
                         allow-clear />
                     </span>
                   </label>
@@ -893,7 +893,7 @@ onBeforeUnmount(() => {
                     </span>
                   </label>
                   <label class="row">
-                    <span class="row-lbl">پس‌زمینه‌ی هدر</span>
+                    <span class="row-lbl">پس‌زمینه هدر</span>
                     <span class="row-ctl">
                       <a-input v-model:value="form.header.background" size="small" placeholder="رنگ/گرادیان"
                         allow-clear />
@@ -925,11 +925,11 @@ onBeforeUnmount(() => {
             </div>
 
             <div v-if="!form.overrides.length" class="faint empty-els">
-              هنوز عنصری ویرایش نشده — از دکمه‌ی بالا یک بخش را از پیش‌نمایش انتخاب کن.
+              هنوز عنصری ویرایش نشده — از دکمه بالا یک بخش را از پیش‌نمایش انتخاب کن.
             </div>
 
             <div v-else-if="selectedOverride === -1" class="faint empty-els">
-              {{ form.overrides.length }} عنصر ویرایش‌شده و اعمال‌شده است. برای ویرایش دوباره‌ی هرکدام،
+              {{ form.overrides.length }} عنصر ویرایش‌شده و اعمال‌شده است. برای ویرایش دوباره هرکدام،
               روی همان بخش در پیش‌نمایش کلیک کن.
             </div>
 
@@ -986,7 +986,7 @@ onBeforeUnmount(() => {
                       danger @click="clearLayer">پاک‌کردن این لایه</a-button>
                   </div>
                   <p class="faint tiny">
-                    هر تغییر فقط برای همین اندازه‌ی صفحه اعمال می‌شود. فیلدهای خالی = بدون تغییر.
+                    هر تغییر فقط برای همین اندازه صفحه اعمال می‌شود. فیلدهای خالی = بدون تغییر.
                   </p>
 
                   <div v-if="o.setText && o.isLeaf" class="el-field" @click.stop>
@@ -1001,7 +1001,7 @@ onBeforeUnmount(() => {
                         <AppIcon name="minus" :size="14" />
                       </a-button>
                       <a-input v-model:value="activeBag.fontSize" size="small"
-                        placeholder="خودکار — مثلاً ۱۶px" allow-clear @keydown="onFontSizeKey" />
+                        placeholder="خودکار — مثلا ۱۶px" allow-clear @keydown="onFontSizeKey" />
                       <a-button size="small" title="بزرگ‌تر (+)" @click="nudgeFont(1)">
                         <AppIcon name="plus" :size="14" />
                       </a-button>
@@ -1044,8 +1044,8 @@ onBeforeUnmount(() => {
                   <div class="el-field" @click.stop>
                     <span class="el-flbl">فاصله داخلی / بیرونی (padding / margin)</span>
                     <a-input v-model:value="activeBag.padding" size="small"
-                      placeholder="padding — مثلاً 8px 16px" allow-clear />
-                    <a-input v-model:value="activeBag.margin" size="small" placeholder="margin — مثلاً 0 auto"
+                      placeholder="padding — مثلا 8px 16px" allow-clear />
+                    <a-input v-model:value="activeBag.margin" size="small" placeholder="margin — مثلا 0 auto"
                       allow-clear />
                   </div>
 
@@ -1064,9 +1064,9 @@ onBeforeUnmount(() => {
                   <div class="el-field" @click.stop>
                     <span class="el-flbl">اندازه</span>
                     <a-input v-model:value="activeBag.width" size="small"
-                      placeholder="width — مثلاً 320px یا 100%" allow-clear />
+                      placeholder="width — مثلا 320px یا 100%" allow-clear />
                     <a-input v-model:value="activeBag.maxWidth" size="small"
-                      placeholder="max-width — مثلاً 480px" allow-clear />
+                      placeholder="max-width — مثلا 480px" allow-clear />
                   </div>
                 </template>
 

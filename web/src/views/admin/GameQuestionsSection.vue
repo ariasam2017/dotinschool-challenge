@@ -137,7 +137,7 @@ async function saveEditor(another = false) {
       editor.open = false
     }
   } catch (e) {
-    admin.toastError(e, 'ذخیره‌ی سوال ناموفق بود')
+    admin.toastError(e, 'ذخیره سوال ناموفق بود')
   } finally {
     editor.saving = false
   }
@@ -148,7 +148,7 @@ function confirmDelete(ids: string[]) {
   if (!ids.length) return
   Modal.confirm({
     title: ids.length === 1 ? 'حذف سوال' : `حذف ${toFa(ids.length)} سوال`,
-    content: 'سوال از بانک حذف می‌شود. بازی‌هایی که قبلاً انجام شده‌اند تغییری نمی‌کنند.',
+    content: 'سوال از بانک حذف می‌شود. بازی‌هایی که قبلا انجام شده‌اند تغییری نمی‌کنند.',
     okText: 'حذف',
     cancelText: 'انصراف',
     okType: 'danger',
@@ -172,7 +172,7 @@ async function addDefaults() {
   try {
     const r = await addDefaultGameQuestions()
     await load()
-    message.success(r.added ? `${toFa(r.added)} سوال پیش‌فرض به بانک اضافه شد` : 'همه‌ی سوالات پیش‌فرض از قبل در بانک هستند')
+    message.success(r.added ? `${toFa(r.added)} سوال پیش‌فرض به بانک اضافه شد` : 'همه سوالات پیش‌فرض از قبل در بانک هستند')
   } catch (e) {
     admin.toastError(e, 'انجام نشد')
   } finally {
@@ -198,7 +198,7 @@ function exportJson() {
 function csvTemplate() {
   const body =
     '\ufeffسوال,گزینه ۱,گزینه ۲,گزینه ۳,گزینه ۴,شماره گزینه درست (۱ تا ۴),دسته,سطح (آسان یا سخت)\r\n' +
-    '"کدام شرکت سازنده‌ی اندروید است؟",اپل,گوگل,سامسونگ,مایکروسافت,2,تکنولوژی,آسان\r\n' +
+    '"کدام شرکت سازنده اندروید است؟",اپل,گوگل,سامسونگ,مایکروسافت,2,تکنولوژی,آسان\r\n' +
     '"پورت پیش‌فرض HTTPS کدام است؟",80,21,443,22,3,تکنولوژی,سخت\r\n'
   download('game-questions-template.csv', body, 'text/csv;charset=utf-8')
 }
@@ -244,7 +244,7 @@ function fromCsv(text: string): GameQuestionInput[] {
   if (rows.length && !/^[1-4]$/.test(faToEn((rows[0][5] || '').trim()))) rows.shift()
   return rows.map((r, i) => {
     const n = Number(faToEn((r[5] || '').trim()))
-    if (!(n >= 1 && n <= 4)) throw new Error(`ردیف ${toFa(i + 1)}: شماره‌ی گزینه‌ی درست باید ۱ تا ۴ باشد`)
+    if (!(n >= 1 && n <= 4)) throw new Error(`ردیف ${toFa(i + 1)}: شماره گزینه درست باید ۱ تا ۴ باشد`)
     return {
       text: (r[0] || '').trim(),
       options: [r[1], r[2], r[3], r[4]].map((o) => (o || '').trim()) as GameQuestionInput['options'],
@@ -354,8 +354,8 @@ async function runImport() {
           <template #overlay>
             <a-menu>
               <a-menu-item key="import" @click="fileInput?.click()">ورود از فایل (Excel CSV یا JSON)</a-menu-item>
-              <a-menu-item key="tpl" @click="csvTemplate">دریافت نمونه‌ی فایل CSV</a-menu-item>
-              <a-menu-item key="export" :disabled="!list.length" @click="exportJson">خروجی JSON همه‌ی سوالات</a-menu-item>
+              <a-menu-item key="tpl" @click="csvTemplate">دریافت نمونه فایل CSV</a-menu-item>
+              <a-menu-item key="export" :disabled="!list.length" @click="exportJson">خروجی JSON همه سوالات</a-menu-item>
             </a-menu>
           </template>
         </a-dropdown>
@@ -420,7 +420,7 @@ async function runImport() {
           <a-auto-complete
             v-model:value="editor.category"
             :options="categories.map((c) => ({ value: c }))"
-            placeholder="مثلاً تکنولوژی"
+            placeholder="مثلا تکنولوژی"
           />
         </label>
         <div class="f">
@@ -435,12 +435,12 @@ async function runImport() {
           <a-textarea v-model:value="editor.text" :rows="3" :maxlength="600" show-count placeholder="سوال را بنویسید…" />
         </label>
         <div class="f">
-          <span>گزینه‌ها — گزینه‌ی درست را با دایره‌ی کنارش مشخص کنید</span>
+          <span>گزینه‌ها — گزینه درست را با دایره کنارش مشخص کنید</span>
           <a-radio-group v-model:value="editor.correct" class="opt-editor">
             <div v-for="i in 4" :key="i" class="opt-row" :class="{ right: editor.correct === i - 1 }">
               <a-radio :value="i - 1" />
               <span class="opt-letter">{{ LETTERS[i - 1] }}</span>
-              <a-input v-model:value="editor.options[i - 1]" :maxlength="200" :placeholder="`گزینه‌ی ${LETTERS[i - 1]}`" />
+              <a-input v-model:value="editor.options[i - 1]" :maxlength="200" :placeholder="`گزینه ${LETTERS[i - 1]}`" />
             </div>
           </a-radio-group>
         </div>
@@ -469,7 +469,7 @@ async function runImport() {
           سوالاتی که متنشان از قبل در بانک هست، تکراری حساب شده و اضافه نمی‌شوند.
         </p>
         <a-checkbox v-model:checked="importState.replace">
-          جایگزینی کامل بانک (همه‌ی سوالات فعلی حذف شوند)
+          جایگزینی کامل بانک (همه سوالات فعلی حذف شوند)
         </a-checkbox>
         <div class="preview">
           <div v-for="(q, i) in importState.rows.slice(0, 5)" :key="i" class="preview-item">

@@ -118,7 +118,7 @@ const convBackResult = computed(() => {
     <section class="card card-pad">
       <span class="section-title">زمان‌بندی شروع خودکار (تقویم جلالی)</span>
       <p class="faint hint">
-        در لحظه‌ی تعیین‌شده، یک کرون‌جاب رویداد را خودکار برای کاربران زنده می‌کند — بدون هیچ اقدام دستی.
+        در لحظه تعیین‌شده، یک کرون‌جاب رویداد را خودکار برای کاربران زنده می‌کند — بدون هیچ اقدام دستی.
       </p>
 
       <div class="sched-grid">

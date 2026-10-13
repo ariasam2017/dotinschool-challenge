@@ -129,6 +129,6 @@ public class Main {
 	ch.Tag = "آرایه‌ها، هش و پیچیدگی"
 	set(model.KeyChallenge, ch)
 
-	fmt.Printf("✓ %d شرکت‌کننده‌ی دمو ساخته شد. رویداد زنده تا %s.\n",
+	fmt.Printf("✓ %d شرکت‌کننده دمو ساخته شد. رویداد زنده تا %s.\n",
 		len(names), time.UnixMilli(end).Format("15:04"))
 }

@@ -81,7 +81,7 @@ async function saveSettings(patch?: Partial<typeof sform>) {
     await refresh()
     message.success('تنظیمات بازی ذخیره شد')
   } catch (e) {
-    admin.toastError(e, 'ذخیره‌ی تنظیمات ناموفق بود')
+    admin.toastError(e, 'ذخیره تنظیمات ناموفق بود')
   } finally {
     savingSettings.value = false
   }
@@ -94,8 +94,8 @@ function confirmOpen(open: boolean) {
   Modal.confirm({
     title: open ? 'شروع بازی' : 'بستن بازی',
     content: open
-      ? 'بازی همین حالا برای همه باز می‌شود و کسانی که روی صفحه‌ی انتظار هستند، چند ثانیه بعد خودکار وارد ثبت‌نام می‌شوند.'
-      : 'کسی دیگر نمی‌تواند ثبت‌نام یا بازی را شروع کند و صفحه‌ی انتظار نمایش داده می‌شود. کسانی که الان وسط بازی هستند، بازی‌شان را تمام می‌کنند.',
+      ? 'بازی همین حالا برای همه باز می‌شود و کسانی که روی صفحه انتظار هستند، چند ثانیه بعد خودکار وارد ثبت‌نام می‌شوند.'
+      : 'کسی دیگر نمی‌تواند ثبت‌نام یا بازی را شروع کند و صفحه انتظار نمایش داده می‌شود. کسانی که الان وسط بازی هستند، بازی‌شان را تمام می‌کنند.',
     okText: open ? 'بله، شروع کن' : 'بله، ببند',
     okButtonProps: open ? {} : { danger: true },
     cancelText: 'انصراف',
@@ -163,7 +163,7 @@ function removeMixRow(i: number) {
 async function saveMix(on = mixOn.value) {
   const mix = mixDraft.value.map((r) => ({ category: r.category, easy: r.easy || 0, hard: r.hard || 0 }))
   if (on) {
-    if (mix.some((r) => !r.category && r.easy + r.hard > 0)) return message.error('دسته‌ی هر ردیف را انتخاب کنید')
+    if (mix.some((r) => !r.category && r.easy + r.hard > 0)) return message.error('دسته هر ردیف را انتخاب کنید')
     if (mixTotal.value < 1 || mixTotal.value > 50) return message.error('جمع سوالات ترکیب باید بین ۱ تا ۵۰ باشد')
   }
   const s = board.value?.settings
@@ -364,7 +364,7 @@ async function openReview(r: BoardRow) {
 function confirmReset(r: BoardRow) {
   Modal.confirm({
     title: 'بازی دوباره',
-    content: `نتیجه‌ی «${r.firstName} ${r.lastName}» پاک می‌شود و می‌تواند دوباره بازی کند.`,
+    content: `نتیجه «${r.firstName} ${r.lastName}» پاک می‌شود و می‌تواند دوباره بازی کند.`,
     okText: 'پاک کردن نتیجه',
     cancelText: 'انصراف',
     okType: 'danger',
@@ -399,8 +399,8 @@ function confirmDelete(r: BoardRow) {
 }
 function confirmDeleteAll() {
   Modal.confirm({
-    title: 'شروع مسابقه‌ی جدید',
-    content: 'همه‌ی بازیکنان و نتایج حذف می‌شوند (بانک سوالات دست نمی‌خورد). این کار برگشت‌پذیر نیست.',
+    title: 'شروع مسابقه جدید',
+    content: 'همه بازیکنان و نتایج حذف می‌شوند (بانک سوالات دست نمی‌خورد). این کار برگشت‌پذیر نیست.',
     okText: 'حذف همه',
     cancelText: 'انصراف',
     okType: 'danger',
@@ -449,7 +449,7 @@ const bankShort = computed(
       type="warning"
       show-icon
       message="بازیکنان در دورهای متفاوتی بازی کرده‌اند"
-      description="تعداد سوال یا زمان هر سوال در وسط مسابقه تغییر کرده است؛ مقایسه‌ی جواب‌های درست بین این بازیکنان منصفانه نیست. برای یک مسابقه‌ی منصفانه، تنظیمات را قبل از شروع مشخص کنید و اگر لازم شد با «حذف همه‌ی نتایج» از نو شروع کنید."
+      description="تعداد سوال یا زمان هر سوال در وسط مسابقه تغییر کرده است؛ مقایسه جواب‌های درست بین این بازیکنان منصفانه نیست. برای یک مسابقه منصفانه، تنظیمات را قبل از شروع مشخص کنید و اگر لازم شد با «حذف همه نتایج» از نو شروع کنید."
     />
 
     <!-- start / close the game for everyone -->
@@ -460,7 +460,7 @@ const bankShort = computed(
         <p class="faint small">
           <template v-if="sform.open">بازیکنان می‌توانند ثبت‌نام کنند و بازی را شروع کنند.</template>
           <template v-else>
-            بازیکنان فقط صفحه‌ی انتظار با لوگو را می‌بینند. با «شروع بازی»، همه چند ثانیه بعد خودکار وارد می‌شوند.
+            بازیکنان فقط صفحه انتظار با لوگو را می‌بینند. با «شروع بازی»، همه چند ثانیه بعد خودکار وارد می‌شوند.
             <template v-if="waitingPlayers.length"> ({{ toFa(waitingPlayers.length) }} نفر ثبت‌نام‌کرده منتظرند)</template>
           </template>
         </p>
@@ -483,7 +483,7 @@ const bankShort = computed(
         <div>
           <b>ترکیب ثابت سوالات بر اساس دسته</b>
           <div class="faint small">
-            هر بازیکن دقیقاً همین تعداد سوال آسان و سخت از هر دسته می‌گیرد — اول همه‌ی آسان‌ها، بعد سخت‌ها، دسته‌ها یکی‌درمیان.
+            هر بازیکن دقیقا همین تعداد سوال آسان و سخت از هر دسته می‌گیرد — اول همه آسان‌ها، بعد سخت‌ها، دسته‌ها یکی‌درمیان.
           </div>
         </div>
       </div>
@@ -527,7 +527,7 @@ const bankShort = computed(
           <span>جمع هر بازی: <b class="num qc-current">{{ toFa(mixTotal) }} سوال</b></span>
           <a-button v-if="mixDirty" size="small" @click="cancelMix">انصراف</a-button>
           <a-button type="primary" size="small" :disabled="!mixDirty" :loading="savingSettings" @click="saveMix()">
-            ذخیره‌ی ترکیب
+            ذخیره ترکیب
           </a-button>
         </div>
         <ol class="mix-order">
@@ -593,7 +593,7 @@ const bankShort = computed(
           <small>ثانیه</small>
         </button>
         <div class="qc-custom">
-          <a-input-number v-model:value="qtCustom" :min="5" :max="300" placeholder="ثانیه‌ی دلخواه" style="width: 130px" />
+          <a-input-number v-model:value="qtCustom" :min="5" :max="300" placeholder="ثانیه دلخواه" style="width: 130px" />
           <a-button :disabled="!qtCustom || savingSettings" :loading="savingSettings" @click="setQuestionTime(qtCustom!)">
             اعمال
           </a-button>
@@ -623,14 +623,14 @@ const bankShort = computed(
           <div class="grow">
             <b><AppIcon name="rotate-ccw" :size="14" /> حالت تست</b>
             <p class="faint small">
-              وقتی روشن است، هر بازیکن در صفحه‌ی نتیجه دکمه‌ی «بازی دوباره» دارد و می‌تواند هر چند بار بخواهد بازی کند.
-              پیش از مسابقه‌ی اصلی خاموشش کنید و با «حذف همه‌ی نتایج» جدول را خالی کنید.
+              وقتی روشن است، هر بازیکن در صفحه نتیجه دکمه «بازی دوباره» دارد و می‌تواند هر چند بار بخواهد بازی کند.
+              پیش از مسابقه اصلی خاموشش کنید و با «حذف همه نتایج» جدول را خالی کنید.
             </p>
           </div>
           <a-switch :checked="sform.testMode" :loading="savingSettings" @change="toggleTestMode" />
         </div>
         <label class="f wide">
-          <span>مدت نمایش نتیجه به بازیکن پیش از صفحه‌ی شبکه‌های اجتماعی (ثانیه)</span>
+          <span>مدت نمایش نتیجه به بازیکن پیش از صفحه شبکه‌های اجتماعی (ثانیه)</span>
           <a-input-number v-model:value="sform.socialDelaySec" :min="2" :max="120" addon-after="ثانیه" style="width: 220px" @change="markDirty" />
         </label>
         <label class="f wide">
@@ -646,16 +646,16 @@ const bankShort = computed(
         <div class="grow" />
         <a-button v-if="settingsDirty" @click="settingsDirty = false; syncSettingsForm()">انصراف</a-button>
         <a-button type="primary" :loading="savingSettings" :disabled="!settingsDirty" @click="saveSettings()">
-          ذخیره‌ی تنظیمات
+          ذخیره تنظیمات
         </a-button>
       </div>
     </section>
 
     <!-- counters -->
     <div class="stat-grid">
-      <StatCard icon="users" label="کل بازیکنان" :value="board?.stats.total ?? 0" tone="primary" sub="همه‌ی ثبت‌نام‌شده‌ها در بازی" />
+      <StatCard icon="users" label="کل بازیکنان" :value="board?.stats.total ?? 0" tone="primary" sub="همه ثبت‌نام‌شده‌ها در بازی" />
       <StatCard icon="gamepad" label="در حال بازی" :value="board?.stats.playing ?? 0" tone="info" sub="همین الان مشغول پاسخ دادن" />
-      <StatCard icon="check-circle" label="بازی تمام‌شده" :value="board?.stats.finished ?? 0" tone="success" sub="نتیجه‌ی نهایی ثبت شده" />
+      <StatCard icon="check-circle" label="بازی تمام‌شده" :value="board?.stats.finished ?? 0" tone="success" sub="نتیجه نهایی ثبت شده" />
       <StatCard
         icon="target"
         label="میانگین امتیاز"
@@ -701,7 +701,7 @@ const bankShort = computed(
     <!-- podium -->
     <section class="card card-pad">
       <div class="card-hd">
-        <span class="section-title grow"><AppIcon name="crown" :size="16" /> نفرات برتر (محاسبه‌ی خودکار)</span>
+        <span class="section-title grow"><AppIcon name="crown" :size="16" /> نفرات برتر (محاسبه خودکار)</span>
         <a-button :disabled="!podium.length" @click="announceOpen = true">
           <template #icon><AppIcon name="list" :size="14" /></template>
           جدول نتایج
@@ -790,7 +790,7 @@ const bankShort = computed(
         </a-input>
         <a-select
           v-model:value="statusFilter"
-          placeholder="همه‌ی وضعیت‌ها"
+          placeholder="همه وضعیت‌ها"
           allow-clear
           style="width: 160px"
           :options="[
@@ -807,7 +807,7 @@ const bankShort = computed(
         </a-button>
         <a-button size="small" danger :disabled="!board?.players.length" @click="confirmDeleteAll">
           <template #icon><AppIcon name="trash" :size="13" /></template>
-          حذف همه‌ی نتایج
+          حذف همه نتایج
         </a-button>
       </div>
 
@@ -902,7 +902,7 @@ const bankShort = computed(
           </template>
           <template v-else-if="column.key === 'actions'">
             <div class="row-actions">
-              <a-tooltip title="مشاهده‌ی پاسخ‌ها">
+              <a-tooltip title="مشاهده پاسخ‌ها">
                 <a-button size="small" :disabled="record.status === 'registered'" @click="openReview(record as BoardRow)">
                   <template #icon><AppIcon name="eye" :size="13" /></template>
                 </a-button>

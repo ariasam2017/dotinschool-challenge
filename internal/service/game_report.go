@@ -141,7 +141,7 @@ func (s *GameService) ReportXLSX() ([]byte, error) {
 
 	sum := [][]any{
 		{xlsx.Cell{V: "گزارش کامل لیگ قهرمانان برنامه‌نویسی", S: xlsx.Title}},
-		{label("زمان تهیه‌ی گزارش"), jalaliDateTime(now)},
+		{label("زمان تهیه گزارش"), jalaliDateTime(now)},
 		{},
 		{label("تعداد ثبت‌نام"), len(players)},
 		{label("بازی تمام‌شده"), len(finished)},

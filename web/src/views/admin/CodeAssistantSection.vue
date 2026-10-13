@@ -179,7 +179,7 @@ async function save() {
     message.success('سرویس‌های هوش مصنوعی ذخیره شد')
     await refreshStatus()
   } catch (e) {
-    admin.toastError(e, 'خطا در ذخیره‌ی سرویس‌ها')
+    admin.toastError(e, 'خطا در ذخیره سرویس‌ها')
   } finally {
     saving.value = false
   }
@@ -296,7 +296,7 @@ const presetOptions = computed(() => presets.value.map((p) => ({ value: p.label 
           <div class="prov-grid">
             <label class="f"><span>نام سرویس</span>
               <a-auto-complete v-model:value="row.label" :options="presetOptions" @change="applyPreset(row)">
-                <a-input placeholder="مثلاً GapGPT" autocomplete="off" />
+                <a-input placeholder="مثلا GapGPT" autocomplete="off" />
               </a-auto-complete>
             </label>
             <label class="f"><span>آدرس پایه</span>

@@ -83,10 +83,10 @@ func (s *OTPService) Send(phone, purpose string) error {
 		pattern = info.LoginPattern
 	}
 	if err := s.sms.SendPattern(phone, pattern, map[string]string{"code": code}); err != nil {
+		// The upstream reason (pattern, line, credit, …) goes to the log and the
+		// admin's SMS test — never to an anonymous visitor.
 		s.log.Errorf("ارسال کد تأیید به %s شکست خورد: %v", phone, err)
-		// Surface the real upstream reason — the original hid it, which made a
-		// misconfigured pattern / line / credit impossible to diagnose.
-		return apperr.New(502, "SMS_SEND_FAILED", "ارسال پیامک ناموفق بود — "+err.Error())
+		return apperr.New(502, "SMS_SEND_FAILED", "ارسال پیامک ناموفق بود — چند دقیقه بعد دوباره تلاش کنید.")
 	}
 	now := time.Now()
 	s.mu.Lock()
@@ -100,7 +100,7 @@ func (s *OTPService) Send(phone, purpose string) error {
 func (s *OTPService) Consume(phone, otp string) error {
 	otp = trimSpace(otp)
 	if otp == "" {
-		return apperr.New(400, "OTP_REQUIRED", "لطفاً کد تأیید پیامک‌شده را وارد کنید.")
+		return apperr.New(400, "OTP_REQUIRED", "لطفا کد تأیید پیامک‌شده را وارد کنید.")
 	}
 
 	s.mu.Lock()

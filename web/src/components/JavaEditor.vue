@@ -108,7 +108,7 @@ function lintJava(code: string): Diagnostic[] {
       /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*\s*(\(.*\))?\s*(=[^=].*)?$/.test(trimmed)
     ) {
       const col = raw.trimEnd().length
-      issues.push({ from: lineEnd - Math.max(1, raw.length - col + 1) + 1, to: lineEnd, severity: 'warning', message: 'احتمالاً «;» در انتهای این خط جا افتاده است' })
+      issues.push({ from: lineEnd - Math.max(1, raw.length - col + 1) + 1, to: lineEnd, severity: 'warning', message: 'احتمالا «;» در انتهای این خط جا افتاده است' })
     }
   }
   return issues

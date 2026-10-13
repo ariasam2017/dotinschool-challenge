@@ -51,8 +51,8 @@ async function removeOne(id: string) {
 }
 function clearAll() {
   Modal.confirm({
-    title: 'پاک‌کردن همه‌ی خطاها',
-    content: 'همه‌ی خطاهای ثبت‌شده‌ی کاربران پاک شوند؟',
+    title: 'پاک‌کردن همه خطاها',
+    content: 'همه خطاهای ثبت‌شده کاربران پاک شوند؟',
     okText: 'پاک‌کن',
     cancelText: 'انصراف',
     okType: 'danger',

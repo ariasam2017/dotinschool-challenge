@@ -77,7 +77,7 @@ async function register() {
     return
   }
   if (!phoneValid.value) {
-    formError.value = 'شماره موبایل معتبر نیست — مثلاً ۰۹۱۲۱۲۳۴۵۶۷'
+    formError.value = 'شماره موبایل معتبر نیست — مثلا ۰۹۱۲۱۲۳۴۵۶۷'
     return
   }
   registering.value = true
@@ -129,7 +129,7 @@ const showResult = ref(false)
 
 /* ---- after the result: the "follow us" screen ---- */
 // The player sees their own result for socialDelaySec, then the logo + social
-// links take over. "مشاهده‌ی نتیجه" brings the result back and stops the switch.
+// links take over. "مشاهده نتیجه" brings the result back and stops the switch.
 const showSocial = ref(false)
 let socialDismissed = false
 let socialTimer: number | undefined
@@ -297,7 +297,7 @@ async function replay() {
   busy.value = true
   const ok = await call(() => gameReplay(token.value!))
   busy.value = false
-  if (ok) message.success('نتیجه‌ی قبلی پاک شد — دوباره بازی کن!')
+  if (ok) message.success('نتیجه قبلی پاک شد — دوباره بازی کن!')
 }
 
 async function next() {
@@ -544,14 +544,14 @@ const waiting = computed(
               <span class="g-avatar">{{ st.player.firstName.charAt(0) }}{{ st.player.lastName.charAt(0) }}</span>
               <div>
                 <div class="g-player-name">{{ fullName }}</div>
-                <div class="g-player-sub"><i class="g-led" /> آماده‌ی مسابقه</div>
+                <div class="g-player-sub"><i class="g-led" /> آماده مسابقه</div>
               </div>
             </div>
 
             <div class="g-card g-rules">
               <h2><AppIcon name="help-circle" :size="20" /> قوانین بازی</h2>
               <ul>
-                <li><AppIcon name="list" :size="18" /><span><b>{{ toFa(qCount) }}</b> سوال چهارگزینه‌ای از حوزه‌ی تکنولوژی و برنامه‌نویسی</span></li>
+                <li><AppIcon name="list" :size="18" /><span><b>{{ toFa(qCount) }}</b> سوال چهارگزینه‌ای از حوزه تکنولوژی و برنامه‌نویسی</span></li>
                 <li><AppIcon name="clock" :size="18" /><span>برای هر سوال <b>{{ toFa(qSecs) }}</b> ثانیه وقت داری</span></li>
                 <li><AppIcon name="zap" :size="18" /><span>رتبه با تعداد جواب درست و سرعت پاسخ‌گویی تعیین می‌شود</span></li>
                 <li><AppIcon name="target" :size="18" /><span>فقط یک بار می‌توانی بازی کنی — با دقت انتخاب کن!</span></li>
@@ -630,7 +630,7 @@ const waiting = computed(
           <div v-else-if="phase === 'finished' && showSocial" class="g-social">
             <img class="g-social-logo" :src="dotinLogo" alt="مدرسه داتین" width="140" height="120" />
             <h2>ورودت به <b>لیگ قهرمانان</b> برنامه‌نویسی رو تبریک می‌گیم!</h2>
-            <p>ما رو در شبکه‌های اجتماعی دنبال کن، تا از نتیجه‌ی مسابقه و رویدادهای بعدی باخبر بشی.</p>
+            <p>ما رو در شبکه‌های اجتماعی دنبال کن، تا از نتیجه مسابقه و رویدادهای بعدی باخبر بشی.</p>
             <div class="g-social-grid">
               <a
                 v-for="(sl, i) in SOCIALS"

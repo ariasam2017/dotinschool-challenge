@@ -40,6 +40,10 @@ type Config struct {
 	AdminPath      string // normalised, always begins with "/" (e.g. "/admin")
 	AdminSubdomain string // lower-case host, no port; "" when disabled
 
+	// TrustedProxies are extra IPs/CIDRs (beyond loopback) whose forwarding
+	// headers are believed — the Docker network a Caddy container sits on.
+	TrustedProxies []string
+
 	// SMS (ippanel) — every value optional; when APIKey is empty the OTP
 	// endpoints report SMS_SEND_FAILED just like the original.
 	IppanelAPIKey             string
@@ -123,6 +127,12 @@ func Load(root string, log *logrus.Logger) *Config {
 		sub = sub[:i]
 	}
 	c.AdminSubdomain = sub
+
+	for _, p := range strings.Split(os.Getenv("TRUSTED_PROXIES"), ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			c.TrustedProxies = append(c.TrustedProxies, p)
+		}
+	}
 
 	c.Domain = strings.TrimSpace(os.Getenv("DOMAIN"))
 	c.PublicHost = strings.TrimSpace(os.Getenv("PUBLIC_HOST"))

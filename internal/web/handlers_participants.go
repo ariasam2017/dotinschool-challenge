@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	"encoding/json"
+	"math"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -91,21 +92,48 @@ func (s *server) handlePatchParticipant(c *gin.Context) {
 			return
 		}
 		if ownerID != id {
-			fail(c, apperr.Forbidden("اجازه‌ی ویرایش این شرکت‌کننده را ندارید."))
+			fail(c, apperr.Forbidden("اجازه ویرایش این شرکت‌کننده را ندارید."))
 			return
 		}
 	}
+
+	touchesProgress := body.Status != nil || body.Code != nil ||
+		len(body.Score) > 0 || len(body.ExecMs) > 0 || len(body.ExecDepth) > 0
 
 	// One-time submission: once a participant has submitted, they cannot
 	// submit again or otherwise touch their challenge progress (status, code,
 	// score, exec stats) — resubmitting no longer overwrites the graded
 	// result. The admin is exempt, so grading/correction still works.
-	if !isAdmin && p.Status == model.StatusSubmitted {
-		touchesProgress := body.Status != nil || body.Code != nil ||
-			len(body.Score) > 0 || len(body.ExecMs) > 0 || len(body.ExecDepth) > 0
-		if touchesProgress {
-			fail(c, apperr.New(409, "ALREADY_SUBMITTED",
-				"شما قبلاً کد خود را ارسال کرده‌اید — امکان ارسال یا ویرایش دوباره وجود ندارد."))
+	if !isAdmin && p.Status == model.StatusSubmitted && touchesProgress {
+		fail(c, apperr.New(409, "ALREADY_SUBMITTED",
+			"شما قبلا کد خود را ارسال کرده‌اید — امکان ارسال یا ویرایش دوباره وجود ندارد."))
+		return
+	}
+
+	// status is an allow-list: a participant may only move forward to
+	// started/submitted; the admin may also reset to registered.
+	if body.Status != nil {
+		switch *body.Status {
+		case model.StatusStarted, model.StatusSubmitted:
+		case model.StatusRegistered:
+			if !isAdmin {
+				fail(c, apperr.Forbidden("فقط ادمین می‌تواند وضعیت را بازنشانی کند."))
+				return
+			}
+		default:
+			fail(c, apperr.InvalidInput("وضعیت نامعتبر است."))
+			return
+		}
+	}
+
+	// the AI verdict is the admin's call, never the participant's
+	if body.AIFlag != nil {
+		if !isAdmin {
+			fail(c, apperr.Forbidden("فقط ادمین می‌تواند این مقدار را تغییر دهد."))
+			return
+		}
+		if f := *body.AIFlag; f != "" && f != model.AIFlagHuman && f != model.AIFlagSuspicious {
+			fail(c, apperr.InvalidInput("مقدار برچسب هوش مصنوعی نامعتبر است."))
 			return
 		}
 	}
@@ -126,8 +154,11 @@ func (s *server) handlePatchParticipant(c *gin.Context) {
 		}
 	}
 
-	// live-event lock for started/submitted
-	if body.Status != nil && (*body.Status == model.StatusSubmitted || *body.Status == model.StatusStarted) {
+	// live-event lock: started/submitted transitions — and, for a participant,
+	// any change to code/score/exec stats — only while the event is live, so a
+	// quiet code or score patch after the clock runs out is refused too.
+	statusMove := body.Status != nil && (*body.Status == model.StatusSubmitted || *body.Status == model.StatusStarted)
+	if statusMove || (!isAdmin && touchesProgress) {
 		now := nowMs()
 		if startsAt := s.svc.Settings.EventStartsAt(); startsAt != nil && *startsAt > now {
 			fail(c, apperr.New(423, "EVENT_NOT_STARTED", "چالش هنوز طبق زمان‌بندی شروع نشده است."))
@@ -171,10 +202,10 @@ func (s *server) handlePatchParticipant(c *gin.Context) {
 	if body.LastName != nil {
 		p.LastName = *body.LastName
 	}
-	applyNullableInt(body.Score, &p.Score, false)
-	applyNullableInt(body.ExecMs, &p.ExecMs, false)
-	applyNullableInt(body.ExecDepth, &p.ExecDepth, false)
-	applyNullableInt(body.AIScore, &p.AIScore, true)
+	applyNullableInt(body.Score, &p.Score, 0, 100)
+	applyNullableInt(body.ExecMs, &p.ExecMs, 0, maxExecStat)
+	applyNullableInt(body.ExecDepth, &p.ExecDepth, 0, maxExecStat)
+	applyNullableInt(body.AIScore, &p.AIScore, 0, 100)
 
 	if err := s.svc.Participants.Save(p); err != nil {
 		s.failWith(c, err)
@@ -183,11 +214,15 @@ func (s *server) handlePatchParticipant(c *gin.Context) {
 	c.JSON(http.StatusOK, p)
 }
 
+// maxExecStat bounds the reported execution time/depth — a client-sent number
+// must never be negative or absurd enough to wreck the admin's sorting.
+const maxExecStat = 10_000_000
+
 // applyNullableInt mirrors `next.x = body.x !== undefined ? body.x : row.x`.
 // raw nil  -> field untouched
 // raw null -> field set to nil
-// raw N    -> field set to N (clamped to 0..100 when clamp is true, for aiScore)
-func applyNullableInt(raw json.RawMessage, dst **int, clamp bool) {
+// raw N    -> field set to N, clamped to lo..hi
+func applyNullableInt(raw json.RawMessage, dst **int, lo, hi int) {
 	if len(raw) == 0 {
 		return
 	}
@@ -199,14 +234,7 @@ func applyNullableInt(raw json.RawMessage, dst **int, clamp bool) {
 	if err := json.Unmarshal(raw, &n); err != nil {
 		return
 	}
+	n = math.Max(float64(lo), math.Min(float64(hi), n))
 	v := int(n)
-	if clamp {
-		if v < 0 {
-			v = 0
-		}
-		if v > 100 {
-			v = 100
-		}
-	}
 	*dst = &v
 }

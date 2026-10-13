@@ -11,6 +11,10 @@
 {$DOMAIN} {
 	encode zstd gzip
 	tls /certs/fullchain.pem /certs/privkey.pem
-	reverse_proxy app:8080
+	# CF-Connecting-IP is read first by the app; drop any client-sent copy so
+	# it can't be used to fake a visitor IP (Caddy sets X-Forwarded-For itself).
+	reverse_proxy app:8080 {
+		header_up -CF-Connecting-IP
+	}
 	header Strict-Transport-Security "max-age=15552000; includeSubDomains"
 }

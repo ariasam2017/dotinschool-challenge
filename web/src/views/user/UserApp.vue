@@ -67,7 +67,7 @@ const initials = computed(() =>
   user.value ? (user.value.firstName[0] || '') + (user.value.lastName[0] || '') : '',
 )
 const resultMessage = computed(
-  () => challenge.value?.submitMessage?.trim() || 'کدت با موفقیت ثبت شد. پس از بررسی مدیر سامانه، نتیجه‌ی چالش به شما اعلام خواهد شد.',
+  () => challenge.value?.submitMessage?.trim() || 'کدت با موفقیت ثبت شد. پس از بررسی مدیر سامانه، نتیجه چالش به شما اعلام خواهد شد.',
 )
 
 // Show the countdown-to-start only inside the final hour before the scheduled
@@ -166,7 +166,7 @@ async function submit() {
       // e.g. a second tab/device raced this one — reflect the true state
       // instead of offering a "retry" that would just fail again the same way
       submitState.value = 'submitted'
-      message.info(err.message || 'کد شما قبلاً ارسال شده است.')
+      message.info(err.message || 'کد شما قبلا ارسال شده است.')
       return
     }
     if (err.code !== 'EVENT_LOCKED' && err.code !== 'EVENT_NOT_STARTED') {
@@ -264,7 +264,7 @@ function confirmExit() {
           <p class="state-kicker"><AppIcon name="calendar" :size="14" /> زمان‌بندی رویداد</p>
           <h2 class="state-title">رویداد هنوز شروع نشده</h2>
           <p class="state-lead">
-            زمان برگزاری را مدیر سامانه تعیین می‌کند. لحظهٔ شروع، سوال چالش خودکار همین‌جا باز می‌شود.
+            زمان برگزاری را مدیر سامانه تعیین می‌کند. لحظه شروع، سوال چالش خودکار همین‌جا باز می‌شود.
           </p>
           <div v-if="eStore.config?.eventStartsAt" class="state-stat">
             <span class="state-stat-label">شروع برنامه‌ریزی‌شده</span>
@@ -291,11 +291,11 @@ function confirmExit() {
         <!-- 3) admin paused a live event. -->
         <section v-else-if="userView === 'paused'" key="paused" class="state-panel tone-warning">
           <p class="state-kicker"><AppIcon name="pause" :size="14" /> رویداد متوقف است</p>
-          <h2 class="state-title">مدیر رویداد را موقتاً نگه داشته</h2>
+          <h2 class="state-title">مدیر رویداد را موقتا نگه داشته</h2>
           <p class="state-lead">
-            سوال و ادیتور تا ادامهٔ رویداد پنهان می‌شوند. کدی که نوشته‌ای محفوظ است و برمی‌گردد.
+            سوال و ادیتور تا ادامه رویداد پنهان می‌شوند. کدی که نوشته‌ای محفوظ است و برمی‌گردد.
           </p>
-          <CountdownClock :ms="remainMs" state="paused" size="lg" label="زمان باقی‌ماندهٔ چالش، متوقف" />
+          <CountdownClock :ms="remainMs" state="paused" size="lg" label="زمان باقی‌مانده چالش، متوقف" />
         </section>
 
         <!-- 4) event finished: the verdict is the prominent element. -->

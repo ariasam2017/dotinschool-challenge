@@ -53,28 +53,28 @@ func TestApplyNullableInt(t *testing.T) {
 
 	// absent -> untouched
 	dst := start
-	applyNullableInt(nil, &dst, false)
+	applyNullableInt(nil, &dst, 0, 100)
 	if dst == nil || *dst != 7 {
 		t.Fatal("absent field must leave the value untouched")
 	}
 
 	// explicit null -> nil
 	dst = start
-	applyNullableInt(json.RawMessage("null"), &dst, false)
+	applyNullableInt(json.RawMessage("null"), &dst, 0, 100)
 	if dst != nil {
 		t.Fatal("explicit null must set the field to nil")
 	}
 
 	// value with clamp
 	dst = nil
-	applyNullableInt(json.RawMessage("512"), &dst, true)
+	applyNullableInt(json.RawMessage("512"), &dst, 0, 100)
 	if dst == nil || *dst != 100 {
 		t.Fatalf("clamped value = %v, want 100", dst)
 	}
 
-	// value without clamp
+	// in-range value
 	dst = nil
-	applyNullableInt(json.RawMessage("42"), &dst, false)
+	applyNullableInt(json.RawMessage("42"), &dst, 0, 100)
 	if dst == nil || *dst != 42 {
 		t.Fatalf("value = %v, want 42", dst)
 	}

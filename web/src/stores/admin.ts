@@ -42,7 +42,7 @@ export const useAdminStore = defineStore('admin', () => {
       authed.value = false
       stopPolling()
       sessionExpiredNote.value =
-        'نشست مدیریتی شما منقضی شده (مثلاً به‌خاطر ری‌استارت سرور) — دوباره وارد شوید.'
+        'نشست مدیریتی شما منقضی شده (مثلا به‌خاطر ری‌استارت سرور) — دوباره وارد شوید.'
       return true
     }
     return false

@@ -229,7 +229,7 @@ onBeforeUnmount(() => {
         <span class="wr-brand">
           <img class="wr-brand-logo" :src="dotinLogo" alt="" width="34" height="29" />
           اعلام نتایج <b>لیگ قهرمانان</b> برنامه‌نویسی
-          <span v-if="demo" class="wr-demo">دمو — داده‌ی نمونه</span>
+          <span v-if="demo" class="wr-demo">دمو — داده نمونه</span>
         </span>
         <div class="wr-tools">
           <button type="button" class="wr-icon" :title="muted ? 'روشن کردن صدا' : 'بی‌صدا'" @click="toggleMute">
@@ -245,7 +245,7 @@ onBeforeUnmount(() => {
         <!-- intro -->
         <section v-if="stage === 'intro'" class="wr-intro">
           <img class="wr-intro-logo" :src="dotinLogo" alt="مدرسه داتین" width="150" height="128" />
-          <h1>لحظه‌ی اعلام برندگان</h1>
+          <h1>لحظه اعلام برندگان</h1>
           <button type="button" class="wr-start" @click="start">
             <AppIcon name="play" :size="22" /> شروع اعلام نتایج
           </button>

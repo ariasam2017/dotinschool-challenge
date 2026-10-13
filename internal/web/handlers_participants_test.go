@@ -69,8 +69,27 @@ func TestPatchParticipant_OneTimeSubmission(t *testing.T) {
 		return body.Code
 	}
 
-	// first submission succeeds
-	rec := patch(map[string]any{"sessionToken": tok, "status": "submitted", "code": "first", "score": 80}, "")
+	// a participant can't stamp their own AI verdict, invent a status, or
+	// reset themselves back to registered
+	for _, bad := range []map[string]any{
+		{"sessionToken": tok, "aiFlag": "human"},
+		{"sessionToken": tok, "status": "winner"},
+		{"sessionToken": tok, "status": "registered"},
+	} {
+		if rec := patch(bad, ""); rec.Code < 400 {
+			t.Fatalf("forged patch %v accepted: status=%d body=%s", bad, rec.Code, rec.Body.String())
+		}
+	}
+
+	// a quiet code patch is refused once the event clock has run out
+	_ = svc.Settings.Set(model.KeyEventEndsAt, now-1000)
+	if rec := patch(map[string]any{"sessionToken": tok, "code": "late"}, ""); rec.Code != 423 {
+		t.Fatalf("code patch after the event ended: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	_ = svc.Settings.Set(model.KeyEventEndsAt, now+3600000)
+
+	// first submission succeeds, with the client-sent score clamped to 0..100
+	rec := patch(map[string]any{"sessionToken": tok, "status": "submitted", "code": "first", "score": 80, "execMs": -5}, "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("first submit: status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -97,6 +116,12 @@ func TestPatchParticipant_OneTimeSubmission(t *testing.T) {
 	}
 	if got.Score == nil || *got.Score != 80 {
 		t.Fatalf("stored score = %v, want 80", got.Score)
+	}
+	if got.ExecMs == nil || *got.ExecMs != 0 {
+		t.Fatalf("stored execMs = %v, want 0 (negative clamped)", got.ExecMs)
+	}
+	if got.AIFlag != nil {
+		t.Fatalf("stored aiFlag = %v, want nil (participant may not set it)", *got.AIFlag)
 	}
 
 	// the admin is exempt from the one-time lock (grading/correction)

@@ -146,10 +146,10 @@ func sanitizeAppearance(a *model.Appearance) error {
 	}
 	if h.Image != "" {
 		if len(h.Image) > appearanceMaxImage {
-			return apperr.InvalidInput("تصویر پس‌زمینه‌ی هیرو بیش از حد بزرگ است (حداکثر ۵۱۲ کیلوبایت).")
+			return apperr.InvalidInput("تصویر پس‌زمینه هیرو بیش از حد بزرگ است (حداکثر ۵۱۲ کیلوبایت).")
 		}
 		if !appearanceImageRe.MatchString(strings.TrimSpace(h.Image)) {
-			return apperr.InvalidInput("فرمت تصویر پس‌زمینه‌ی هیرو نامعتبر است.")
+			return apperr.InvalidInput("فرمت تصویر پس‌زمینه هیرو نامعتبر است.")
 		}
 	}
 

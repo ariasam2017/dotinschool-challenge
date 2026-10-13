@@ -98,9 +98,9 @@ const faDec = (n: number) => toFa(String(n)).replace('.', '٫')
           load: <b class="num">{{ faDec(sys!.load[0]) }} / {{ faDec(sys!.load[1]) }} / {{ faDec(sys!.load[2]) }}</b>
         </span>
         <span>پردازش‌های همزمان: <b class="num">{{ toFa(sys?.go.goroutines ?? 0) }}</b></span>
-        <span>حافظهٔ خودِ برنامه: <b class="num">{{ fmtBytes(sys?.go.alloc ?? 0) }}</b></span>
+        <span>حافظه خودِ برنامه: <b class="num">{{ fmtBytes(sys?.go.alloc ?? 0) }}</b></span>
       </p>
-      <p class="faint hint">به‌روزرسانی خودکار هر ۱ ثانیه — همهٔ اعداد بالا همین لحظه از سرور خوانده می‌شوند.</p>
+      <p class="faint hint">به‌روزرسانی خودکار هر ۱ ثانیه — همه اعداد بالا همین لحظه از سرور خوانده می‌شوند.</p>
     </section>
   </div>
 </template>

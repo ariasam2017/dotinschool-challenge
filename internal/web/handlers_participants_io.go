@@ -78,14 +78,14 @@ func (s *server) handleImportParticipants(c *gin.Context) {
 
 	for i := range body.Participants {
 		p := &body.Participants[i]
-		where := fmt.Sprintf("شرکت‌کنندهٔ ردیف %d", i+1)
+		where := fmt.Sprintf("شرکت‌کننده ردیف %d", i+1)
 
 		if p.ID == "" {
 			fail(c, apperr.InvalidInput(where+": شناسه (id) خالی است."))
 			return
 		}
 		if p.PublicID == "" {
-			fail(c, apperr.InvalidInput(where+": شناسهٔ نمایشی (publicId) خالی است."))
+			fail(c, apperr.InvalidInput(where+": شناسه نمایشی (publicId) خالی است."))
 			return
 		}
 		if p.FirstName == "" || len([]rune(p.FirstName)) > 60 ||
@@ -94,7 +94,7 @@ func (s *server) handleImportParticipants(c *gin.Context) {
 			return
 		}
 		if !validPhone(p.Phone) {
-			fail(c, apperr.InvalidInput(where+": شمارهٔ موبایل نامعتبر است."))
+			fail(c, apperr.InvalidInput(where+": شماره موبایل نامعتبر است."))
 			return
 		}
 		switch p.Status {
@@ -108,7 +108,7 @@ func (s *server) handleImportParticipants(c *gin.Context) {
 			return
 		}
 		if seenID[p.ID] || seenPhone[p.Phone] || seenPublic[p.PublicID] {
-			fail(c, apperr.InvalidInput(where+": شناسه/موبایل/شناسهٔ نمایشی تکراری در فایل."))
+			fail(c, apperr.InvalidInput(where+": شناسه/موبایل/شناسه نمایشی تکراری در فایل."))
 			return
 		}
 		seenID[p.ID], seenPhone[p.Phone], seenPublic[p.PublicID] = true, true, true

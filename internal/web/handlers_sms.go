@@ -102,7 +102,7 @@ func (s *server) handleSMSTest(c *gin.Context) {
 	phone = strings.TrimPrefix(phone, "+98")
 	phone = strings.TrimPrefix(phone, "0")
 	if !validPhone(phone) {
-		fail(c, apperr.InvalidInput("شمارهٔ موبایل باید به شکل ۹XXXXXXXXX باشد (بدون صفر و بدون +۹۸)."))
+		fail(c, apperr.InvalidInput("شماره موبایل باید به شکل ۹XXXXXXXXX باشد (بدون صفر و بدون +۹۸)."))
 		return
 	}
 

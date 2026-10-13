@@ -58,7 +58,7 @@ func bindJSON(c *gin.Context, dst any) error {
 		if errors.As(err, &mbe) {
 			return apperr.New(http.StatusRequestEntityTooLarge, "BODY_TOO_LARGE", "حجم درخواست بیش از حد مجاز است.")
 		}
-		return apperr.New(400, "INVALID_JSON", "بدنه‌ی درخواست نامعتبر است.")
+		return apperr.New(400, "INVALID_JSON", "بدنه درخواست نامعتبر است.")
 	}
 	return nil
 }

@@ -32,7 +32,7 @@ func participantWithToken(p *model.Participant, token string) gin.H {
 func (s *server) resolveParticipant(token string) (string, *apperr.Error) {
 	id, ok := s.svc.Sessions.ResolveParticipant(token)
 	if !ok {
-		return "", apperr.New(401, "SESSION_EXPIRED", "نشست شما منقضی شده — لطفاً دوباره وارد شوید.")
+		return "", apperr.New(401, "SESSION_EXPIRED", "نشست شما منقضی شده — لطفا دوباره وارد شوید.")
 	}
 	return id, nil
 }

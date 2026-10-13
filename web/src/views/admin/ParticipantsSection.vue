@@ -136,7 +136,7 @@ function confirmDelete(ids: string[]) {
         </a-input>
         <a-select
           v-model:value="statusFilter"
-          placeholder="همه‌ی وضعیت‌ها"
+          placeholder="همه وضعیت‌ها"
           allow-clear
           style="width: 170px"
           :options="[

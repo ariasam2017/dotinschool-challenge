@@ -229,7 +229,7 @@ func (p *ippanelProvider) Verbose(phone, patternCode string, params map[string]s
 	// configuration problem on our side - say so, so a transient outage
 	// doesn't read as "your API key / pattern is wrong".
 	if !res.OK && httpRes.StatusCode >= 500 && strings.TrimSpace(res.Message) == "" {
-		res.Message = fmt.Sprintf("سرویس ippanel موقتاً در دسترس نیست (کد %d) — چند دقیقه بعد دوباره امتحان کنید. تنظیمات شما درست است.", httpRes.StatusCode)
+		res.Message = fmt.Sprintf("سرویس ippanel موقتا در دسترس نیست (کد %d) — چند دقیقه بعد دوباره امتحان کنید. تنظیمات شما درست است.", httpRes.StatusCode)
 	}
 
 	if !res.OK {

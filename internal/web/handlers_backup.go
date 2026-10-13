@@ -90,7 +90,7 @@ func (s *server) handleRestore(c *gin.Context) {
 		database.CleanSidecars(stagePath)
 		s.log.WithError(verr).Warn("restore: uploaded database failed validation — restore refused")
 		fail(c, apperr.New(400, "RESTORE_INCOMPATIBLE",
-			"این فایل بکاپ سالم نیست یا با نسخهٔ فعلی سامانه سازگار نیست — بازیابی انجام نشد و داده‌های فعلی دست‌نخورده ماند. بهتر است هر دو سرور روی یک نسخه باشند."))
+			"این فایل بکاپ سالم نیست یا با نسخه فعلی سامانه سازگار نیست — بازیابی انجام نشد و داده‌های فعلی دست‌نخورده ماند. بهتر است هر دو سرور روی یک نسخه باشند."))
 		return
 	}
 
@@ -133,11 +133,11 @@ func (s *server) handleUpdate(c *gin.Context) {
 	if s.cfg.InDocker {
 		c.JSON(http.StatusOK, gin.H{
 			"updated": false,
-			"message": "این نصب روی Docker است — برای به‌روزرسانی، از پوشهٔ ریشهٔ پروژه روی همان سرور (همان‌جا که docker-up.ps1 / docker-up.sh هست) دستور زیر را اجرا کنید:\n" +
+			"message": "این نصب روی Docker است — برای به‌روزرسانی، از پوشه ریشه پروژه روی همان سرور (همان‌جا که docker-up.ps1 / docker-up.sh هست) دستور زیر را اجرا کنید:\n" +
 				"• ویندوز (PowerShell): .\\update.ps1\n" +
 				"• لینوکس/مک: ./update.sh\n" +
 				"(اگر با اسکریپت نصب لینوکسی docker-install.sh نصب کرده‌اید، دستور «dotinschool update» هم همین کار را می‌کند.)\n" +
-				"این اسکریپت‌ها نسخهٔ جدید را از گیت‌هاب می‌گیرند، باینری را دوباره می‌سازند و سرویس را ری‌استارت می‌کنند — بدون نیاز به build داخل کانتینر. داده‌ها در ولوم ./data دست‌نخورده می‌مانند.",
+				"این اسکریپت‌ها نسخه جدید را از گیت‌هاب می‌گیرند، باینری را دوباره می‌سازند و سرویس را ری‌استارت می‌کنند — بدون نیاز به build داخل کانتینر. داده‌ها در ولوم ./data دست‌نخورده می‌مانند.",
 		})
 		return
 	}
@@ -162,11 +162,11 @@ func (s *server) handleUpdate(c *gin.Context) {
 		return
 	}
 	if localHead == remoteHead {
-		c.JSON(http.StatusOK, gin.H{"updated": false, "message": "سامانه از قبل به‌روز است — نسخه‌ی جدیدی روی گیت‌هاب نیست."})
+		c.JSON(http.StatusOK, gin.H{"updated": false, "message": "سامانه از قبل به‌روز است — نسخه جدیدی روی گیت‌هاب نیست."})
 		return
 	}
 	if _, err := git("reset", "--hard", "origin/main"); err != nil {
-		fail(c, apperr.New(500, "UPDATE_FAILED", "دریافت نسخه‌ی جدید موفق بود ولی اعمالش شکست خورد — چیزی تغییر نکرد."))
+		fail(c, apperr.New(500, "UPDATE_FAILED", "دریافت نسخه جدید موفق بود ولی اعمالش شکست خورد — چیزی تغییر نکرد."))
 		return
 	}
 

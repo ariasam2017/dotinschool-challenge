@@ -68,15 +68,15 @@ async function sendOtp() {
     return
   }
   if (mode.value === 'register') {
-    if (!form.first.trim()) return (errors.first = 'لطفاً نام را وارد کنید.') && undefined
-    if (!form.last.trim()) return (errors.last = 'لطفاً نام خانوادگی را وارد کنید.') && undefined
+    if (!form.first.trim()) return (errors.first = 'لطفا نام را وارد کنید.') && undefined
+    if (!form.last.trim()) return (errors.last = 'لطفا نام خانوادگی را وارد کنید.') && undefined
   }
   sending.value = true
   try {
     await requestOtp(phone, mode.value)
     otpSent.value = true
     startCooldown()
-    message.success('کد تأیید برای شماره‌ی شما پیامک شد')
+    message.success('کد تأیید برای شماره شما پیامک شد')
     // move the caret straight into the OTP box the moment it appears, so
     // typing the phone (+ Enter, or the send button) flows right into it
     await nextTick()
@@ -92,11 +92,11 @@ async function submit() {
   Object.keys(errors).forEach((k) => (errors[k] = ''))
   const phone = normalizePhone(form.phone)
   if (mode.value === 'register') {
-    if (!form.first.trim()) return void (errors.first = 'لطفاً نام را وارد کنید.')
-    if (!form.last.trim()) return void (errors.last = 'لطفاً نام خانوادگی را وارد کنید.')
+    if (!form.first.trim()) return void (errors.first = 'لطفا نام را وارد کنید.')
+    if (!form.last.trim()) return void (errors.last = 'لطفا نام خانوادگی را وارد کنید.')
   }
   if (!/^9\d{9}$/.test(phone)) return void (errors.phone = 'شماره موبایل نامعتبر است.')
-  if (!form.otp.trim()) return void (errors.otp = 'لطفاً کدی که برایتان پیامک شد را وارد کنید.')
+  if (!form.otp.trim()) return void (errors.otp = 'لطفا کدی که برایتان پیامک شد را وارد کنید.')
 
   submitting.value = true
   try {
@@ -108,7 +108,7 @@ async function submit() {
     emit('authed', u.status)
   } catch (e) {
     if (e instanceof ApiError) {
-      if (e.code === 'DUPLICATE_PHONE') errors.phone = `شما قبلاً با شماره +۹۸ ${toFa(phone)} ثبت‌نام کرده‌اید.`
+      if (e.code === 'DUPLICATE_PHONE') errors.phone = `شما قبلا با شماره +۹۸ ${toFa(phone)} ثبت‌نام کرده‌اید.`
       else if (['INVALID_OTP', 'OTP_EXPIRED', 'OTP_TOO_MANY_ATTEMPTS', 'OTP_REQUIRED'].includes(e.code)) {
         errors.otp = e.message
         if (e.code === 'INVALID_OTP') {
@@ -148,19 +148,19 @@ async function submit() {
     </div>
 
     <p class="auth-lead">
-      {{ mode === 'register' ? 'با شماره موبایلت ثبت‌نام کن تا سوال چالش باز شود.' : 'قبلاً ثبت‌نام کرده‌ای؟ با همان شماره موبایل وارد شو.' }}
+      {{ mode === 'register' ? 'با شماره موبایلت ثبت‌نام کن تا سوال چالش باز شود.' : 'قبلا ثبت‌نام کرده‌ای؟ با همان شماره موبایل وارد شو.' }}
     </p>
 
     <form class="stack" @submit.prevent="submit">
       <template v-if="mode === 'register'">
         <label class="field">
           <span class="field-label">نام</span>
-          <a-input v-model:value="form.first" size="large" :status="errors.first ? 'error' : ''" placeholder="مثلاً امیر" @input="errors.first = ''" />
+          <a-input v-model:value="form.first" size="large" :status="errors.first ? 'error' : ''" placeholder="مثلا امیر" @input="errors.first = ''" />
           <span v-if="errors.first" class="field-err">{{ errors.first }}</span>
         </label>
         <label class="field">
           <span class="field-label">نام خانوادگی</span>
-          <a-input v-model:value="form.last" size="large" :status="errors.last ? 'error' : ''" placeholder="مثلاً رضایی" @input="errors.last = ''" />
+          <a-input v-model:value="form.last" size="large" :status="errors.last ? 'error' : ''" placeholder="مثلا رضایی" @input="errors.last = ''" />
           <span v-if="errors.last" class="field-err">{{ errors.last }}</span>
         </label>
       </template>

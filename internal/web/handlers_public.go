@@ -40,17 +40,23 @@ func (s *server) handleOTPRequest(c *gin.Context) {
 
 	exists := s.svc.Participants.ExistsByPhone(body.Phone)
 	if purpose == "register" && exists {
-		fail(c, apperr.New(http.StatusConflict, "DUPLICATE_PHONE", "شما قبلاً با این شماره موبایل در این رویداد ثبت‌نام کرده‌اید."))
+		fail(c, apperr.New(http.StatusConflict, "DUPLICATE_PHONE", "شما قبلا با این شماره موبایل در این رویداد ثبت‌نام کرده‌اید."))
 		return
 	}
 	if purpose == "login" && !exists {
-		fail(c, apperr.New(http.StatusNotFound, "NOT_FOUND", "شماره موبایلی با این مشخصات ثبت‌نام نشده — لطفاً ابتدا ثبت‌نام کنید."))
+		fail(c, apperr.New(http.StatusNotFound, "NOT_FOUND", "شماره موبایلی با این مشخصات ثبت‌نام نشده — لطفا ابتدا ثبت‌نام کنید."))
 		return
 	}
 
 	if wait := s.svc.OTP.CooldownRemaining(body.Phone); wait > 0 {
 		sec := int(math.Ceil(wait.Seconds()))
-		fail(c, apperr.New(429, "OTP_COOLDOWN", "لطفاً "+strconv.Itoa(sec)+" ثانیه دیگر دوباره تلاش کنید."))
+		fail(c, apperr.New(429, "OTP_COOLDOWN", "لطفا "+strconv.Itoa(sec)+" ثانیه دیگر دوباره تلاش کنید."))
+		return
+	}
+	// Per-phone ceiling on top of the per-IP one: someone rotating IPs can't
+	// SMS-bomb a single number or drain the panel's SMS credit through it.
+	if !s.svc.RateLimiter.Allow("otp-phone", body.Phone, 5, time.Hour) {
+		fail(c, apperr.TooManyRequests())
 		return
 	}
 
@@ -90,7 +96,7 @@ func (s *server) handleRegister(c *gin.Context) {
 		return
 	}
 	if s.svc.Participants.ExistsByPhone(body.Phone) {
-		fail(c, apperr.New(http.StatusConflict, "DUPLICATE_PHONE", "شما قبلاً با این شماره موبایل در این رویداد ثبت‌نام کرده‌اید."))
+		fail(c, apperr.New(http.StatusConflict, "DUPLICATE_PHONE", "شما قبلا با این شماره موبایل در این رویداد ثبت‌نام کرده‌اید."))
 		return
 	}
 
@@ -191,7 +197,7 @@ func (s *server) notFound(err error) bool { return err == gorm.ErrRecordNotFound
 
 func validateRegistration(first, last, phone string) *apperr.Error {
 	if first == "" || last == "" || phone == "" {
-		return apperr.InvalidInput("لطفاً همه‌ی فیلدها را کامل وارد کنید.")
+		return apperr.InvalidInput("لطفا همه فیلدها را کامل وارد کنید.")
 	}
 	if len([]rune(first)) > 60 || len([]rune(last)) > 60 {
 		return apperr.InvalidInput("طول یکی از فیلدها بیش از حد مجاز است.")
