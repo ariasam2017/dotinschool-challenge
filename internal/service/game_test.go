@@ -344,6 +344,46 @@ func TestGameFortyConcurrentPlayers(t *testing.T) {
 	}
 }
 
+// Registration has no global lock: when one phone signs up from several tabs at
+// once, exactly one row is created and every same-name call gets that row back;
+// a different name on that phone is refused.
+func TestGameConcurrentSamePhoneRegister(t *testing.T) {
+	g, _ := gameSvc(t)
+	const tries = 20
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	created, ids := 0, map[string]bool{}
+	errs := make(chan error, tries)
+	for i := 0; i < tries; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			p, c, err := g.Register("Sara", "Ahmadi", "09351112233")
+			if err != nil {
+				errs <- err
+				return
+			}
+			mu.Lock()
+			ids[p.ID] = true
+			if c {
+				created++
+			}
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+	if created != 1 || len(ids) != 1 {
+		t.Fatalf("created=%d distinct ids=%d, want exactly one player", created, len(ids))
+	}
+	if _, _, err := g.Register("Other", "Person", "09351112233"); err == nil {
+		t.Fatal("a different name on a taken phone must be refused")
+	}
+}
+
 // Every built-in question is valid (4 distinct, non-empty options, a correct
 // index) and no question text appears twice.
 func TestBuiltInBankIsClean(t *testing.T) {

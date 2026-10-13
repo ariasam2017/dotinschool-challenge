@@ -44,7 +44,6 @@ type GameService struct {
 	// twice — while different players proceed in parallel. Stripes (not one
 	// mutex per player) keep memory bounded however many register.
 	stripes [64]sync.Mutex
-	regMu   sync.Mutex // registration: phone uniqueness check + insert
 
 	// settings are read on every request; cache them (SaveSettings refreshes)
 	cfg atomic.Pointer[model.GameSettings]
@@ -487,41 +486,48 @@ func (s *GameService) Register(first, last, phone string) (p *model.GamePlayer, 
 		return nil, false, apperr.New(400, "INVALID_PHONE", "شماره موبایل معتبر نیست — مثلا ۰۹۱۲۱۲۳۴۵۶۷")
 	}
 
-	s.regMu.Lock()
-	defer s.regMu.Unlock()
-
-	var existing model.GamePlayer
-	err = s.db.Where("phone = ?", norm).First(&existing).Error
-	if err == nil {
-		if sameName(existing.FirstName, first) && sameName(existing.LastName, last) {
-			return &existing, false, nil
+	// No global registration lock: the unique index on phone settles a race
+	// between two simultaneous sign-ups of one number, and the loser simply
+	// re-reads the winner's row. A lock here queued every registration behind
+	// the single DB connection — seconds of wait when a class joins at once.
+	for attempt := 0; ; attempt++ {
+		var existing model.GamePlayer
+		err = s.db.Where("phone = ?", norm).First(&existing).Error
+		if err == nil {
+			if sameName(existing.FirstName, first) && sameName(existing.LastName, last) {
+				return &existing, false, nil
+			}
+			return nil, false, apperr.New(http.StatusConflict, "PHONE_TAKEN",
+				"این شماره موبایل قبلا با نام دیگری در بازی ثبت شده است.")
 		}
-		return nil, false, apperr.New(http.StatusConflict, "PHONE_TAKEN",
-			"این شماره موبایل قبلا با نام دیگری در بازی ثبت شده است.")
-	}
-	// a returning player may sign back in (e.g. to see their result) while the
-	// game is closed, but nobody new gets in until the admin opens it
-	if errors.Is(err, gorm.ErrRecordNotFound) && !s.Settings().Open {
-		return nil, false, apperr.New(423, "GAME_CLOSED", "بازی هنوز شروع نشده — همین صفحه را باز نگه دار، به‌محض شروع وارد می‌شوی.")
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, false, err
-	}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, err
+		}
+		// a returning player may sign back in (e.g. to see their result) while the
+		// game is closed, but nobody new gets in until the admin opens it
+		if !s.Settings().Open {
+			return nil, false, apperr.New(423, "GAME_CLOSED", "بازی هنوز شروع نشده — همین صفحه را باز نگه دار، به‌محض شروع وارد می‌شوی.")
+		}
 
-	p = &model.GamePlayer{
-		ID:        uuid.NewString(),
-		Token:     newToken(),
-		FirstName: first,
-		LastName:  last,
-		Phone:     norm,
-		CreatedAt: s.nowMs(),
-		Status:    model.GameRegistered,
-		Items:     "[]",
-	}
-	if err := s.db.Create(p).Error; err != nil {
+		p = &model.GamePlayer{
+			ID:        uuid.NewString(),
+			Token:     newToken(),
+			FirstName: first,
+			LastName:  last,
+			Phone:     norm,
+			CreatedAt: s.nowMs(),
+			Status:    model.GameRegistered,
+			Items:     "[]",
+		}
+		err = s.db.Create(p).Error
+		if err == nil {
+			return p, true, nil
+		}
+		if attempt == 0 && strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			continue // the same phone was registered a moment ago — re-read it
+		}
 		return nil, false, err
 	}
-	return p, true, nil
 }
 
 func (s *GameService) byToken(token string) (*model.GamePlayer, error) {
@@ -639,7 +645,7 @@ func (s *GameService) State(token string) (*GameState, error) {
 		if p.Current < len(items) {
 			it := items[p.Current]
 			if it.ServedAt > 0 && !it.Answered && s.nowMs()-it.ServedAt > p.LimitMs+answerGraceMs {
-				s.record(p, items, -1)
+				s.record(p, items, -1, s.nowMs())
 				if err := s.db.Save(p).Error; err != nil {
 					return nil, err
 				}
@@ -708,6 +714,10 @@ func (s *GameService) Start(token string) (*GameState, error) {
 // question index. Re-answering an already answered question is a no-op that
 // returns the current state, so a double tap is harmless.
 func (s *GameService) Answer(token string, index, choice int) (*GameState, error) {
+	// Time the answer from when it reached the server, before it queues for
+	// the player's lock and the single DB connection — under load that wait
+	// must not count against the player's speed (the ranking tie-break).
+	arrived := s.nowMs()
 	p, unlock, err := s.lockPlayer(token)
 	if err != nil {
 		return nil, err
@@ -723,7 +733,7 @@ func (s *GameService) Answer(token string, index, choice int) (*GameState, error
 	if choice < -1 || choice > 3 {
 		choice = -1
 	}
-	s.record(p, items, choice)
+	s.record(p, items, choice, arrived)
 	if err := s.db.Save(p).Error; err != nil {
 		return nil, err
 	}
@@ -752,11 +762,12 @@ func (s *GameService) Next(token string) (*GameState, error) {
 	return s.view(p), nil
 }
 
-// record scores the current question (choice -1 = timeout) and finishes the
-// game after the last one. Caller holds the player's lock and saves p.
-func (s *GameService) record(p *model.GamePlayer, items []model.GameItem, choice int) {
+// record scores the current question (choice -1 = timeout) answered at time
+// at, and finishes the game after the last one. Caller holds the player's lock
+// and saves p.
+func (s *GameService) record(p *model.GamePlayer, items []model.GameItem, choice int, at int64) {
 	it := &items[p.Current]
-	elapsed := s.nowMs() - it.ServedAt
+	elapsed := at - it.ServedAt
 	if elapsed < 0 {
 		elapsed = 0
 	}
