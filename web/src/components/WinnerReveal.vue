@@ -279,7 +279,7 @@ onBeforeUnmount(() => {
           <div v-else class="wr-stats">
             <div class="wr-stat">
               <b class="num">{{ toFa(winner.correct) }} از {{ toFa(winner.total) }}</b>
-              <small>جواب درست</small>
+              <small>سوال درست</small>
             </div>
             <div class="wr-stat">
               <b class="num">{{ fmtSecs(winner.totalMs) }}</b>
@@ -301,13 +301,12 @@ onBeforeUnmount(() => {
         <section v-else-if="stage === 'final'" class="wr-final">
           <img class="wr-final-logo" :src="dotinLogo" alt="مدرسه داتین" width="96" height="82" />
           <h2>برندگان لیگ قهرمانان برنامه‌نویسی</h2>
-          <p class="wr-rule">رتبه‌بندی بر اساس تعداد جواب درست و سپس سرعت پاسخ‌گویی</p>
           <div class="wr-podium">
             <div v-for="p in [1, 0, 2].filter((i) => podium[i])" :key="p" class="wr-col" :class="'c' + (p + 1)">
               <span class="wr-col-medal">{{ MEDALS[p] }}</span>
               <span class="wr-col-name">{{ fullName(podium[p]) }}</span>
               <span class="wr-col-meta num">
-                {{ toFa(podium[p].correct) }} از {{ toFa(podium[p].total) }} درست — {{ fmtSecs(podium[p].totalMs) }} ثانیه
+                {{ toFa(podium[p].correct) }} از {{ toFa(podium[p].total) }} سوال درست — {{ fmtSecs(podium[p].totalMs) }} ثانیه
               </span>
               <span class="wr-col-score num">{{ toFa(podium[p].score) }} امتیاز</span>
               <div class="wr-col-block">{{ PLACE[p] }}</div>
@@ -708,10 +707,6 @@ onBeforeUnmount(() => {
   color: #fff;
   font-size: clamp(1.6rem, 4vw, 2.6rem);
   font-weight: 900;
-  margin-bottom: 4px;
-}
-.wr-rule {
-  color: #a7c4b5;
   margin-bottom: 30px;
 }
 .wr-podium {
