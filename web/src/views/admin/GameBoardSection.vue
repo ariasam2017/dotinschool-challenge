@@ -971,9 +971,7 @@ const bankShort = computed(
       :podium="podium"
       :names="showNames"
       :timing="showTiming"
-      :report-loading="reportLoading"
       @close="showOpen = false"
-      @report="exportReport"
     />
 
     <!-- winners announcement (big, for a projector) -->

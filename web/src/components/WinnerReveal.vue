@@ -16,10 +16,8 @@ const props = defineProps<{
   timing: { third: number; second: number; first: number; gap: number } // seconds
   /** sample data — shows a "دمو" badge */
   demo?: boolean
-  /** the parent is downloading the Excel report */
-  reportLoading?: boolean
 }>()
-const emit = defineEmits<{ close: []; report: [] }>()
+const emit = defineEmits<{ close: [] }>()
 
 const MEDALS = ['🥇', '🥈', '🥉']
 const PLACE = ['نفر اول', 'نفر دوم', 'نفر سوم']
@@ -154,11 +152,6 @@ function start() {
   sound?.setMuted(muted.value)
   // full screen for the projector; a refusal (browser policy) is harmless
   root.value?.requestFullscreen?.().catch(() => {})
-  void run()
-}
-
-function replay() {
-  confetti.value = []
   void run()
 }
 
@@ -311,13 +304,6 @@ onBeforeUnmount(() => {
               <span class="wr-col-score num">{{ toFa(podium[p].score) }} امتیاز</span>
               <div class="wr-col-block">{{ PLACE[p] }}</div>
             </div>
-          </div>
-          <div class="wr-final-actions">
-            <button v-if="!demo" type="button" class="wr-ghost" :disabled="reportLoading" @click="emit('report')">
-              <AppIcon name="download" :size="16" /> {{ reportLoading ? 'در حال آماده‌سازی…' : 'گزارش کامل Excel' }}
-            </button>
-            <button type="button" class="wr-ghost" @click="replay"><AppIcon name="rotate-ccw" :size="16" /> اجرای دوباره</button>
-            <button type="button" class="wr-ghost" @click="close">بستن</button>
           </div>
         </section>
       </main>
@@ -777,24 +763,6 @@ onBeforeUnmount(() => {
   height: 110px;
   background: linear-gradient(180deg, #f68b1f, #78350f);
 }
-.wr-final-actions {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 26px;
-}
-.wr-ghost {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 22px;
-  border-radius: 14px;
-  border: 1px solid rgba(60, 207, 141, 0.4);
-  background: rgba(6, 32, 21, 0.7);
-  color: #eaf6ef;
-  font-weight: 700;
-}
-
 /* ---- confetti ---- */
 .wr-confetti {
   position: absolute;
