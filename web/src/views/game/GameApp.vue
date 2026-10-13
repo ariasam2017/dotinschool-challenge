@@ -487,7 +487,7 @@ const waiting = computed(
           <img class="g-waiting-logo" :src="dotinLogo" alt="مدرسه داتین" width="150" height="128" />
           <p class="g-kicker">&lt;PCL /&gt;</p>
           <h1><b>لیگ قهرمانان</b> برنامه‌نویسی</h1>
-          <p class="g-waiting-text">بازی به‌زودی شروع می‌شود. همین صفحه را باز نگه دار؛ به‌محض شروع، خودکار وارد می‌شوی.</p>
+          <p class="g-waiting-text">بازی به‌زودی شروع می‌شود. همین صفحه را باز نگه دار</p>
           <span class="g-waiting-dots" aria-label="در انتظار شروع بازی"><i /><i /><i /></span>
         </section>
 
