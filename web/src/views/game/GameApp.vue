@@ -699,7 +699,7 @@ const waiting = computed(
             </div>
 
             <button type="button" class="g-btn g-btn-primary" @click="openSocial">
-              <AppIcon name="users" :size="20" /> شبکه‌های اجتماعی ما
+              <AppIcon name="users" :size="20" /> شبکه‌های اجتماعی مدرسه داتین
             </button>
 
             <button v-if="st.testMode" type="button" class="g-btn g-btn-replay" :disabled="busy" @click="replay">
