@@ -442,8 +442,16 @@ show_ports(){
   fi
 }
 
+# Inside WSL (Linux on Windows) the internet-facing IP belongs to the router,
+# not to this machine, so that address never opens; WSL's own IP is the one
+# reachable from the Windows host.
+is_wsl(){ grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; }
+
 server_ip(){
-  local ip; ip=$(curl -fsSL -4 --connect-timeout 8 https://api.ipify.org 2>/dev/null) || true
+  local ip=""
+  if ! is_wsl; then
+    ip=$(curl -fsSL -4 --connect-timeout 8 https://api.ipify.org 2>/dev/null) || true
+  fi
   [[ -n "$ip" ]] || ip=$(hostname -I 2>/dev/null | awk '{print $1}') || true
   echo "${ip:-<this-server-IP>}"
 }

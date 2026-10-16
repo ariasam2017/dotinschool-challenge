@@ -374,8 +374,16 @@ set_env_val(){
   if grep -qE "^${key}=" "$ENV_FILE" 2>/dev/null; then sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"; else echo "${key}=${val}" >> "$ENV_FILE"; fi
 }
 
+# Inside WSL (Linux on Windows) the internet-facing IP belongs to the router,
+# not to this machine, so that address never opens; WSL's own IP is the one
+# reachable from the Windows host.
+is_wsl(){ grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; }
+
 server_ip(){
-  local ip; ip=$(curl -fsSL -4 --connect-timeout 8 https://api.ipify.org 2>/dev/null) || true
+  local ip=""
+  if ! is_wsl; then
+    ip=$(curl -fsSL -4 --connect-timeout 8 https://api.ipify.org 2>/dev/null) || true
+  fi
   [[ -n "$ip" ]] || ip=$(hostname -I 2>/dev/null | awk '{print $1}') || true
   echo "${ip:-<this-server-IP>}"
 }
@@ -388,7 +396,7 @@ print_access_info(){
   adminpath=$(get_env_val ADMIN_PATH); adminpath=${adminpath:-admin}
   subdomain=$(get_env_val ADMIN_SUBDOMAIN)
   echo
-  ok "User panel (public address):          ${scheme}://${ip}:${port}/"
+  ok "User panel:                           ${scheme}://${ip}:${port}/"
   ok "Admin panel (secret path — you only): ${scheme}://${ip}:${port}/${adminpath}/"
   [[ -n "$subdomain" ]] && ok "Admin panel (dedicated subdomain):    ${scheme}://${subdomain}/"
   if systemctl is-active --quiet dotinschool-challenge-tunnel 2>/dev/null; then
@@ -398,6 +406,10 @@ print_access_info(){
   ok "Admin username:                       $(get_env_val ADMIN_USERNAME)"
   ok "Admin password:                       $(get_env_val ADMIN_PASSWORD)"
   echo
+  if is_wsl; then
+    warn "Running inside WSL: open these from this Windows PC. The address is WSL's own IP and can change"
+    warn "after a reboot (check with: hostname -I). If the page stays blank, let local addresses bypass your VPN/proxy."
+  fi
   warn "Save this information somewhere safe — it can only be viewed again with \"dotinschool-challenge admin\"."
 }
 
