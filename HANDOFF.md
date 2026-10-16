@@ -25,7 +25,7 @@ git log --oneline -30 و ساختار کد (cmd/, internal/, web/src/, scripts/,
 برای کلون کردن روی سیستم جدید، یک **fine-grained Personal Access Token** لازم است (مراحل کامل ساختنش توی README.md بخش «نصب سریع» هست: Resource owner `ariasam2017`، Only select repositories → `dotinschool-challenge`، Repository permissions → Contents: Read-only). توکن قبلی که حین این پروژه یک‌بار توی یک اسکرین‌شات لو رفت **Revoke شده** — اگر نشده، حتماً همین الان Revoke کنید و یک توکن تازه بسازید.
 
 ```bash
-git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git
+git clone https://x-access-token:YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git
 ```
 
 اگر سیستم جدید هم پشت شبکهٔ فیلترشده است (نکتهٔ ۶ را ببینید)، شاید همین `git clone` هم گیر کند.

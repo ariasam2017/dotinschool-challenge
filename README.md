@@ -58,7 +58,7 @@ $s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Mar
 
 <div dir="rtl" align="right">
 
-اگر ترجیح می‌دهید توکن را مستقیم داخل خودِ دستور (بدون پرامپت تعاملی) بگذارید — مثلاً برای اسکریپت‌های خودکار — همان `git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git` هم جواب می‌دهد؛ جزئیات هر دو روش در ادامهٔ همین سند آمده است.
+اگر ترجیح می‌دهید توکن را مستقیم داخل خودِ دستور (بدون پرامپت تعاملی) بگذارید — مثلاً برای اسکریپت‌های خودکار — همان `git clone https://x-access-token:YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git` هم جواب می‌دهد؛ جزئیات هر دو روش در ادامهٔ همین سند آمده است.
 
 ---
 
@@ -149,7 +149,7 @@ bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(cu
 </div>
 
 ```bash
-git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git
+git clone https://x-access-token:YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git
 ```
 
 <div dir="rtl" align="right">

@@ -63,7 +63,9 @@ require_root(){ [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run as root (sudo)."; }
 # which then fails with "Permission denied (publickey)" since this uses a
 # token over HTTPS, not an SSH key. Bypass ANY such rewrite for git calls that
 # touch GitHub, rather than trying to detect or explain the specific rule.
-git_nc(){ GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git "$@"; }
+# GIT_TERMINAL_PROMPT=0: a rejected token must fail fast, never sit waiting
+# for a username/password nobody will type.
+git_nc(){ GIT_TERMINAL_PROMPT=0 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git "$@"; }
 
 # The repo is private: prefer an explicitly-passed token, otherwise reuse the
 # one already embedded in the existing clone's git remote (set on first
@@ -71,14 +73,14 @@ git_nc(){ GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git "$@"; }
 gh_token(){
   if [[ -n "${DOTINSCHOOL_GH_TOKEN:-}" ]]; then echo "$DOTINSCHOOL_GH_TOKEN"; return; fi
   if [[ -d "$INSTALL_DIR/.git" ]]; then
-    git_nc -C "$INSTALL_DIR" remote get-url origin 2>/dev/null | sed -n 's#https://\([^@]*\)@github\.com/.*#\1#p'
+    git_nc -C "$INSTALL_DIR" remote get-url origin 2>/dev/null | sed -n 's#https://\(x-access-token:\)\{0,1\}\([^@]*\)@github\.com/.*#\2#p'
   fi
 }
 
 repo_url(){
   if [[ -n "${DOTINSCHOOL_REPO_URL:-}" ]]; then echo "$DOTINSCHOOL_REPO_URL"; return; fi
   local t; t=$(gh_token)
-  if [[ -n "$t" ]]; then echo "https://${t}@github.com/ariasam2017/dotinschool-challenge.git"
+  if [[ -n "$t" ]]; then echo "https://x-access-token:${t}@github.com/ariasam2017/dotinschool-challenge.git"
   else echo "https://github.com/ariasam2017/dotinschool-challenge.git"; fi
 }
 
@@ -252,7 +254,7 @@ fetch_repo(){
 
   # `timeout` + inline env so a filtered network fails fast instead of hanging;
   # git_nc is a shell function so `timeout` can't call it directly.
-  clone_try(){ rm -rf "$INSTALL_DIR"; timeout "${1}" env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+  clone_try(){ rm -rf "$INSTALL_DIR"; timeout "${1}" env GIT_TERMINAL_PROMPT=0 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
       git clone --depth 1 --branch "$BRANCH" "${2}" "$INSTALL_DIR" >/dev/null 2>&1; }
 
   if clone_try 90 "$url"; then ok "Source ready at ${INSTALL_DIR}."; return; fi
@@ -302,16 +304,33 @@ EOF
   ok ".env created — random admin password and secret path generated."
 }
 
+# Download the Go modules one mirror at a time, each bounded by a timeout. A
+# mirror that stalls mid-download (goproxy.cn has been seen to, forever, with no
+# error) or refuses (goproxy.io: 403) must not hang the install; whatever was
+# already fetched stays in the module cache, so the next mirror only fetches
+# what is still missing. The build afterwards runs with GOPROXY=off (offline).
+go_mod_download(){
+  local entry proxy sumdb
+  for entry in "https://goproxy.cn|sum.golang.google.cn" \
+               "https://proxy.golang.org|sum.golang.org" \
+               "https://goproxy.io|sum.golang.google.cn"; do
+    proxy=${entry%%|*}; sumdb=${entry##*|}
+    info "Downloading Go modules via ${proxy}..."
+    if ( cd "$INSTALL_DIR" && GOPROXY="${proxy},direct" GOSUMDB="$sumdb" GOTOOLCHAIN=auto \
+           timeout 240 "${GO_ROOT}/bin/go" mod download ); then
+      return 0
+    fi
+    warn "${proxy} failed or stalled - trying the next mirror."
+  done
+  return 1
+}
+
 build_image(){
+  go_mod_download || die "Could not download the Go modules from any mirror - check this server's internet access and run the installer again."
   info "Compiling the binary on the host + building the image (no go build inside the container)..."
-  # goproxy.cn mirrors the module proxy AND the Go toolchain, and stays
-  # reachable where proxy.golang.org / sum.golang.org don't - so the compile
-  # step resolves dependencies (and any auto toolchain) on a filtered network
-  # too. Harmless on an open one.
   ( cd "$INSTALL_DIR" \
     && PATH="${GO_ROOT}/bin:$PATH" \
-       GOPROXY="https://goproxy.cn,https://goproxy.io,direct" \
-       GOSUMDB="sum.golang.google.cn" \
+       GOPROXY=off \
        GOTOOLCHAIN="auto" \
        bash scripts/docker-build.sh "$(arch_tag)" )
   ok "Image dotinschool-challenge:local built."

@@ -7,7 +7,7 @@
 # with "Contents: Read-only", is enough. Create one at
 # https://github.com/settings/personal-access-tokens/new, then install with:
 #
-#   git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git
+#   git clone https://x-access-token:YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git
 #   sudo bash dotinschool-challenge/scripts/install.sh
 #
 # The token is only needed for that first "git clone": once cloned, this
@@ -88,7 +88,9 @@ require_root(){ [[ ${EUID:-$(id -u)} -eq 0 ]] || die "This script must be run as
 # which then fails with "Permission denied (publickey)" since this uses a
 # token over HTTPS, not an SSH key. Bypass ANY such rewrite for git calls that
 # touch GitHub, rather than trying to detect or explain the specific rule.
-git_nc(){ GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git "$@"; }
+# GIT_TERMINAL_PROMPT=0: a rejected token must fail fast, never sit waiting
+# for a username/password nobody will type.
+git_nc(){ GIT_TERMINAL_PROMPT=0 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git "$@"; }
 
 # The repo is private: prefer an explicitly-passed token, otherwise reuse the
 # one already embedded in the existing clone's git remote (set on first
@@ -96,14 +98,14 @@ git_nc(){ GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git "$@"; }
 gh_token(){
   if [[ -n "${DOTINSCHOOL_GH_TOKEN:-}" ]]; then echo "$DOTINSCHOOL_GH_TOKEN"; return; fi
   if [[ -d "$INSTALL_DIR/.git" ]]; then
-    git_nc -C "$INSTALL_DIR" remote get-url origin 2>/dev/null | sed -n 's#https://\([^@]*\)@github\.com/.*#\1#p'
+    git_nc -C "$INSTALL_DIR" remote get-url origin 2>/dev/null | sed -n 's#https://\(x-access-token:\)\{0,1\}\([^@]*\)@github\.com/.*#\2#p'
   fi
 }
 
 repo_url(){
   if [[ -n "${DOTINSCHOOL_REPO_URL:-}" ]]; then echo "$DOTINSCHOOL_REPO_URL"; return; fi
   local t; t=$(gh_token)
-  if [[ -n "$t" ]]; then echo "https://${t}@github.com/ariasam2017/dotinschool-challenge.git"
+  if [[ -n "$t" ]]; then echo "https://x-access-token:${t}@github.com/ariasam2017/dotinschool-challenge.git"
   else echo "https://github.com/ariasam2017/dotinschool-challenge.git"; fi
 }
 
@@ -247,7 +249,7 @@ fetch_app(){
   [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
 
   # timeout + inline env so a filtered network fails fast instead of hanging.
-  clone_try(){ rm -rf "$INSTALL_DIR"; timeout "${1}" env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+  clone_try(){ rm -rf "$INSTALL_DIR"; timeout "${1}" env GIT_TERMINAL_PROMPT=0 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
       git clone --depth 1 --branch "$BRANCH" "${2}" "$INSTALL_DIR" >/dev/null 2>&1; }
 
   if clone_try 90 "$url"; then ok "Source ready at ${INSTALL_DIR}."; return; fi
@@ -266,14 +268,31 @@ fetch_app(){
   exit 1
 }
 
+# Download the Go modules one mirror at a time, each bounded by a timeout. A
+# mirror that stalls mid-download (goproxy.cn has been seen to, forever, with no
+# error) or refuses (goproxy.io: 403) must not hang the install; whatever was
+# already fetched stays in the module cache, so the next mirror only fetches
+# what is still missing. The build afterwards runs with GOPROXY=off (offline).
+go_mod_download(){
+  local entry proxy sumdb
+  for entry in "https://goproxy.cn|sum.golang.google.cn" \
+               "https://proxy.golang.org|sum.golang.org" \
+               "https://goproxy.io|sum.golang.google.cn"; do
+    proxy=${entry%%|*}; sumdb=${entry##*|}
+    info "Downloading Go modules via ${proxy}..."
+    if ( cd "$INSTALL_DIR" && GOPROXY="${proxy},direct" GOSUMDB="$sumdb" GOTOOLCHAIN=auto \
+           timeout 240 "${GO_ROOT}/bin/go" mod download ); then
+      return 0
+    fi
+    warn "${proxy} failed or stalled - trying the next mirror."
+  done
+  return 1
+}
+
 build_binary(){
+  go_mod_download || { err "Could not download the Go modules from any mirror."; github_unreachable_hint; exit 1; }
   info "Compiling binary (CGO off, frontend already built and committed)..."
-  # goproxy.cn mirrors both the module proxy and the Go toolchain and stays
-  # reachable where proxy.golang.org / sum.golang.org don't - so the compile
-  # resolves dependencies on a filtered network too. Harmless on an open one.
-  ( cd "$INSTALL_DIR" && CGO_ENABLED=0 \
-      GOPROXY="https://goproxy.cn,https://goproxy.io,direct" \
-      GOSUMDB="sum.golang.google.cn" GOTOOLCHAIN="auto" \
+  ( cd "$INSTALL_DIR" && CGO_ENABLED=0 GOPROXY=off GOTOOLCHAIN="auto" \
       "${GO_ROOT}/bin/go" build -trimpath -ldflags="-s -w" -o "${BIN_NAME}.new" ./cmd/server )
   mv "${INSTALL_DIR}/${BIN_NAME}.new" "${INSTALL_DIR}/${BIN_NAME}"
   chmod +x "${INSTALL_DIR}/${BIN_NAME}"
@@ -323,8 +342,9 @@ Environment=PATH=${GO_ROOT}/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=${ENV_FILE}
 WorkingDirectory=${INSTALL_DIR}
 # rebuild on start so the in-panel "update" button (git reset + restart) takes
-# effect; a failed build keeps the previous working binary.
-ExecStartPre=-/bin/sh -c 'cd ${INSTALL_DIR} && CGO_ENABLED=0 ${GO_ROOT}/bin/go build -trimpath -ldflags="-s -w" -o ${BIN_NAME}.new ./cmd/server && mv ${BIN_NAME}.new ${BIN_NAME}'
+# effect; a failed or timed-out build keeps the previous working binary (the
+# timeout stays under systemd's 90s start limit, so the unit always comes up).
+ExecStartPre=-/bin/sh -c 'cd ${INSTALL_DIR} && CGO_ENABLED=0 GOPROXY=https://goproxy.cn,https://proxy.golang.org,direct timeout 75 ${GO_ROOT}/bin/go build -trimpath -ldflags="-s -w" -o ${BIN_NAME}.new ./cmd/server && mv ${BIN_NAME}.new ${BIN_NAME}'
 ExecStart=${INSTALL_DIR}/${BIN_NAME}
 Restart=always
 RestartSec=3

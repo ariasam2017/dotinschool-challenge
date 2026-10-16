@@ -114,7 +114,7 @@ function Get-RepoUrl {
     if ($existing -match '^https://([^@]+)@github\.com/') { return $existing }
   }
   if ($env:DOTINSCHOOL_GH_TOKEN) {
-    return "https://$($env:DOTINSCHOOL_GH_TOKEN)@github.com/ariasam2017/dotinschool-challenge.git"
+    return "https://x-access-token:$($env:DOTINSCHOOL_GH_TOKEN)@github.com/ariasam2017/dotinschool-challenge.git"
   }
   return 'https://github.com/ariasam2017/dotinschool-challenge.git'
 }
