@@ -104,9 +104,17 @@ action).
   `data/*-config.json` sidecar > `.env`. It's resolved **fresh on every call**, so
   pasting a key in the admin panel takes effect with no restart. `SMS`/`AI` are
   always the real provider; "configured?" is computed per request.
-- **Self-update**: `handleUpdate` runs `git fetch` + `git reset --hard origin/main`
-  then `os.Exit(0)`, relying on systemd/Docker to bring the process back up (Docker
-  installs print a manual command instead).
+- **Releases & server installs**: servers never clone this (private) repo. They
+  install/update from the PUBLIC repo `ariasam2017/dotinschool-install`, which
+  holds only the installers (`challenge.sh`, `challenge-docker.sh`) and a rolling GitHub
+  release `challenge-latest` with one bundle per arch (prebuilt binary + `build/`
+  + the two install scripts, no source). `bash scripts/publish-release.sh`
+  (needs `gh`; compiles with Go or, if absent, in a `golang` container) packs the
+  bundle from the **commit** (`git archive`, so Windows CRLF never ships) and
+  publishes it; servers then run `dotinschool-challenge update`. Commit before publishing.
+- **Self-update**: the panel's update button only works for a git checkout
+  (`git fetch` + `git reset --hard origin/main`, then `os.Exit(0)`); on a release
+  install (no `.git`) and on Docker it just tells the admin to run `dotinschool-challenge update`.
 
 ### API surface & auth model
 

@@ -19,23 +19,16 @@
 
 ## نصب سریع
 
-**نصب سامانهٔ چالش برنامه‌نویسی با یک دستور:** دستور لینوکسی مناسب را در ترمینال سرور (با کاربر root یا کاربری که sudo دارد) کپی کنید و Enter بزنید؛ فقط توکن را می‌پرسد و بقیه را خودش انجام می‌دهد — بدون منو و سؤال اضافه. آخر کار آدرس پنل، نام کاربری و رمز ادمین را چاپ می‌کند و منوی مدیریتی با دستور `dotinschool-challenge` در دسترس است.
+**نصب سامانهٔ چالش برنامه‌نویسی روی سرور لینوکس با یک دستور — بدون توکن گیت‌هاب و بدون Go.** دستور را با کاربر **root** در ترمینال سرور بزنید. روی سرور تازه مستقیم نصب می‌کند؛ اگر قبلاً نصب شده باشد، همان دستور منوی مدیریتی را باز می‌کند. آخر نصب، آدرس پنل، نام کاربری و رمز ادمین چاپ می‌شود و منو با دستور `dotinschool-challenge` در دسترس است (پورت پیش‌فرض **8081**).
 
-هر سه دستور، همون لحظه که اجرا می‌کنید، توکن گیت‌هاب رو به‌صورت مخفی (مثل رمز عبور، دیده نمی‌شود) ازتان می‌پرسند — چیزی داخل خودِ دستور جای‌گذاری نمی‌کنید. بعد خودشان آخرین نسخه را می‌گیرند، پیش‌نیازهای لازم را نصب می‌کنند، و برنامه را بالا می‌آورند. همان دستور را دوباره اجرا کنید تا به‌روزرسانی بگیرید — این‌بار دیگر توکن نمی‌خواهد، چون همان اولی داخل remote کلون ذخیره شده.
-
-مخزن **Private** است، پس فقط برای همین اولین اجرا یک توکن گیت‌هاب لازم دارید:
-
-1. به [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) بروید.
-2. Resource owner: `ariasam2017` · Repository access: Only select repositories → `dotinschool-challenge`.
-3. Repository permissions → Contents: **Read-only**.
-4. Generate token و مقدارش را کپی کنید (فقط همان لحظه نشان داده می‌شود).
+نصب از مخزن عمومی [`ariasam2017/dotinschool-install`](https://github.com/ariasam2017/dotinschool-install) انجام می‌شود که فقط نسخهٔ آماده (باینری + فایل‌های Docker) را دارد؛ کد منبع همین مخزن خصوصی می‌ماند. انتشار نسخهٔ جدید: بخش «انتشار نسخهٔ جدید برای سرورها» پایین‌تر.
 
 **لینوکس، نصب دائمی به‌عنوان سرویس سیستم (بدون Docker):**
 
 </div>
 
 ```bash
-bash -c 'read -rsp "GitHub token: " T; echo; curl -fsSL -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/scripts/install.sh -o /tmp/dotinschool-challenge-install.sh || { echo "Download failed - check the token and that it can read dotinschool-challenge"; exit 1; }; S=; [ "$(id -u)" -eq 0 ] || S=sudo; $S env DOTINSCHOOL_GH_TOKEN="$T" bash /tmp/dotinschool-challenge-install.sh install'
+bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool-install/main/challenge.sh)
 ```
 
 <div dir="rtl" align="right">
@@ -45,12 +38,14 @@ bash -c 'read -rsp "GitHub token: " T; echo; curl -fsSL -H "Authorization: token
 </div>
 
 ```bash
-bash -c 'read -rsp "GitHub token: " T; echo; curl -fsSL -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/build/docker-install.sh -o /tmp/dotinschool-challenge-docker-install.sh || { echo "Download failed - check the token and that it can read dotinschool-challenge"; exit 1; }; S=; [ "$(id -u)" -eq 0 ] || S=sudo; $S env DOTINSCHOOL_GH_TOKEN="$T" bash /tmp/dotinschool-challenge-docker-install.sh'
+bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool-install/main/challenge-docker.sh)
 ```
 
 <div dir="rtl" align="right">
 
-**ویندوز، اجرای محلی روی Docker** (Go را اگر نبود خودش مستقیم از go.dev دانلود می‌کند؛ اما Docker Desktop را نه — اگر نصب نباشد فقط پیام می‌دهد که نصبش کنید و دوباره همین دستور را بزنید):
+**به‌روزرسانی سرور:** `dotinschool-challenge update` (یا گزینهٔ ۲ منو) — آخرین نسخهٔ منتشرشده را دانلود و سرویس را ری‌استارت می‌کند؛ داده‌ها دست‌نخورده می‌مانند.
+
+**ویندوز، اجرای محلی روی Docker از روی سورس** (به توکن گیت‌هاب نیاز دارد، چون سورس را کلون می‌کند — ساخت توکن: Contents: Read-only روی همین مخزن · Go را اگر نبود خودش مستقیم از go.dev دانلود می‌کند؛ اما Docker Desktop را نه — اگر نصب نباشد فقط پیام می‌دهد که نصبش کنید و دوباره همین دستور را بزنید):
 
 </div>
 
@@ -111,19 +106,19 @@ go run ./cmd/seed     # wipes and reseeds the DB with ~16 participants and a liv
 
 ## نصب روی سرور لینوکس (bare-metal)
 
-اسکریپت نصب همه‌چیز را خودش انجام می‌دهد — از نصب پیش‌نیازهای سیستم تا بالا آوردن سرویس؛ فقط با کاربر `root` اجرا کنید (توکن گیت‌هاب را همان‌جا تعاملی می‌پرسد، توضیحش در «نصب سریع» بالا):
+اسکریپت نصب همه‌چیز را خودش انجام می‌دهد — از نصب پیش‌نیازهای سیستم تا بالا آوردن سرویس؛ فقط با کاربر `root` اجرا کنید (توکن گیت‌هاب لازم نیست):
 
 </div>
 
 ```bash
-bash -c 'read -rsp "GitHub token: " T; echo; curl -fsSL -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/scripts/install.sh -o /tmp/dotinschool-challenge-install.sh || { echo "Download failed - check the token and that it can read dotinschool-challenge"; exit 1; }; S=; [ "$(id -u)" -eq 0 ] || S=sudo; $S env DOTINSCHOOL_GH_TOKEN="$T" bash /tmp/dotinschool-challenge-install.sh install'
+bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool-install/main/challenge.sh)
 ```
 
 <div dir="rtl" align="right">
 
-اسکریپت به‌صورت خودکار: پیش‌نیازهای سیستم (`curl`, `git`, `tar`, `openssl`) و **Go** را نصب می‌کند، سورس را کلون می‌کند، باینری را می‌سازد، سرویس systemd می‌سازد (اجرای دائمی + ری‌استارت خودکار)، یک **رمز ادمین تصادفی** و یک **مسیر مخفی تصادفی** برای پنل مدیریت تولید می‌کند، و در پایان آدرس‌ها و اطلاعات ورود را چاپ می‌کند. تمام پیام‌های اسکریپت انگلیسی است و منوی مدیریتش به سبک x-ui/Sanaei جعبه‌ای است.
+اسکریپت به‌صورت خودکار: پیش‌نیازهای سیستم (`curl`, `git`, `tar`, `openssl`) را نصب می‌کند، نسخهٔ آماده (باینری کامپایل‌شده) را از مخزن عمومی `dotinschool-install` دانلود می‌کند — بدون Go و بدون کلون سورس — سرویس systemd می‌سازد (اجرای دائمی + ری‌استارت خودکار)، یک **رمز ادمین تصادفی** و یک **مسیر مخفی تصادفی** برای پنل مدیریت تولید می‌کند، و در پایان آدرس‌ها و اطلاعات ورود را چاپ می‌کند. تمام پیام‌های اسکریپت انگلیسی است و منوی مدیریتش به سبک x-ui/Sanaei جعبه‌ای است.
 
-فرانت‌اند بیلدشده (`web/assets/`) داخل مخزن commit شده است، پس نصب سرور به Node نیاز ندارد.
+فرانت‌اند داخل همان باینری است، پس سرور به Node یا Go نیاز ندارد. اگر گیت‌هاب از سرور در دسترس نباشد، اسکریپت خودش از mirrorهای عمومی دانلود می‌کند.
 
 ### دستورات مدیریتی
 
@@ -131,7 +126,7 @@ bash -c 'read -rsp "GitHub token: " T; echo; curl -fsSL -H "Authorization: token
 |---|---|
 | `dotinschool-challenge` | منوی مدیریت تعاملی (به سبک x-ui) |
 | `dotinschool-challenge admin` | نمایش/تغییر آدرس مخفی، نام‌کاربری، رمز، پورت، ساب‌دامین |
-| `dotinschool-challenge update` | دریافت آخرین نسخه از گیت‌هاب + کامپایل مجدد + ری‌استارت |
+| `dotinschool-challenge update` | دانلود آخرین نسخهٔ منتشرشده + ری‌استارت (داده‌ها دست‌نخورده) |
 | `dotinschool-challenge update-menu` | به‌روزرسانی فقط همین اسکریپت |
 | `dotinschool-challenge cert` | گرفتن/تمدید گواهی SSL از Let's Encrypt، روش HTTP-01 (نیاز به پورت ۸۰ باز) |
 | `dotinschool-challenge cert-cf` | گرفتن/تمدید گواهی SSL از راه Cloudflare DNS (بدون نیاز به پورت ۸۰) |
@@ -146,17 +141,9 @@ bash -c 'read -rsp "GitHub token: " T; echo; curl -fsSL -H "Authorization: token
 
 موقع نصب، اگر دامنه‌ای داشته باشید که به IP این سرور اشاره می‌کند، خودِ اسکریپت در همان لحظه ازتان می‌پرسد و SSL کامل (HTTP-01 یا Cloudflare DNS) را همان‌جا برایتان فعال می‌کند — نیازی به اجرای دستیِ `dotinschool-challenge cert` بعد از نصب نیست، مگر بخواهید بعداً اضافه‌اش کنید.
 
-### اگر `git clone` روی سرور گیر کرد و چیزی دانلود نشد
+### اگر دانلود از گیت‌هاب روی سرور گیر کرد
 
-</div>
-
-```bash
-git clone https://x-access-token:YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git
-```
-
-<div dir="rtl" align="right">
-
-بعضی شبکه‌ها (مثل خیلی از سرورهای ایران) گیت‌هاب را کامل روی IP بلاک می‌کنند — نه فقط DNS، خودِ اتصال TCP هم تایم‌اوت می‌شود. علامتش این است: بعد از «Cloning into...» هیچ پیشرفتی نمی‌بینید و بعد از چند دقیقه با `Connection timed out` شکست می‌خورد. راه‌حل، مسیرکردن ترافیک از راه Cloudflare WARP است (رایگان، رسمی):
+بعضی شبکه‌ها (مثل خیلی از سرورهای ایران) گیت‌هاب را کامل روی IP بلاک می‌کنند — نه فقط DNS، خودِ اتصال TCP هم تایم‌اوت می‌شود. علامتش این است: اسکریپت نصب بعد از امتحان همهٔ mirrorها با پیام «Could not download from GitHub» متوقف می‌شود. راه‌حل، مسیرکردن ترافیک از راه Cloudflare WARP است (رایگان، رسمی):
 
 </div>
 
@@ -181,9 +168,9 @@ dnf install -y cloudflare-warp   # or: yum install -y cloudflare-warp
 
 <div dir="rtl" align="right">
 
-با `warp-cli status` مطمئن شوید وصل است، بعد دوباره `git clone` را امتحان کنید. بعد از این‌که یک‌بار `dotinschool-challenge` نصب شد، همین کار را با یک دستور هم می‌شود انجام داد: `dotinschool-challenge warp`.
+با `warp-cli status` مطمئن شوید وصل است، بعد دستور نصب را دوباره بزنید. بعد از این‌که یک‌بار `dotinschool-challenge` نصب شد، همین کار را با یک دستور هم می‌شود انجام داد: `dotinschool-challenge warp`.
 
-یونیت systemd یک `ExecStartPre` دارد که در هر ری‌استارت باینری را از سورس فعلی می‌سازد؛ به همین دلیل دکمهٔ «به‌روزرسانی» داخل پنل (که `git reset --hard origin/main` + ری‌استارت می‌کند) واقعاً اعمال می‌شود. اگر بیلد شکست بخورد، باینری قبلیِ سالم دست‌نخورده می‌ماند.
+به‌روزرسانی با `dotinschool-challenge update` (یا دکمهٔ «به‌روزرسانی» پنل، که همین دستور را نشان می‌دهد) نسخهٔ جدید را دانلود و سرویس را ری‌استارت می‌کند؛ اگر دانلود ناموفق باشد، نسخهٔ فعلی دست‌نخورده می‌ماند.
 
 ### SSL (اگر موقع نصب رد کردید)
 
@@ -259,7 +246,7 @@ $s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Mar
 </div>
 
 ```bash
-bash -c 'read -rsp "GitHub token: " T; echo; curl -fsSL -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/build/docker-install.sh -o /tmp/dotinschool-challenge-docker-install.sh || { echo "Download failed - check the token and that it can read dotinschool-challenge"; exit 1; }; S=; [ "$(id -u)" -eq 0 ] || S=sudo; $S env DOTINSCHOOL_GH_TOKEN="$T" bash /tmp/dotinschool-challenge-docker-install.sh'
+bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool-install/main/challenge-docker.sh)
 ```
 
 <div dir="rtl" align="right">
@@ -327,6 +314,22 @@ scripts/build.sh          # linux/amd64, linux/arm64, windows/amd64 -> dist/
 ```
 
 <div dir="rtl" align="right">
+
+---
+
+## انتشار نسخهٔ جدید برای سرورها
+
+سرورها از نسخهٔ منتشرشده در مخزن عمومی نصب و به‌روزرسانی می‌شوند، نه مستقیم از این مخزن. بعد از commit تغییرات (و build فرانت در صورت تغییر آن)، از ریشهٔ همین مخزن:
+
+</div>
+
+```bash
+bash scripts/publish-release.sh
+```
+
+<div dir="rtl" align="right">
+
+باینری لینوکس (amd64 و arm64) را می‌سازد — با Go، یا اگر Go نصب نیست داخل Docker — و بسته را به‌همراه اسکریپت‌های نصب در `ariasam2017/dotinschool-install` (release با تگ `challenge-latest`) منتشر می‌کند. بعد از آن روی هر سرور: `dotinschool-challenge update`.
 
 ---
 

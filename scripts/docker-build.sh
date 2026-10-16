@@ -13,9 +13,12 @@ cd "$(dirname "$0")/.."
 ARCHS="${1:-amd64}"
 TAG="${DOCKER_TAG:-dotinschool-challenge:local}"
 
-command -v go >/dev/null 2>&1 || { echo "go not found on PATH"; exit 1; }
+# DOTIN_PREBUILT=1: dist/ already holds the release binary (installed servers
+# have no source and no Go) - just package it.
+PREBUILT="${DOTIN_PREBUILT:-0}"
+[ "$PREBUILT" = 1 ] || command -v go >/dev/null 2>&1 || { echo "go not found on PATH"; exit 1; }
 
-if [ ! -f web/assets/index.html ] || ! grep -q 'DOTIN_HEAD' web/assets/index.html; then
+if [ "$PREBUILT" != 1 ] && { [ ! -f web/assets/index.html ] || ! grep -q 'DOTIN_HEAD' web/assets/index.html; }; then
   echo "==> web/assets looks unbuilt — building the frontend"
   ( cd web && npm ci --no-audit --no-fund && npm run build:fast )
 fi
@@ -24,6 +27,10 @@ VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
 mkdir -p dist
 
 for a in $ARCHS; do
+  if [ "$PREBUILT" = 1 ]; then
+    [ -s "dist/dotinschool-challenge_linux_${a}" ] || { echo "dist/dotinschool-challenge_linux_${a} is missing"; exit 1; }
+    continue
+  fi
   echo "==> host-compiling linux/$a"
   GOOS=linux GOARCH="$a" CGO_ENABLED=0 \
     go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" \

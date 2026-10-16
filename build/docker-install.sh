@@ -2,22 +2,12 @@
 # =============================================================================
 # dotinschool-challenge — Docker installer for a Linux host.
 #
-# The dotinschool-challenge repo is private, so getting the source needs a GitHub
-# token: a fine-grained personal access token, scoped to just this repository
-# with "Contents: Read-only", is enough. Create one at
-# https://github.com/settings/personal-access-tokens/new, then run this —
-# no token in the command itself, it asks for it interactively:
-#
-#   bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/build/docker-install.sh)'
-#
-# The token is only needed for that first run: it gets embedded in the
-# /opt/dotinschool-challenge clone's git remote, so later updates (this script, or
-# `dotinschool-challenge update`) keep working without it.
-#
-# Installs Docker + Go if missing (auto — no prompts), clones the repo to
+# One command, no GitHub token - it downloads the prebuilt release (binary +
+# Docker files, no source) from the public dotinschool-install repo:
+#   bash <(curl -Ls https://raw.githubusercontent.com/ariasam2017/dotinschool-install/main/challenge-docker.sh)
+# Installs Docker if missing (auto — no prompts), unpacks the release into
 # /opt/dotinschool-challenge, generates a .env with a random admin password + secret
-# admin path, builds the image the RELIABLE way (host-compile the binary,
-# then package it — never an in-container `go build`), brings the stack up,
+# admin path, packages the prebuilt binary into a tiny image, brings the stack up,
 # and installs a wrapper command:
 #
 #   dotinschool-challenge                 interactive menu (free-port finder, HTTPS cert, ...)
@@ -43,11 +33,11 @@
 # =============================================================================
 set -euo pipefail
 
-BRANCH="${DOTINSCHOOL_BRANCH:-main}"
+PUBLIC_REPO="ariasam2017/dotinschool-install"
+RELEASE_TAG="challenge-latest"
+BIN_NAME="dotinschool-challenge"
 INSTALL_DIR="/opt/dotinschool-challenge"
 CLI_PATH="/usr/local/bin/dotinschool-challenge"
-GO_VERSION="1.27.1"  # last-resort fallback only; see resolve_go_tarballs
-GO_ROOT="/usr/local/go"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; NC='\033[0m'
 info(){ echo -e "${CYAN}[i]${NC} $*"; }
@@ -56,46 +46,6 @@ warn(){ echo -e "${YELLOW}[!]${NC} $*"; }
 die(){ echo -e "${RED}[x]${NC} $*" >&2; exit 1; }
 
 require_root(){ [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run as root (sudo)."; }
-
-# Some hosts have a global/system git config with a "url.insteadOf" rewrite
-# (a common convenience for people who normally use SSH keys with GitHub) that
-# silently turns "https://TOKEN@github.com/..." into "git@github.com:...",
-# which then fails with "Permission denied (publickey)" since this uses a
-# token over HTTPS, not an SSH key. Bypass ANY such rewrite for git calls that
-# touch GitHub, rather than trying to detect or explain the specific rule.
-# GIT_TERMINAL_PROMPT=0: a rejected token must fail fast, never sit waiting
-# for a username/password nobody will type.
-git_nc(){ GIT_TERMINAL_PROMPT=0 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git "$@"; }
-
-# The repo is private: prefer an explicitly-passed token, otherwise reuse the
-# one already embedded in the existing clone's git remote (set on first
-# install). Never echo the URL built from this — it carries the token.
-gh_token(){
-  if [[ -n "${DOTINSCHOOL_GH_TOKEN:-}" ]]; then echo "$DOTINSCHOOL_GH_TOKEN"; return; fi
-  if [[ -d "$INSTALL_DIR/.git" ]]; then
-    git_nc -C "$INSTALL_DIR" remote get-url origin 2>/dev/null | sed -n 's#https://\(x-access-token:\)\{0,1\}\([^@]*\)@github\.com/.*#\2#p'
-  fi
-}
-
-repo_url(){
-  if [[ -n "${DOTINSCHOOL_REPO_URL:-}" ]]; then echo "$DOTINSCHOOL_REPO_URL"; return; fi
-  local t; t=$(gh_token)
-  if [[ -n "$t" ]]; then echo "https://x-access-token:${t}@github.com/ariasam2017/dotinschool-challenge.git"
-  else echo "https://github.com/ariasam2017/dotinschool-challenge.git"; fi
-}
-
-# Prompts once, in the real shell (not a $(...) subshell, so the export
-# actually sticks), if nothing else already supplies a token.
-ensure_gh_token(){
-  [[ -n "${DOTINSCHOOL_GH_TOKEN:-}" ]] && return
-  [[ -n "${DOTINSCHOOL_REPO_URL:-}" ]] && return
-  [[ -d "$INSTALL_DIR/.git" ]] && [[ -n "$(gh_token)" ]] && return
-  [[ -t 0 ]] || return 0
-  echo "This repo is private. Create a fine-grained token (Contents: Read-only) at:"
-  echo "  https://github.com/settings/personal-access-tokens/new"
-  read -rsp "GitHub token: " DOTINSCHOOL_GH_TOKEN; echo
-  export DOTINSCHOOL_GH_TOKEN
-}
 
 install_prereqs(){
   if command -v apt-get >/dev/null 2>&1; then apt-get update -y >/dev/null; apt-get install -y curl git tar openssl ca-certificates >/dev/null
@@ -165,52 +115,6 @@ JSON
 
 arch_tag(){ case "$(uname -m)" in x86_64|amd64) echo amd64 ;; aarch64|arm64) echo arm64 ;; *) die "Unsupported architecture: $(uname -m)";; esac; }
 
-# No version is hardcoded as the primary source: go.dev sometimes lists a
-# release as stable in its metadata a little before every platform's archive
-# has finished uploading, so a pinned version can 404. Ask go.dev's JSON
-# endpoint for the actual current release names instead; GO_VERSION is only
-# the last-resort fallback if that lookup itself fails.
-resolve_go_tarballs(){
-  local arch="$1" json u
-  for u in "https://go.dev/dl/?mode=json" "https://golang.google.cn/dl/?mode=json"; do
-    json=$(curl -fsSL --connect-timeout 15 "$u" 2>/dev/null) || true
-    [[ -n "$json" ]] && break
-  done
-  [[ -n "$json" ]] && echo "$json" | grep -o "\"go[0-9.]*\.linux-${arch}\.tar\.gz\"" | tr -d '"' | awk '!seen[$0]++'
-}
-
-install_go(){
-  if [[ -x "${GO_ROOT}/bin/go" ]] && "${GO_ROOT}/bin/go" version >/dev/null 2>&1; then ok "Go is already installed."; return; fi
-  local arch; arch=$(arch_tag)
-  info "Looking up the latest Go release..."
-  local candidates=() c
-  while IFS= read -r c; do [[ -n "$c" ]] && candidates+=("$c"); done < <(resolve_go_tarballs "$arch" | head -5)
-  if [[ ${#candidates[@]} -eq 0 ]]; then
-    warn "Could not look up Go releases online — falling back to a pinned version (${GO_VERSION})."
-    candidates=("go${GO_VERSION}.linux-${arch}.tar.gz")
-  fi
-  info "Trying Go release(s): ${candidates[*]}"
-  # aliyun / ustc / nju mirrors are the ones that tend to still work on
-  # filtered networks where go.dev and dl.google.com don't.
-  local tmp="" tgz base found=0
-  for tgz in "${candidates[@]}"; do
-    for base in \
-      "https://go.dev/dl" \
-      "https://mirrors.aliyun.com/golang" \
-      "https://mirrors.ustc.edu.cn/golang" \
-      "https://mirror.nju.edu.cn/golang" \
-      "https://golang.google.cn/dl"; do
-      tmp=$(mktemp)
-      if curl -fsSL --connect-timeout 15 "${base}/${tgz}" -o "$tmp" && [[ -s "$tmp" ]]; then found=1; break 2; fi
-      rm -f "$tmp"; tmp=""
-    done
-  done
-  [[ $found -eq 1 ]] || die "Could not download Go from any mirror. On a filtered server, turn on a tunnel/DNS bypass and re-run, or install Go manually to ${GO_ROOT}."
-  rm -rf "$GO_ROOT"; tar -C /usr/local -xzf "$tmp"; rm -f "$tmp"
-  export PATH="${GO_ROOT}/bin:$PATH"
-  ok "Go $("${GO_ROOT}/bin/go" version | awk '{print $3}') installed."
-}
-
 random_password(){ openssl rand -base64 18 | tr -dc 'A-Za-z0-9' | head -c 20; }
 random_admin_path(){ echo "panel-$(openssl rand -hex 6)"; }
 
@@ -225,52 +129,34 @@ find_free_port(){
   echo "$port"
 }
 
-fetch_repo(){
-  if [[ -d "$INSTALL_DIR/.git" ]]; then
-    git_nc -C "$INSTALL_DIR" fetch --depth 1 origin "$BRANCH" >/dev/null
-    git_nc -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}" >/dev/null
-    ok "Source ready at ${INSTALL_DIR}."
-    return
-  fi
-
-  # Running from inside an already-cloned checkout of this same repo? Reuse
-  # it instead of asking for the token again (see the header comment above).
-  local self_dir=""
-  if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
-    self_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd) || self_dir=""
-  fi
-  if [[ -n "$self_dir" && -d "$self_dir/.git" ]]; then
-    local origin; origin=$(git_nc -C "$self_dir" remote get-url origin 2>/dev/null)
-    if [[ "$origin" == *"github.com/ariasam2017/dotinschool-challenge"* ]]; then
-      git_nc clone --depth 1 --branch "$BRANCH" "$self_dir" "$INSTALL_DIR" >/dev/null
-      git_nc -C "$INSTALL_DIR" remote set-url origin "$origin"
-      ok "Source ready at ${INSTALL_DIR}."
-      return
-    fi
-  fi
-
-  local url; url=$(repo_url)
-  [[ -n "${DOTINSCHOOL_REPO_URL:-}" || "$url" == *"@github.com"* ]] || warn "No GitHub token found (DOTINSCHOOL_GH_TOKEN) — this will fail, the repo is private."
-
-  # `timeout` + inline env so a filtered network fails fast instead of hanging;
-  # git_nc is a shell function so `timeout` can't call it directly.
-  clone_try(){ rm -rf "$INSTALL_DIR"; timeout "${1}" env GIT_TERMINAL_PROMPT=0 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
-      git clone --depth 1 --branch "$BRANCH" "${2}" "$INSTALL_DIR" >/dev/null 2>&1; }
-
-  if clone_try 90 "$url"; then ok "Source ready at ${INSTALL_DIR}."; return; fi
-
-  warn "Direct clone from GitHub failed/timed out - trying public git mirrors..."
+# The source repo is private; installs come from the public release repo
+# (prebuilt binary + Docker files, no source). GitHub itself first, then
+# public mirrors for networks that block it.
+gh_get(){ # <path on github.com> <dest file>
   local m
-  for m in "https://gh-proxy.com" "https://ghproxy.net" "https://ghfast.top" "https://gh.ddlc.top"; do
-    info "  via ${m}"
-    if clone_try 120 "${m}/${url}"; then
-      git_nc -C "$INSTALL_DIR" remote set-url origin "$url"
-      ok "Source ready at ${INSTALL_DIR} (via ${m})."
-      return
+  for m in "" "https://gh-proxy.com/" "https://ghproxy.net/" "https://ghfast.top/" "https://gh.ddlc.top/"; do
+    [[ -n "$m" ]] && info "  retrying via ${m}"
+    if curl -fsSL --connect-timeout 15 --max-time 900 "${m}https://github.com/${1}" -o "$2" 2>/dev/null && [[ -s "$2" ]]; then
+      return 0
     fi
   done
+  return 1
+}
 
-  die "Could not fetch the source from GitHub or any mirror. On a filtered server: turn on a tunnel / DNS bypass, 'git clone' the repo yourself into a folder, then run 'bash build/docker-install.sh' from INSIDE that folder - it reuses a local checkout without touching the network for the source."
+# Downloads the latest release bundle and lays it over INSTALL_DIR. The bundle
+# holds no data/ directory, so the database (and .env) are never touched.
+fetch_bundle(){
+  local arch tmp; arch=$(arch_tag); tmp=$(mktemp -d)
+  info "Downloading the latest ${BIN_NAME} release (linux/${arch})..."
+  if ! gh_get "${PUBLIC_REPO}/releases/download/${RELEASE_TAG}/${BIN_NAME}_linux_${arch}.tar.gz" "$tmp/bundle.tgz"; then
+    rm -rf "$tmp"; die "Could not download the release from GitHub or any mirror - check this server's internet access and run this again."
+  fi
+  tar -xzf "$tmp/bundle.tgz" -C "$tmp" 2>/dev/null && [[ -s "$tmp/${BIN_NAME}/dist/${BIN_NAME}_linux_${arch}" ]] \
+    || { rm -rf "$tmp"; die "The downloaded release is incomplete or damaged - run this again."; }
+  mkdir -p "$INSTALL_DIR"
+  cp -a "$tmp/${BIN_NAME}/." "$INSTALL_DIR/"
+  rm -rf "$tmp"
+  ok "Release $(cat "${INSTALL_DIR}/VERSION" 2>/dev/null || echo '?') ready at ${INSTALL_DIR}."
 }
 
 write_env(){
@@ -304,35 +190,9 @@ EOF
   ok ".env created — random admin password and secret path generated."
 }
 
-# Download the Go modules one mirror at a time, each bounded by a timeout. A
-# mirror that stalls mid-download (goproxy.cn has been seen to, forever, with no
-# error) or refuses (goproxy.io: 403) must not hang the install; whatever was
-# already fetched stays in the module cache, so the next mirror only fetches
-# what is still missing. The build afterwards runs with GOPROXY=off (offline).
-go_mod_download(){
-  local entry proxy sumdb
-  for entry in "https://goproxy.cn|sum.golang.google.cn" \
-               "https://proxy.golang.org|sum.golang.org" \
-               "https://goproxy.io|sum.golang.google.cn"; do
-    proxy=${entry%%|*}; sumdb=${entry##*|}
-    info "Downloading Go modules via ${proxy}..."
-    if ( cd "$INSTALL_DIR" && GOPROXY="${proxy},direct" GOSUMDB="$sumdb" GOTOOLCHAIN=auto \
-           timeout 240 "${GO_ROOT}/bin/go" mod download ); then
-      return 0
-    fi
-    warn "${proxy} failed or stalled - trying the next mirror."
-  done
-  return 1
-}
-
 build_image(){
-  go_mod_download || die "Could not download the Go modules from any mirror - check this server's internet access and run the installer again."
-  info "Compiling the binary on the host + building the image (no go build inside the container)..."
-  ( cd "$INSTALL_DIR" \
-    && PATH="${GO_ROOT}/bin:$PATH" \
-       GOPROXY=off \
-       GOTOOLCHAIN="auto" \
-       bash scripts/docker-build.sh "$(arch_tag)" )
+  info "Packaging the prebuilt binary into the image..."
+  ( cd "$INSTALL_DIR" && DOTIN_PREBUILT=1 bash scripts/docker-build.sh "$(arch_tag)" )
   ok "Image dotinschool-challenge:local built."
 }
 
@@ -757,36 +617,31 @@ run_action(){
       "${C[@]}" ps ;;
     rebuild)
       arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
-      PATH="/usr/local/go/bin:/usr/lib/go/bin:$HOME/go/bin:$PATH" \
-        bash scripts/docker-build.sh "$arch" \
+      DOTIN_PREBUILT=1 bash scripts/docker-build.sh "$arch" \
         || { echo "[x] build failed — the running panel was left as it was. Fix the error above and re-run."; exit 1; }
       "${C[@]}" up -d --force-recreate --remove-orphans
       echo "== rebuilt & restarted. Hard-refresh the browser (Ctrl+Shift+R)." ;;
     update)
       arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
-      before="$(git rev-parse --short HEAD 2>/dev/null || echo '?')"
-      echo "==> [1/5] fetching the latest source from GitHub"
-      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git fetch --depth 1 origin main \
-        || { echo "[x] git fetch failed — check this server's internet/DNS, then re-run 'dotinschool-challenge update'."; exit 1; }
-      echo "==> [2/5] applying it (git reset --hard origin/main)"
-      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git reset --hard origin/main \
-        || { echo "[x] git reset failed."; exit 1; }
-      after="$(git rev-parse --short HEAD 2>/dev/null || echo '?')"
+      before="$(cat VERSION 2>/dev/null || echo '?')"
+      echo "==> [1/4] downloading the latest release"
+      bash build/docker-install.sh --fetch \
+        || { echo "[x] download failed — the running panel was NOT touched. Check this server's internet and re-run 'dotinschool-challenge update'."; exit 1; }
+      after="$(cat VERSION 2>/dev/null || echo '?')"
       echo "    $before -> $after"
-      echo "==> [3/5] refreshing the 'dotinschool-challenge' command"
+      echo "==> [2/4] refreshing the 'dotinschool-challenge' command"
       bash build/docker-install.sh --reinstall-cli || echo "[!] CLI refresh failed (carrying on)"
-      echo "==> [4/5] compiling the binary + packaging the image"
-      PATH="/usr/local/go/bin:/usr/lib/go/bin:$HOME/go/bin:$PATH" \
-        bash scripts/docker-build.sh "$arch" \
-        || { echo "[x] build failed — the running panel was NOT touched, it is still up on the old version. Fix the error above and re-run 'dotinschool-challenge update'."; exit 1; }
-      echo "==> [5/5] recreating the container with the new image"
+      echo "==> [3/4] packaging the image"
+      DOTIN_PREBUILT=1 bash scripts/docker-build.sh "$arch" \
+        || { echo "[x] image build failed — the running panel was NOT touched, it is still up on the old version."; exit 1; }
+      echo "==> [4/4] recreating the container with the new image"
       "${C[@]}" up -d --force-recreate --remove-orphans \
         || { echo "[x] 'compose up' failed — run 'dotinschool-challenge logs' to see why."; exit 1; }
       sleep 2
       running="$({ "${C[@]}" logs --since 60s app 2>/dev/null || true; } | sed -n 's/.*dotinschool-challenge version \([^"]*\).*/\1/p' | tail -n1 || true)"
       echo
       if [ "$before" = "$after" ]; then
-        echo "== Already on the latest commit ($after). Image rebuilt & container recreated anyway."
+        echo "== Already on the latest release ($after). Image rebuilt & container recreated anyway."
       else
         echo "== Updated $before -> $after."
       fi
@@ -885,11 +740,9 @@ wait_healthy(){
 
 main(){
   require_root
-  ensure_gh_token
   install_prereqs
   install_docker
-  install_go
-  fetch_repo
+  fetch_bundle
   write_env
   build_image
   install_cli
@@ -924,6 +777,12 @@ main(){
 # update" updated the app but never itself, so a new CLI feature (a menu
 # item, a new subcommand) only ever showed up after re-running the whole
 # one-line installer again from scratch.
+# --fetch: the CLI's "update" action downloads the new release with this.
+if [[ "${1:-}" == "--fetch" ]]; then
+  require_root
+  fetch_bundle
+  exit 0
+fi
 if [[ "${1:-}" == "--reinstall-cli" ]]; then
   require_root
   install_cli

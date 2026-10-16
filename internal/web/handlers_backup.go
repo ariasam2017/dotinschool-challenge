@@ -136,8 +136,21 @@ func (s *server) handleUpdate(c *gin.Context) {
 			"message": "این نصب روی Docker است — برای به‌روزرسانی، از پوشه ریشه پروژه روی همان سرور (همان‌جا که docker-up.ps1 / docker-up.sh هست) دستور زیر را اجرا کنید:\n" +
 				"• ویندوز (PowerShell): .\\update.ps1\n" +
 				"• لینوکس/مک: ./update.sh\n" +
-				"(اگر با اسکریپت نصب لینوکسی docker-install.sh نصب کرده‌اید، دستور «dotinschool-challenge update» هم همین کار را می‌کند.)\n" +
+				"(اگر با دستور نصب لینوکسی نصب کرده‌اید، روی سرور فقط بزنید: dotinschool-challenge update)\n" +
 				"این اسکریپت‌ها نسخه جدید را از گیت‌هاب می‌گیرند، باینری را دوباره می‌سازند و سرویس را ری‌استارت می‌کنند — بدون نیاز به build داخل کانتینر. داده‌ها در ولوم ./data دست‌نخورده می‌مانند.",
+		})
+		return
+	}
+
+	// Installs from the public release repo are a prebuilt binary with no git
+	// checkout: they update through the server-side menu, which downloads the
+	// new release and restarts the service.
+	if _, err := os.Stat(filepath.Join(s.cfg.Root, ".git")); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"updated": false,
+			"message": "این سامانه از نسخهٔ آماده نصب شده — برای به‌روزرسانی، روی سرور (با root) این دستور را بزنید:\n" +
+				"dotinschool-challenge update\n" +
+				"(یا در منوی «dotinschool-challenge» گزینهٔ ۲). آخرین نسخه دانلود و سرویس ری‌استارت می‌شود؛ داده‌ها دست‌نخورده می‌مانند.",
 		})
 		return
 	}
