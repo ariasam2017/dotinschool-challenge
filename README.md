@@ -19,6 +19,8 @@
 
 ## نصب سریع
 
+**نصب سامانهٔ چالش برنامه‌نویسی با یک دستور:** دستور لینوکسی مناسب را در ترمینال سرور (با کاربر root یا کاربری که sudo دارد) کپی کنید و Enter بزنید؛ فقط توکن را می‌پرسد و بقیه را خودش انجام می‌دهد — بدون منو و سؤال اضافه. آخر کار آدرس پنل، نام کاربری و رمز ادمین را چاپ می‌کند و منوی مدیریتی با دستور `dotinschool-challenge` در دسترس است.
+
 هر سه دستور، همون لحظه که اجرا می‌کنید، توکن گیت‌هاب رو به‌صورت مخفی (مثل رمز عبور، دیده نمی‌شود) ازتان می‌پرسند — چیزی داخل خودِ دستور جای‌گذاری نمی‌کنید. بعد خودشان آخرین نسخه را می‌گیرند، پیش‌نیازهای لازم را نصب می‌کنند، و برنامه را بالا می‌آورند. همان دستور را دوباره اجرا کنید تا به‌روزرسانی بگیرید — این‌بار دیگر توکن نمی‌خواهد، چون همان اولی داخل remote کلون ذخیره شده.
 
 مخزن **Private** است، پس فقط برای همین اولین اجرا یک توکن گیت‌هاب لازم دارید:
@@ -33,7 +35,7 @@
 </div>
 
 ```bash
-bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/scripts/install.sh)'
+bash -c 'read -rsp "GitHub token: " T; echo; curl -fsSL -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/scripts/install.sh -o /tmp/dotinschool-challenge-install.sh || { echo "Download failed - check the token and that it can read dotinschool-challenge"; exit 1; }; S=; [ "$(id -u)" -eq 0 ] || S=sudo; $S env DOTINSCHOOL_GH_TOKEN="$T" bash /tmp/dotinschool-challenge-install.sh install'
 ```
 
 <div dir="rtl" align="right">
@@ -43,7 +45,7 @@ bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(cu
 </div>
 
 ```bash
-bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/build/docker-install.sh)'
+bash -c 'read -rsp "GitHub token: " T; echo; curl -fsSL -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/build/docker-install.sh -o /tmp/dotinschool-challenge-docker-install.sh || { echo "Download failed - check the token and that it can read dotinschool-challenge"; exit 1; }; S=; [ "$(id -u)" -eq 0 ] || S=sudo; $S env DOTINSCHOOL_GH_TOKEN="$T" bash /tmp/dotinschool-challenge-docker-install.sh'
 ```
 
 <div dir="rtl" align="right">
@@ -114,7 +116,7 @@ go run ./cmd/seed     # wipes and reseeds the DB with ~16 participants and a liv
 </div>
 
 ```bash
-bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/scripts/install.sh)'
+bash -c 'read -rsp "GitHub token: " T; echo; curl -fsSL -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/scripts/install.sh -o /tmp/dotinschool-challenge-install.sh || { echo "Download failed - check the token and that it can read dotinschool-challenge"; exit 1; }; S=; [ "$(id -u)" -eq 0 ] || S=sudo; $S env DOTINSCHOOL_GH_TOKEN="$T" bash /tmp/dotinschool-challenge-install.sh install'
 ```
 
 <div dir="rtl" align="right">
@@ -257,7 +259,7 @@ $s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Mar
 </div>
 
 ```bash
-bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/build/docker-install.sh)'
+bash -c 'read -rsp "GitHub token: " T; echo; curl -fsSL -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/build/docker-install.sh -o /tmp/dotinschool-challenge-docker-install.sh || { echo "Download failed - check the token and that it can read dotinschool-challenge"; exit 1; }; S=; [ "$(id -u)" -eq 0 ] || S=sudo; $S env DOTINSCHOOL_GH_TOKEN="$T" bash /tmp/dotinschool-challenge-docker-install.sh'
 ```
 
 <div dir="rtl" align="right">

@@ -90,7 +90,7 @@ ensure_gh_token(){
   [[ -n "${DOTINSCHOOL_GH_TOKEN:-}" ]] && return
   [[ -n "${DOTINSCHOOL_REPO_URL:-}" ]] && return
   [[ -d "$INSTALL_DIR/.git" ]] && [[ -n "$(gh_token)" ]] && return
-  [[ -t 0 ]] || return
+  [[ -t 0 ]] || return 0
   echo "This repo is private. Create a fine-grained token (Contents: Read-only) at:"
   echo "  https://github.com/settings/personal-access-tokens/new"
   read -rsp "GitHub token: " DOTINSCHOOL_GH_TOKEN; echo

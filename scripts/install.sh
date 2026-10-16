@@ -116,7 +116,7 @@ ensure_gh_token(){
   [[ -n "${DOTINSCHOOL_GH_TOKEN:-}" ]] && return
   [[ -n "${DOTINSCHOOL_REPO_URL:-}" ]] && return
   [[ -d "$INSTALL_DIR/.git" ]] && [[ -n "$(gh_token)" ]] && return
-  [[ -t 0 ]] || return
+  [[ -t 0 ]] || return 0
   echo "This repo is private. Create a fine-grained token (Contents: Read-only) at:"
   echo "  https://github.com/settings/personal-access-tokens/new"
   read -rsp "GitHub token: " DOTINSCHOOL_GH_TOKEN; echo
@@ -576,7 +576,7 @@ cmd_cert_cf(){
 prompt_domain_setup(){
   echo
   read -r -p "Do you have a domain pointing at this server's IP? Set up SSL now? [y/N] " ans
-  [[ "$ans" == "y" || "$ans" == "Y" ]] || return
+  [[ "$ans" == "y" || "$ans" == "Y" ]] || return 0
   echo "1) Let's Encrypt over HTTP-01 (needs port 80 reachable from the internet)"
   echo "2) Let's Encrypt via Cloudflare DNS (needs a Cloudflare API token, works without port 80)"
   read -r -p "Choice [1/2, empty = skip]: " m
