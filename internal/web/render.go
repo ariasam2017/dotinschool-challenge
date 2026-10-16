@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/dotinschool/dotinschool/internal/apperr"
+	"github.com/dotinschool/dotinschool-challenge/internal/apperr"
 )
 
 // context keys

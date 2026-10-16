@@ -1,10 +1,10 @@
-# ── dotinschool ── HTTPS-only, direct TLS. The 3x-ui / sanaei-panel model:
+# ── dotinschool-challenge ── HTTPS-only, direct TLS. The 3x-ui / sanaei-panel model:
 # the app terminates TLS itself on one port, from a certificate acme.sh issued
 # (Cloudflare-DNS or standalone-HTTP). No reverse proxy, no plain-HTTP port.
 #
 # This file is used ALONE (not layered on docker-compose.yml) so there is no
 # leftover :8080 publish — the panel is reachable only as https://$DOMAIN/.
-# `dotinschool cert <domain>` writes CERT_MODE=direct to .env and switches to
+# `dotinschool-challenge cert <domain>` writes CERT_MODE=direct to .env and switches to
 # this file automatically.
 #
 #   docker compose --env-file .env -f build/docker-compose.tls.yml up -d
@@ -14,15 +14,15 @@
 # taken). Certs live in ../certs/$DOMAIN and acme.sh's cron auto-renews them
 # (its --reloadcmd restarts this container).
 
-name: dotinschool
+name: dotinschool-challenge
 
 services:
   app:
     build:
       context: ..
       dockerfile: build/Dockerfile
-    image: dotinschool:local
-    container_name: dotinschool
+    image: dotinschool-challenge:local
+    container_name: dotinschool-challenge
     ports:
       - "${HTTPS_PORT:-443}:8443"
     environment:

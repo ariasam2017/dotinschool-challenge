@@ -1,4 +1,4 @@
-# dotinschool — packaging Dockerfile.
+# dotinschool-challenge — packaging Dockerfile.
 #
 # This image contains NOTHING but the prebuilt static binary + CA certs, so the
 # `docker build` step is a ~2 second file copy that cannot fail on memory, a
@@ -10,8 +10,8 @@
 #   make image            # host cross-compile + docker build, one command
 #   # or manually:
 #   GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" \
-#       -o dist/dotinschool_linux_amd64 ./cmd/server
-#   docker build -f build/Dockerfile -t dotinschool:local .
+#       -o dist/dotinschool-challenge_linux_amd64 ./cmd/server
+#   docker build -f build/Dockerfile -t dotinschool-challenge:local .
 #
 # For a fully hermetic in-container build (needs ~2 GB free for `go build`), use
 # build/Dockerfile.hermetic instead.
@@ -23,8 +23,8 @@ WORKDIR /app
 
 # TARGETARCH is set automatically by `docker build` / buildx (amd64, arm64).
 ARG TARGETARCH=amd64
-COPY dist/dotinschool_linux_${TARGETARCH} /app/dotinschool
-RUN chmod +x /app/dotinschool \
+COPY dist/dotinschool-challenge_linux_${TARGETARCH} /app/dotinschool-challenge
+RUN chmod +x /app/dotinschool-challenge \
     && mkdir -p /app/data \
     && chown -R app:app /app
 
@@ -40,4 +40,4 @@ HEALTHCHECK --interval=30s --timeout=4s --start-period=5s --retries=3 \
   CMD wget -qO- "http://127.0.0.1:${PORT}/api/config" >/dev/null 2>&1 || exit 1
 
 USER app
-ENTRYPOINT ["/app/dotinschool"]
+ENTRYPOINT ["/app/dotinschool-challenge"]

@@ -9,14 +9,14 @@
 .env
 .env.local
 
-# TLS certs + acme.sh state — created at runtime by `dotinschool cert`
+# TLS certs + acme.sh state — created at runtime by `dotinschool-challenge cert`
 /certs/
 /.acme.sh/
 
 # build output binaries
 /dist/
-/dotinschool
-/dotinschool.exe
+/dotinschool-challenge
+/dotinschool-challenge.exe
 /server
 /server.exe
 
@@ -37,7 +37,7 @@ Thumbs.db
 # local run artifacts
 /run.pid
 /run.log
-/dotinschool.exe
+/dotinschool-challenge.exe
 
 # scratch dirs for local screenshots / smoke tests
 .demo/

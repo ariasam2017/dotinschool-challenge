@@ -1,4 +1,6 @@
-# HANDOFF — dotinschool
+# HANDOFF — dotinschool-challenge
+
+> **نکته (۲۰۲۶-۱۰-۱۶):** این مخزن از پروژهٔ مشترک «dotinschool-Game&Challenge» جدا شد. بخش‌های این سند که به پروژهٔ دیگر مربوط است تاریخی‌اند؛ مرجع به‌روز `README.md` و `CLAUDE.md` است.
 
 سندی برای شروعِ سریع یک نشستِ جدیدِ Claude روی یک سیستم دیگر، برای ادامهٔ همین پروژه. تاریخ اولین نگارش: ۲۰۲۶-۰۹-۰۵ · آخرین به‌روزرسانی: ۲۰۲۶-۰۹-۰۸.
 
@@ -14,16 +16,16 @@ git log --oneline -30 و ساختار کد (cmd/, internal/, web/src/, scripts/,
 
 ## ۱. پروژه چیست
 
-`dotinschool` — سامانهٔ آنلاین چالش برنامه‌نویسی، با معماری‌ای مشابه پنل‌های **x-ui / 3x-ui**: یک باینری استاتیک تک‌فایل به زبان **Go** که هم فرانت‌اند Vue بیلدشده را داخل خودش embed می‌کند و هم یک REST API کوچک روی SQLite دارد. دو پنل مجزا: **پنل شرکت‌کننده** و **پنل مدیریت**. جزئیات کامل فنی (پشته، معماری، قرارداد API، امنیت) توی README.md است — این‌جا تکرارش نمی‌کنم.
+`dotinschool-challenge` — سامانهٔ آنلاین چالش برنامه‌نویسی، با معماری‌ای مشابه پنل‌های **x-ui / 3x-ui**: یک باینری استاتیک تک‌فایل به زبان **Go** که هم فرانت‌اند Vue بیلدشده را داخل خودش embed می‌کند و هم یک REST API کوچک روی SQLite دارد. دو پنل مجزا: **پنل شرکت‌کننده** و **پنل مدیریت**. جزئیات کامل فنی (پشته، معماری، قرارداد API، امنیت) توی README.md است — این‌جا تکرارش نمی‌کنم.
 
 ## ۲. دسترسی به مخزن
 
-مخزن **Private** است: `https://github.com/ariasam2017/dotinschool` (صاحبِ اکانت گیت‌هاب: `ariasam2017`).
+مخزن **Private** است: `https://github.com/ariasam2017/dotinschool-challenge` (صاحبِ اکانت گیت‌هاب: `ariasam2017`).
 
-برای کلون کردن روی سیستم جدید، یک **fine-grained Personal Access Token** لازم است (مراحل کامل ساختنش توی README.md بخش «نصب سریع» هست: Resource owner `ariasam2017`، Only select repositories → `dotinschool`، Repository permissions → Contents: Read-only). توکن قبلی که حین این پروژه یک‌بار توی یک اسکرین‌شات لو رفت **Revoke شده** — اگر نشده، حتماً همین الان Revoke کنید و یک توکن تازه بسازید.
+برای کلون کردن روی سیستم جدید، یک **fine-grained Personal Access Token** لازم است (مراحل کامل ساختنش توی README.md بخش «نصب سریع» هست: Resource owner `ariasam2017`، Only select repositories → `dotinschool-challenge`، Repository permissions → Contents: Read-only). توکن قبلی که حین این پروژه یک‌بار توی یک اسکرین‌شات لو رفت **Revoke شده** — اگر نشده، حتماً همین الان Revoke کنید و یک توکن تازه بسازید.
 
 ```bash
-git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
+git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git
 ```
 
 اگر سیستم جدید هم پشت شبکهٔ فیلترشده است (نکتهٔ ۶ را ببینید)، شاید همین `git clone` هم گیر کند.
@@ -48,7 +50,7 @@ git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
 - `cmd/server/main.go`: به‌جای هاردکدِ 127.0.0.1 از `cfg.PublicBaseURL()` استفاده می‌کند + `var version = "dev"` که با `-ldflags -X main.version=` استمپ و در استارت‌آپ لاگ می‌شود.
 - `build/docker-install.sh` و `docker-up.ps1` مقدار `PUBLIC_HOST` را در `.env` می‌نویسند.
 
-### ۴.۴ سخت‌سازیِ `dotinschool update`
+### ۴.۴ سخت‌سازیِ `dotinschool-challenge update`
 - اکشنِ `update`/`rebuild` در wrapperِ CLIِ داخل `build/docker-install.sh`: اگر `root` نباشد با `sudo` **دوباره اجرا می‌شود**؛ مراحل شماره‌دار با خطای صریح (نه زنجیرهٔ `&&` بی‌صدا)؛ خطای «رفرش CLI» غیرِمرگبار؛ `compose up -d --force-recreate`؛ آخرش هش گیت و نسخهٔ در حال اجرا را چاپ می‌کند.
 - `docker-up.ps1` هم `--force-recreate` می‌زند، `main.version` را از `git describe` استمپ می‌کند، و خط `deployed build: <hash>` را چاپ می‌کند.
 
@@ -88,7 +90,7 @@ git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
 - **پاس ۱ — رنگ‌بندی (کامیت `7384940`):** اسکیلِ سبزِ `tokens.css` روی `#006839` (`--green-800` هرگز عوض نشود؛ `--green-400: #3ccf8d` برای متن/لینک در دارک). توکنِ `--primary-bright` (روشن: `#006839`، دارک: `#3ccf8d`). هر دو بلاکِ دارک بازنویسی و یکسان: زمینهٔ `#0a1310`، سطوح `#101914/#16221c/#1f2f27`، هیرلاین‌ها با ته‌رنگِ سبز، وضعیت‌ها (amber/red/blue) متمایز. override ایندیگوی `[data-panel='admin']` حذف شد. `theme.ts`: توکن‌های antd هم‌راستا. ۷ استفادهٔ متنیِ `var(--primary)` به `var(--primary-bright)` تغییر کرد. رنگِ outlineِ انتخابگرِ استودیو → `#34c98b`.
 - **پاس ۲ — ساختار (کامیت `7fe6ff1`):**
   - `tokens.css`: بلاکِ `:root[data-panel='admin']` — تراکمِ داشبورد: `--space-5/6/7` کوچک‌تر، `--header-h: 52px`، `--sidebar-w: 236px`، `--rail-w: 64px`، `--content-max: 1440px`. فقط فاصله؛ رنگ/روشنایی دست‌نخورده.
-  - `AdminShell.vue` (بازنویسی): نویگیشنِ کناری از لیستِ تختِ ۸تایی → **۴ گروهِ برچسب‌دار** (رویداد / کاربران / هوش مصنوعی / سامانه). آیتمِ فعال میلهٔ لبه‌ایِ `--primary` می‌گیرد (نه فقط تینت). **ریلِ آیکونیِ جمع‌شونده ۶۴px** با کلید در ردیفِ برند و در تاپ‌بار، ذخیره در `localStorage` (`dotinschool_admin_rail`). تاپ‌بار ۶۰→۵۲px، حالا نوارِ زمینه: بردکرامبِ «پنل مدیریت / <بخش>» + نشانگرِ ضربانیِ «زنده».
+  - `AdminShell.vue` (بازنویسی): نویگیشنِ کناری از لیستِ تختِ ۸تایی → **۴ گروهِ برچسب‌دار** (رویداد / کاربران / هوش مصنوعی / سامانه). آیتمِ فعال میلهٔ لبه‌ایِ `--primary` می‌گیرد (نه فقط تینت). **ریلِ آیکونیِ جمع‌شونده ۶۴px** با کلید در ردیفِ برند و در تاپ‌بار، ذخیره در `localStorage` (`dotinschool-challenge_admin_rail`). تاپ‌بار ۶۰→۵۲px، حالا نوارِ زمینه: بردکرامبِ «پنل مدیریت / <بخش>» + نشانگرِ ضربانیِ «زنده».
   - `StatCard.vue` (بازنویسی): کاشیِ ابزارگونه — برچسب بالا-راست، چیپِ آیکون بالا-چپ، عددِ `2rem`، نوارِ رنگِ tone روی لبهٔ بالا، اسپارک‌لاین چسبیده به لبه.
   - `base.css`: `.card-hd` (هدرِ کارت با هیرلاینِ تمام‌عرض، از padding بیرون می‌زند) و `.data-table` (هدرِ چسبان، ارتفاعِ ردیفِ ثابت، hover) برای یکدستیِ جدول‌های همهٔ بخش‌ها؛ انیمیشنِ `admin-rise` (ظاهرشدنِ پلکانیِ سکشن‌ها، پشتِ `prefers-reduced-motion`). `.section-title` کمی پررنگ‌تر (`--text-dim`, ۷۰۰).
   - `OverviewSection.vue`: تیترها با `.card-hd`، جدولِ «آخرین شرکت‌کنندگان» با `.data-table`.
@@ -105,13 +107,13 @@ git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
 ۳. **اسکریپت نصب لینوکس (`scripts/install.sh`)** به سبک x-ui/Sanaei بازنویسی و توسعه یافت:
    - همهٔ پیام‌ها انگلیسی، منوی جعبه‌ای تعاملی.
    - چون مخزن Private است، توکن گیت‌هاب را **خودش تعاملی می‌پرسد** (`ensure_gh_token`) — نه اینکه توی دستور جای‌گذاری بشود. توکن فقط همان یک‌بار لازم است؛ داخل remote گیت کلون محلی ذخیره می‌شود.
-   - `dotinschool cert` (SSL از راه HTTP-01) و `dotinschool cert-cf` (SSL از راه Cloudflare DNS، برای وقتی پورت ۸۰ باز نیست) — موقع نصب هم اگر دامنه داشته باشید همان لحظه ازتان می‌پرسد و SSL کامل فعال می‌کند.
-   - `dotinschool log` (لاگ زنده/پاک‌کردن)، `dotinschool reset` (بازنشانی کامل به پیش‌فرض — مخرب، تأیید می‌خواهد)، `dotinschool fail2ban` + `dotinschool banlog` (بن خودکار IP بعد از چند بار ورود اشتباه به پنل ادمین).
-   - `dotinschool warp` — **مهم**: بعضی شبکه‌ها (خیلی از سرورهای ایران) گیت‌هاب را کامل روی IP بلاک می‌کنند (نه فقط DNS — خودِ TCP تایم‌اوت می‌شود). این دستور Cloudflare WARP را نصب و وصل می‌کند که این بلاک را دور می‌زند. **این مشکل واقعاً روی VPS کاربر (لینوکسِ ایران) پیش آمد و با WARP حل شد.**
+   - `dotinschool-challenge cert` (SSL از راه HTTP-01) و `dotinschool-challenge cert-cf` (SSL از راه Cloudflare DNS، برای وقتی پورت ۸۰ باز نیست) — موقع نصب هم اگر دامنه داشته باشید همان لحظه ازتان می‌پرسد و SSL کامل فعال می‌کند.
+   - `dotinschool-challenge log` (لاگ زنده/پاک‌کردن)، `dotinschool-challenge reset` (بازنشانی کامل به پیش‌فرض — مخرب، تأیید می‌خواهد)، `dotinschool-challenge fail2ban` + `dotinschool-challenge banlog` (بن خودکار IP بعد از چند بار ورود اشتباه به پنل ادمین).
+   - `dotinschool-challenge warp` — **مهم**: بعضی شبکه‌ها (خیلی از سرورهای ایران) گیت‌هاب را کامل روی IP بلاک می‌کنند (نه فقط DNS — خودِ TCP تایم‌اوت می‌شود). این دستور Cloudflare WARP را نصب و وصل می‌کند که این بلاک را دور می‌زند. **این مشکل واقعاً روی VPS کاربر (لینوکسِ ایران) پیش آمد و با WARP حل شد.**
    - `build/docker-install.sh` (نصب Docker روی لینوکس) هم همین رفتارِ توکنِ تعاملی و منطقِ WARP را دارد؛ اگر Docker نصب نباشد **خودش نصبش می‌کند**.
 
 ۴. **نصب ویندوز** (`scripts/windows-install.ps1` + `docker-up.ps1`) — این بخش پر از رفع‌باگ بود، دقت کنید:
-   - `windows-install.ps1` هم توکن را تعاملی می‌پرسد (`Ensure-GhToken`, ورودی مخفی)، مخزن را در `%USERPROFILE%\dotinschool` کلون/آپدیت می‌کند، بعد `docker-up.ps1` را صدا می‌زند.
+   - `windows-install.ps1` هم توکن را تعاملی می‌پرسد (`Ensure-GhToken`, ورودی مخفی)، مخزن را در `%USERPROFILE%\dotinschool-challenge` کلون/آپدیت می‌کند، بعد `docker-up.ps1` را صدا می‌زند.
    - **باگ حل‌شده ۱ (Execution Policy)**: چون `windows-install.ps1` از راه `irm | iex` اجرا می‌شود ولی `docker-up.ps1` را به‌عنوان فایل واقعی صدا می‌زند، ویندوز با «running scripts is disabled» رد می‌کرد. با `Set-ExecutionPolicy -Scope Process -Bypass -Force` (فقط برای همان پردازش، بدون نیاز به Admin) حل شد.
    - **باگ حل‌شده ۲ (پنجره ناگهان بسته می‌شد)**: تابع `Die` هر دو اسکریپت از `exit 1` استفاده می‌کرد. چون این اسکریپت‌ها مستقیم توی نشستِ زندهٔ کاربر اجرا می‌شوند (نه یک پردازش جدا)، `exit` کل پنجرهٔ PowerShell را می‌بست، نه فقط اسکریپت را — یعنی هر خطایی (هرچی بود) پنجره را بی‌صدا می‌بست. با تغییر `exit 1` به `throw $m` حل شد (تست شد: throw فقط اسکریپت را متوقف می‌کند، نشست زنده می‌ماند).
    - روی ویندوز، **Go خودش نصب می‌شود** (مستقیم از go.dev/dl، نه از winget — چون manifest جامعهٔ winget برای `GoLang.Go` به نسخهٔ ۱.۲۷.۰ اشاره می‌کرد که اصلاً منتشر نشده بود، ۴۰۴ می‌داد). **Docker Desktop عمداً خودکار نصب نمی‌شود** — چون نصبش تعاملی است و ممکن است ری‌استارت برای WSL2 بخواهد؛ اگر نصب نباشد فقط پیام انگلیسی می‌دهد که نصبش کنید و دوباره اجرا کنید.
@@ -128,7 +130,7 @@ git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
   GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go test -c -o /dev/null ./internal/web/ ./internal/service/
   ```
 - **بیلدِ فرانت‌اند حافظه می‌خواهد.** روی این ماشین `vue-tsc`/`vite` وقتی RAM آزاد < ~۲GB بود OOM شد. با `NODE_OPTIONS="--max-old-space-size=2560" npm run build` و بستنِ مرورگر/کانتینر حل شد. `wsl --shutdown` هم ~۲GB آزاد می‌کند.
-- **گردشِ کارِ تست:** کامیتِ لوکال → `git bundle create ../design-studio-full.bundle <last-pushed>..HEAD` → کاربر روی سرور `sudo git pull --ff-only /root/<bundle> HEAD && sudo dotinschool rebuild`. روی داکرِ ویندوزِ خودِ کاربر فقط `.\docker-up.ps1` (یا تابعِ `dsup` که در `$PROFILE` ساخته). بعدِ هر دیپلوی `Ctrl+Shift+R` لازم است؛ خطِ `deployed build:` و چیپِ `build <زمان>` در استودیو برای تأییدِ نسخه.
+- **گردشِ کارِ تست:** کامیتِ لوکال → `git bundle create ../design-studio-full.bundle <last-pushed>..HEAD` → کاربر روی سرور `sudo git pull --ff-only /root/<bundle> HEAD && sudo dotinschool-challenge rebuild`. روی داکرِ ویندوزِ خودِ کاربر فقط `.\docker-up.ps1` (یا تابعِ `dsup` که در `$PROFILE` ساخته). بعدِ هر دیپلوی `Ctrl+Shift+R` لازم است؛ خطِ `deployed build:` و چیپِ `build <زمان>` در استودیو برای تأییدِ نسخه.
 - کاربر (`amir`, `amir.kingstars@gmail.com`) گاهی پشت شبکهٔ فیلترشده کار می‌کند (VPS لینوکسیِ ایران تأیید شد؛ سیستم ویندوزی هنوز نامشخص). هر مشکل «اتصال گیر می‌کند / تایم‌اوت می‌شود بدون خطای واضح» را اول از این زاویه بررسی کنید.
 - تمام اسکریپت‌های نصب (`scripts/install.sh`, `build/docker-install.sh`, `scripts/windows-install.ps1`) توکن گیت‌هاب را **تعاملی** می‌پرسند اگر از قبل نباشد؛ کد نمونهٔ دستورهای دقیق توی README.md «نصب سریع» است.
 - `docker-up.ps1` و `scripts/windows-install.ps1` باید **ASCII خالص** بمانند (کامنت بالای هر فایل دلیلش رو توضیح می‌ده: PowerShell 5.1 بدون BOM فایل غیر-ASCII رو درست نمی‌خونه). قبل از هر commit روی این دو فایل، چک کنید:
@@ -153,7 +155,7 @@ git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
 
 ```bash
 git log --oneline -30                 # تاریخچهٔ اخیر
-gh api repos/ariasam2017/dotinschool/commits --jq '.[0:10][].commit.message | split("\n")[0]'
+gh api repos/ariasam2017/dotinschool-challenge/commits --jq '.[0:10][].commit.message | split("\n")[0]'
 bash -n scripts/install.sh build/docker-install.sh   # syntax check شل
 
 # build و تأییدِ صحت (این ماشین)

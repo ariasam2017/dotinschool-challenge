@@ -14,9 +14,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/dotinschool/dotinschool/internal/apperr"
-	"github.com/dotinschool/dotinschool/internal/config"
-	"github.com/dotinschool/dotinschool/internal/model"
+	"github.com/dotinschool/dotinschool-challenge/internal/apperr"
+	"github.com/dotinschool/dotinschool-challenge/internal/config"
+	"github.com/dotinschool/dotinschool-challenge/internal/model"
 )
 
 // AI limits and defaults, identical to the original server.

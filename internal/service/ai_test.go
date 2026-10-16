@@ -3,7 +3,7 @@ package service
 import (
 	"testing"
 
-	"github.com/dotinschool/dotinschool/internal/config"
+	"github.com/dotinschool/dotinschool-challenge/internal/config"
 )
 
 // A browser password manager autofilling the panel login username into the

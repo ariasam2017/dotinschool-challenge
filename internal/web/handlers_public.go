@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	"github.com/dotinschool/dotinschool/internal/apperr"
+	"github.com/dotinschool/dotinschool-challenge/internal/apperr"
 )
 
 // POST /api/otp/request — public, rate-limited. Sends a 5-digit code by SMS.

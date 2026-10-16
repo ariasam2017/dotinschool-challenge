@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dotinschool — bring the whole thing up on Docker with ONE command:
+# dotinschool-challenge — bring the whole thing up on Docker with ONE command:
 #
 #   ./docker-up.sh
 #
@@ -23,7 +23,7 @@ if [ ! -f .env ]; then
   say "creating .env (random admin password + secret path)"
   rnd(){ LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$1"; }
   cat > .env <<EOF
-APP_PORT=8080
+APP_PORT=8081
 ADMIN_USERNAME=administrator
 ADMIN_PASSWORD=$(rnd 20)
 ADMIN_PATH=panel-$(rnd 8)
@@ -42,8 +42,8 @@ fi
 # pick a free host port (exported for compose; .env is not modified)
 port_free(){ ! (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
 PORT=""
-for p in 8080 8090 8091 8092 3000 9000; do if port_free "$p"; then PORT="$p"; break; fi; done
-export APP_PORT="${PORT:-8080}"
+for p in 8081 8082 8083 8084 3001 9001; do if port_free "$p"; then PORT="$p"; break; fi; done
+export APP_PORT="${PORT:-8081}"
 say "host port: $APP_PORT"
 
 # Tell the container which address to advertise in its start-up log (otherwise
@@ -64,10 +64,10 @@ fi
 say "compiling the linux binary on the host (first run may take ~1 min)"
 mkdir -p dist
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 "$GO" build -trimpath -ldflags="-s -w" \
-  -o dist/dotinschool_linux_amd64 ./cmd/server
+  -o dist/dotinschool-challenge_linux_amd64 ./cmd/server
 
 say "building the Docker image (packaging — a few seconds)"
-docker build -f build/Dockerfile -t dotinschool:local .
+docker build -f build/Dockerfile -t dotinschool-challenge:local .
 
 say "starting the stack"
 docker compose -f build/docker-compose.yml up -d

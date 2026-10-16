@@ -14,9 +14,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/dotinschool/dotinschool/internal/config"
-	"github.com/dotinschool/dotinschool/internal/database"
-	"github.com/dotinschool/dotinschool/internal/model"
+	"github.com/dotinschool/dotinschool-challenge/internal/config"
+	"github.com/dotinschool/dotinschool-challenge/internal/database"
+	"github.com/dotinschool/dotinschool-challenge/internal/model"
 )
 
 func main() {

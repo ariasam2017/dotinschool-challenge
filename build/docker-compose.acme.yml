@@ -1,8 +1,8 @@
-# ── dotinschool ── HTTPS via an acme.sh-issued certificate (Cloudflare DNS or
+# ── dotinschool-challenge ── HTTPS via an acme.sh-issued certificate (Cloudflare DNS or
 # standalone HTTP). Same shape as docker-compose.prod.yml, except Caddy serves
 # a certificate file instead of running its own ACME — see build/Caddyfile.acme.
 #
-# `dotinschool cert <domain>` picks this override automatically when you choose
+# `dotinschool-challenge cert <domain>` picks this override automatically when you choose
 # the Cloudflare-DNS or standalone method (it writes CERT_MODE=acme to .env).
 # The app keeps its plain http://<ip>:<APP_PORT> binding from the base file.
 #
@@ -20,7 +20,7 @@ services:
 
   caddy:
     image: caddy:2-alpine
-    container_name: dotinschool-caddy
+    container_name: dotinschool-challenge-caddy
     depends_on:
       - app
     ports:

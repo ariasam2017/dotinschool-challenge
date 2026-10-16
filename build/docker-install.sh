@@ -1,36 +1,36 @@
 #!/usr/bin/env bash
 # =============================================================================
-# dotinschool — Docker installer for a Linux host.
+# dotinschool-challenge — Docker installer for a Linux host.
 #
-# The dotinschool repo is private, so getting the source needs a GitHub
+# The dotinschool-challenge repo is private, so getting the source needs a GitHub
 # token: a fine-grained personal access token, scoped to just this repository
 # with "Contents: Read-only", is enough. Create one at
 # https://github.com/settings/personal-access-tokens/new, then run this —
 # no token in the command itself, it asks for it interactively:
 #
-#   bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)'
+#   bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/build/docker-install.sh)'
 #
 # The token is only needed for that first run: it gets embedded in the
-# /opt/dotinschool clone's git remote, so later updates (this script, or
-# `dotinschool update`) keep working without it.
+# /opt/dotinschool-challenge clone's git remote, so later updates (this script, or
+# `dotinschool-challenge update`) keep working without it.
 #
 # Installs Docker + Go if missing (auto — no prompts), clones the repo to
-# /opt/dotinschool, generates a .env with a random admin password + secret
+# /opt/dotinschool-challenge, generates a .env with a random admin password + secret
 # admin path, builds the image the RELIABLE way (host-compile the binary,
 # then package it — never an in-container `go build`), brings the stack up,
 # and installs a wrapper command:
 #
-#   dotinschool                 interactive menu (free-port finder, HTTPS cert, ...)
-#   dotinschool up | down | restart | logs | update | admin | ps | rebuild | port
-#   dotinschool cert <domain>   set up HTTPS - pick a method interactively:
+#   dotinschool-challenge                 interactive menu (free-port finder, HTTPS cert, ...)
+#   dotinschool-challenge up | down | restart | logs | update | admin | ps | rebuild | port
+#   dotinschool-challenge cert <domain>   set up HTTPS - pick a method interactively:
 #                                 1) HTTPS-only :443, cert via Cloudflare DNS  }  the
 #                                 2) HTTPS-only :443, cert via standalone HTTP  }  3x-ui
 #                                    (app terminates TLS itself, no HTTP)       }  shape
 #                                 3) Caddy in front + keep HTTP, auto Let's Encrypt
 #                                 4) Caddy in front + keep HTTP, Cloudflare DNS
-#   dotinschool cert <domain> 1  skip the prompt, use method 1 (or 2 / 3 / 4)
-#   dotinschool cert off        remove HTTPS again (plain HTTP on APP_PORT)
-#   dotinschool heal            recover a stuck / half-brought-up stack
+#   dotinschool-challenge cert <domain> 1  skip the prompt, use method 1 (or 2 / 3 / 4)
+#   dotinschool-challenge cert off        remove HTTPS again (plain HTTP on APP_PORT)
+#   dotinschool-challenge heal            recover a stuck / half-brought-up stack
 #
 # acme.sh (the same engine 3x-ui uses) is the certificate tool for methods
 # 1/2/4; it auto-renews via its own cron. Methods 1/2 are HTTPS-only on :443
@@ -44,8 +44,8 @@
 set -euo pipefail
 
 BRANCH="${DOTINSCHOOL_BRANCH:-main}"
-INSTALL_DIR="/opt/dotinschool"
-CLI_PATH="/usr/local/bin/dotinschool"
+INSTALL_DIR="/opt/dotinschool-challenge"
+CLI_PATH="/usr/local/bin/dotinschool-challenge"
 GO_VERSION="1.27.1"  # last-resort fallback only; see resolve_go_tarballs
 GO_ROOT="/usr/local/go"
 
@@ -78,8 +78,8 @@ gh_token(){
 repo_url(){
   if [[ -n "${DOTINSCHOOL_REPO_URL:-}" ]]; then echo "$DOTINSCHOOL_REPO_URL"; return; fi
   local t; t=$(gh_token)
-  if [[ -n "$t" ]]; then echo "https://${t}@github.com/ariasam2017/dotinschool.git"
-  else echo "https://github.com/ariasam2017/dotinschool.git"; fi
+  if [[ -n "$t" ]]; then echo "https://${t}@github.com/ariasam2017/dotinschool-challenge.git"
+  else echo "https://github.com/ariasam2017/dotinschool-challenge.git"; fi
 }
 
 # Prompts once, in the real shell (not a $(...) subshell, so the export
@@ -218,7 +218,7 @@ random_admin_path(){ echo "panel-$(openssl rand -hex 6)"; }
 # use" on a server with 3x-ui or similar already installed.
 port_in_use(){ (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && { exec 3<&- 2>/dev/null; exec 3>&- 2>/dev/null; return 0; }; return 1; }
 find_free_port(){
-  local port="${1:-8080}" tries=0
+  local port="${1:-8081}" tries=0
   while port_in_use "$port"; do port=$((port+1)); tries=$((tries+1)); [[ $tries -lt 100 ]] || { echo "$1"; return; }; done
   echo "$port"
 }
@@ -239,7 +239,7 @@ fetch_repo(){
   fi
   if [[ -n "$self_dir" && -d "$self_dir/.git" ]]; then
     local origin; origin=$(git_nc -C "$self_dir" remote get-url origin 2>/dev/null)
-    if [[ "$origin" == *"github.com/ariasam2017/dotinschool"* ]]; then
+    if [[ "$origin" == *"github.com/ariasam2017/dotinschool-challenge"* ]]; then
       git_nc clone --depth 1 --branch "$BRANCH" "$self_dir" "$INSTALL_DIR" >/dev/null
       git_nc -C "$INSTALL_DIR" remote set-url origin "$origin"
       ok "Source ready at ${INSTALL_DIR}."
@@ -274,12 +274,12 @@ fetch_repo(){
 write_env(){
   local env="${INSTALL_DIR}/.env"
   [[ -f "$env" ]] && { ok ".env already exists — left untouched."; return; }
-  local port; port=$(find_free_port 8080)
-  [[ "$port" == "8080" ]] || warn "Port 8080 is already in use on this server — using ${port} instead."
+  local port; port=$(find_free_port 8081)
+  [[ "$port" == "8081" ]] || warn "Port 8081 is already in use on this server — using ${port} instead."
   cat > "$env" <<EOF
 APP_PORT=${port}
 DOMAIN=
-# CERT_MODE (set by 'dotinschool cert', don't edit by hand):
+# CERT_MODE (set by 'dotinschool-challenge cert', don't edit by hand):
 #   blank  = plain HTTP, or Caddy-auto HTTPS when DOMAIN is set
 #   acme   = Caddy in front serving an acme.sh cert file
 #   direct = HTTPS-only, app terminates TLS itself on HTTPS_PORT (3x-ui style)
@@ -314,13 +314,13 @@ build_image(){
        GOSUMDB="sum.golang.google.cn" \
        GOTOOLCHAIN="auto" \
        bash scripts/docker-build.sh "$(arch_tag)" )
-  ok "Image dotinschool:local built."
+  ok "Image dotinschool-challenge:local built."
 }
 
 install_cli(){
   # Written to a temp file and moved into place (atomic rename), NEVER
   # truncated in place - install_cli() can run from INSIDE an already-running
-  # /usr/local/bin/dotinschool process (its own "update" action calls this
+  # /usr/local/bin/dotinschool-challenge process (its own "update" action calls this
   # script with --reinstall-cli), and `cat > "$CLI_PATH"` truncating that
   # exact file WHILE it's still executing corrupts the running interpreter's
   # read of it ("unexpected EOF" mid-run, an in-place-self-overwrite hazard,
@@ -329,11 +329,11 @@ install_cli(){
   # readable for whatever's still running from it.
   # Same directory as $CLI_PATH (not the default /tmp, which can be a
   # different filesystem) - mv is only atomic within one filesystem.
-  local tmp; tmp=$(mktemp "$(dirname "$CLI_PATH")/.dotinschool.XXXXXX")
+  local tmp; tmp=$(mktemp "$(dirname "$CLI_PATH")/.dotinschool-challenge.XXXXXX")
   cat > "$tmp" <<'WRAP'
 #!/usr/bin/env bash
 set -euo pipefail
-cd /opt/dotinschool
+cd /opt/dotinschool-challenge
 # The app runs as a non-root user (uid 10001) inside the container, but
 # ../data:/app/data is a bind mount to a HOST directory - if Docker had to
 # auto-create that host directory the first time (e.g. the very first "up"
@@ -374,8 +374,8 @@ else
 fi
 C=(docker compose --env-file .env "${COMPOSE_FILES[@]}")
 
-CERT_DIR="/opt/dotinschool/certs"
-ACME_HOME="/opt/dotinschool/.acme.sh"
+CERT_DIR="/opt/dotinschool-challenge/certs"
+ACME_HOME="/opt/dotinschool-challenge/.acme.sh"
 
 has_domain(){ grep -qE '^DOMAIN=[^[:space:]]' .env 2>/dev/null; }
 get_domain(){ grep -E '^DOMAIN=' .env 2>/dev/null | cut -d= -f2-; }
@@ -396,7 +396,7 @@ sync_public_host(){
 
 port_in_use(){ (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && { exec 3<&- 2>/dev/null; exec 3>&- 2>/dev/null; return 0; }; return 1; }
 find_free_port(){
-  local port="${1:-8080}" tries=0
+  local port="${1:-8081}" tries=0
   while port_in_use "$port"; do port=$((port+1)); tries=$((tries+1)); [[ $tries -lt 100 ]] || { echo ""; return 1; }; done
   echo "$port"
 }
@@ -405,12 +405,12 @@ show_ports(){
   (ss -tulpn 2>/dev/null || netstat -tulpn 2>/dev/null) | awk 'NR==1 || /LISTEN|udp/'
   echo
   local cur; cur=$(grep -E '^APP_PORT=' .env 2>/dev/null | cut -d= -f2)
-  echo "dotinschool is currently using port: ${cur:-unknown}"
-  local suggestion; suggestion=$(find_free_port 8080)
+  echo "dotinschool-challenge is currently using port: ${cur:-unknown}"
+  local suggestion; suggestion=$(find_free_port 8081)
   if [[ -n "$suggestion" ]]; then
-    echo "First free port found (from 8080 up): $suggestion"
+    echo "First free port found (from 8081 up): $suggestion"
   else
-    echo "Could not find a free port in the 8080-8179 range."
+    echo "Could not find a free port in the 8081-8180 range."
     return
   fi
   if [[ -t 0 && "$suggestion" != "$cur" ]]; then
@@ -430,7 +430,7 @@ server_ip(){
 }
 
 # --- acme.sh (the same engine the 3x-ui / sanaei panel uses) --------------
-# Installs acme.sh under /opt/dotinschool/.acme.sh. Tries the official
+# Installs acme.sh under /opt/dotinschool-challenge/.acme.sh. Tries the official
 # get.acme.sh first, then a git clone via the same GitHub mirrors the rest of
 # this installer uses (so it also works on a filtered network).
 acme_install(){
@@ -466,7 +466,7 @@ acme_install(){
     echo "    Either turn on a tunnel/DNS bypass and retry, or install it by hand:"
     echo "      git clone --depth 1 https://github.com/acmesh-official/acme.sh /tmp/a \\"
     echo "        && (cd /tmp/a && ./acme.sh --install --home ${ACME_HOME} --nocron)"
-    echo "    then re-run:  dotinschool cert <domain>"
+    echo "    then re-run:  dotinschool-challenge cert <domain>"
     return 1
   fi
   # acme.sh's own cron entry can't reload a container (it runs as a bare shell
@@ -505,13 +505,13 @@ acme_issue(){
   else
     echo "Issuing via standalone HTTP - port 80 is needed for ~20s ..."
     local had_caddy=0
-    if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dotinschool-caddy; then
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dotinschool-challenge-caddy; then
       had_caddy=1
       echo "  (pausing Caddy so acme.sh can bind :80)"
-      docker stop dotinschool-caddy >/dev/null 2>&1 || true
+      docker stop dotinschool-challenge-caddy >/dev/null 2>&1 || true
     fi
     timeout 180 "$ACME_HOME/acme.sh" --issue "${CA[@]}" --standalone -d "$domain" --home "$ACME_HOME" --keylength ec-256 --httpport 80 && ok=1
-    [[ $had_caddy -eq 1 ]] && docker start dotinschool-caddy >/dev/null 2>&1 || true
+    [[ $had_caddy -eq 1 ]] && docker start dotinschool-challenge-caddy >/dev/null 2>&1 || true
   fi
   # acme.sh exits non-zero when the cert already exists and isn't near expiry -
   # that's still a success for us, the files just need installing.
@@ -526,7 +526,7 @@ acme_issue(){
   "$ACME_HOME/acme.sh" --install-cert -d "$domain" --home "$ACME_HOME" --ecc \
     --fullchain-file "$CERT_DIR/$domain/fullchain.pem" \
     --key-file "$CERT_DIR/$domain/privkey.pem" \
-    --reloadcmd "${fixperms}; docker exec dotinschool-caddy caddy reload --config /etc/caddy/Caddyfile --force >/dev/null 2>&1; docker restart dotinschool >/dev/null 2>&1; true" \
+    --reloadcmd "${fixperms}; docker exec dotinschool-challenge-caddy caddy reload --config /etc/caddy/Caddyfile --force >/dev/null 2>&1; docker restart dotinschool-challenge >/dev/null 2>&1; true" \
     >/dev/null 2>&1
   [[ -s "$CERT_DIR/$domain/fullchain.pem" && -s "$CERT_DIR/$domain/privkey.pem" ]] || { echo "[!] Certificate files were not written."; return 1; }
   chown -R 10001:10001 "$CERT_DIR/$domain" 2>/dev/null || true
@@ -534,7 +534,7 @@ acme_issue(){
   echo "[ok] Certificate saved to $CERT_DIR/$domain/ (acme.sh will auto-renew it)."
 }
 
-# `dotinschool cert <domain>` — set up HTTPS. acme.sh is the certificate
+# `dotinschool-challenge cert <domain>` — set up HTTPS. acme.sh is the certificate
 # engine (the same one the 3x-ui / sanaei panel uses). Two shapes:
 #
 #   direct (default) — the 3x-ui model. The app terminates TLS itself on :443,
@@ -543,7 +543,7 @@ acme_issue(){
 #   caddy — Caddy sits in front and plain http://<ip>:<APP_PORT> is kept too
 #     (handy while DNS is still propagating).
 #
-# `dotinschool cert off` tears HTTPS down and goes back to plain HTTP.
+# `dotinschool-challenge cert off` tears HTTPS down and goes back to plain HTTP.
 do_cert(){
   local domain="${1:-}"
   local method="${2:-}"
@@ -557,7 +557,7 @@ do_cert(){
 
   if [[ "$domain" == "off" ]]; then
     echo "Disabling HTTPS - back to plain HTTP on APP_PORT ..."
-    docker rm -f dotinschool-caddy >/dev/null 2>&1 || true
+    docker rm -f dotinschool-challenge-caddy >/dev/null 2>&1 || true
     $PROD down --remove-orphans 2>/dev/null || true
     $ACME down --remove-orphans 2>/dev/null || true
     $TLS  down --remove-orphans 2>/dev/null || true
@@ -589,7 +589,7 @@ do_cert(){
   fi
   [[ -n "$method" ]] || method=1
 
-  docker rm -f dotinschool-caddy >/dev/null 2>&1 || true
+  docker rm -f dotinschool-challenge-caddy >/dev/null 2>&1 || true
   set_env_kv DOMAIN "$domain"
 
   case "$method" in
@@ -607,13 +607,13 @@ _cert_direct(){ # domain issuemethod apath ip appport
   grep -qE '^HTTPS_PORT=' .env || set_env_kv HTTPS_PORT 443
   local hp; hp=$(grep -E '^HTTPS_PORT=' .env | cut -d= -f2-); hp=${hp:-443}
 
-  if port_in_use "$hp" && ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dotinschool; then
+  if port_in_use "$hp" && ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dotinschool-challenge; then
     echo "[!] Port ${hp} is already in use by something else. Free it (or set HTTPS_PORT in .env) and retry."
     return 1
   fi
   # Stop any Caddy stack (frees :80 for the standalone challenge, and clears
   # the old shape before we switch to HTTPS-only).
-  docker rm -f dotinschool-caddy >/dev/null 2>&1 || true
+  docker rm -f dotinschool-challenge-caddy >/dev/null 2>&1 || true
   docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
   docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.acme.yml down --remove-orphans 2>/dev/null || true
 
@@ -627,8 +627,8 @@ _cert_direct(){ # domain issuemethod apath ip appport
     echo "Done - HTTPS only, no plain HTTP (exactly like the 3x-ui panel)."
     echo "  panel : https://${domain}${shown}/${apath}/"
     echo "  user  : https://${domain}${shown}/"
-    echo "  logs  : dotinschool logs"
-    echo "  cert auto-renews (acme.sh cron); turn it off with:  dotinschool cert off"
+    echo "  logs  : dotinschool-challenge logs"
+    echo "  cert auto-renews (acme.sh cron); turn it off with:  dotinschool-challenge cert off"
   else
     _cert_rollback "$domain" "$ip" "$appport" "$apath"; return 1
   fi
@@ -642,7 +642,7 @@ _cert_caddy(){ # domain issuemethod apath ip appport   (issuemethod: auto|cf)
   local ACME="$BASE -f build/docker-compose.acme.yml"
   local p
   for p in 80 443; do
-    if port_in_use "$p" && ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dotinschool-caddy; then
+    if port_in_use "$p" && ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx dotinschool-challenge-caddy; then
       echo "  note: something already listens on :$p - if it isn't ours, Caddy can't bind it."
     fi
   done
@@ -659,7 +659,7 @@ _cert_caddy(){ # domain issuemethod apath ip appport   (issuemethod: auto|cf)
     echo "Bringing up Caddy with automatic Let's Encrypt ..."
     if $PROD up -d --remove-orphans; then
       _cert_ok "$domain" "$apath" "$ip" "$appport"
-      echo "  (HTTPS goes green once Caddy finishes the ACME challenge, ~30s - watch: dotinschool logs)"
+      echo "  (HTTPS goes green once Caddy finishes the ACME challenge, ~30s - watch: dotinschool-challenge logs)"
     else _cert_rollback "$domain" "$ip" "$appport" "$apath"; return 1; fi
   fi
 }
@@ -669,30 +669,30 @@ _cert_ok(){ # domain apath ip appport
   echo "Done."
   echo "  https : https://${1}/${2}/"
   echo "  http  : http://${3}:${4}/${2}/        (always available)"
-  echo "  watch : dotinschool logs"
+  echo "  watch : dotinschool-challenge logs"
 }
 _cert_rollback(){ # domain ip appport apath
   echo
   echo "[!] HTTPS setup failed - reverting to plain HTTP so the panel stays up."
   set_env_kv DOMAIN ""
   set_env_kv CERT_MODE ""
-  docker rm -f dotinschool-caddy >/dev/null 2>&1 || true
+  docker rm -f dotinschool-challenge-caddy >/dev/null 2>&1 || true
   docker compose --env-file .env -f build/docker-compose.yml up -d --remove-orphans || true
   echo "    Panel still on: http://${2}:${3}/${4}/"
-  echo "    Fix the cause and retry:  dotinschool cert ${1}"
+  echo "    Fix the cause and retry:  dotinschool-challenge cert ${1}"
 }
 
 running_count(){ "${C[@]}" ps -q 2>/dev/null | grep -c . || true; }
 
 run_action(){
-  # update/rebuild write /opt/dotinschool and /usr/local/bin and drive Docker —
+  # update/rebuild write /opt/dotinschool-challenge and /usr/local/bin and drive Docker —
   # all root-owned. Without this a non-root run dies half-way (a failed step in
   # an && chain) and the panel looks "not updated". Re-exec via sudo instead.
   case "$1" in
     update|rebuild|up|restart|cert|heal|fix|reset)
       if [ "$(id -u)" -ne 0 ]; then
         if command -v sudo >/dev/null 2>&1; then exec sudo -- "$0" "$@"; fi
-        echo "[x] '$1' needs root — re-run as:  sudo dotinschool $1"; exit 1
+        echo "[x] '$1' needs root — re-run as:  sudo dotinschool-challenge $1"; exit 1
       fi ;;
   esac
   case "$1" in up|restart|update|rebuild) sync_public_host ;; esac
@@ -702,25 +702,25 @@ run_action(){
     restart) "${C[@]}" up -d --remove-orphans ;;
     logs)
       if [[ "$(running_count)" == "0" ]]; then
-        echo "Nothing is running yet - start it with 'dotinschool up' (menu option 1), then check the logs."
+        echo "Nothing is running yet - start it with 'dotinschool-challenge up' (menu option 1), then check the logs."
         exit 0
       fi
       "${C[@]}" logs -f ;;
     ps|status)
       "${C[@]}" ps
-      [[ "$(running_count)" == "0" ]] && echo && echo "(no containers running - 'dotinschool up' / menu option 1 brings the stack up)" ;;
+      [[ "$(running_count)" == "0" ]] && echo && echo "(no containers running - 'dotinschool-challenge up' / menu option 1 brings the stack up)" ;;
     port)    show_ports ;;
     cert)    do_cert "${2:-}" "${3:-}" ;;
     heal|fix|reset)
       echo "Recovering the stack..."
-      docker rm -f dotinschool dotinschool-caddy >/dev/null 2>&1 || true
+      docker rm -f dotinschool-challenge dotinschool-challenge-caddy >/dev/null 2>&1 || true
       docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
       docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.acme.yml down --remove-orphans 2>/dev/null || true
       docker compose --env-file .env -f build/docker-compose.tls.yml down --remove-orphans 2>/dev/null || true
       # If .env says an HTTPS mode but the cert file is gone (a half-finished
       # issue), don't crash-loop - drop back to plain HTTP.
       if grep -qE '^CERT_MODE=(acme|direct)' .env 2>/dev/null && [[ ! -s "${CERT_DIR}/$(get_domain)/fullchain.pem" ]]; then
-        echo "  (cert file missing - falling back to plain HTTP; re-run 'dotinschool cert <domain>' to retry)"
+        echo "  (cert file missing - falling back to plain HTTP; re-run 'dotinschool-challenge cert <domain>' to retry)"
         set_env_kv DOMAIN ""; set_env_kv CERT_MODE ""
         docker compose --env-file .env -f build/docker-compose.yml up -d --remove-orphans
       else
@@ -740,23 +740,23 @@ run_action(){
       before="$(git rev-parse --short HEAD 2>/dev/null || echo '?')"
       echo "==> [1/5] fetching the latest source from GitHub"
       GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git fetch --depth 1 origin main \
-        || { echo "[x] git fetch failed — check this server's internet/DNS, then re-run 'dotinschool update'."; exit 1; }
+        || { echo "[x] git fetch failed — check this server's internet/DNS, then re-run 'dotinschool-challenge update'."; exit 1; }
       echo "==> [2/5] applying it (git reset --hard origin/main)"
       GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git reset --hard origin/main \
         || { echo "[x] git reset failed."; exit 1; }
       after="$(git rev-parse --short HEAD 2>/dev/null || echo '?')"
       echo "    $before -> $after"
-      echo "==> [3/5] refreshing the 'dotinschool' command"
+      echo "==> [3/5] refreshing the 'dotinschool-challenge' command"
       bash build/docker-install.sh --reinstall-cli || echo "[!] CLI refresh failed (carrying on)"
       echo "==> [4/5] compiling the binary + packaging the image"
       PATH="/usr/local/go/bin:/usr/lib/go/bin:$HOME/go/bin:$PATH" \
         bash scripts/docker-build.sh "$arch" \
-        || { echo "[x] build failed — the running panel was NOT touched, it is still up on the old version. Fix the error above and re-run 'dotinschool update'."; exit 1; }
+        || { echo "[x] build failed — the running panel was NOT touched, it is still up on the old version. Fix the error above and re-run 'dotinschool-challenge update'."; exit 1; }
       echo "==> [5/5] recreating the container with the new image"
       "${C[@]}" up -d --force-recreate --remove-orphans \
-        || { echo "[x] 'compose up' failed — run 'dotinschool logs' to see why."; exit 1; }
+        || { echo "[x] 'compose up' failed — run 'dotinschool-challenge logs' to see why."; exit 1; }
       sleep 2
-      running="$({ "${C[@]}" logs --since 60s app 2>/dev/null || true; } | sed -n 's/.*dotinschool version \([^"]*\).*/\1/p' | tail -n1 || true)"
+      running="$({ "${C[@]}" logs --since 60s app 2>/dev/null || true; } | sed -n 's/.*dotinschool-challenge version \([^"]*\).*/\1/p' | tail -n1 || true)"
       echo
       if [ "$before" = "$after" ]; then
         echo "== Already on the latest commit ($after). Image rebuilt & container recreated anyway."
@@ -789,14 +789,14 @@ run_action(){
       echo "Username:     $(grep -E '^ADMIN_USERNAME=' $e | cut -d= -f2-)"
       echo "Password:     $(grep -E '^ADMIN_PASSWORD=' $e | cut -d= -f2-)"
       ;;
-    *) echo "usage: dotinschool {up|down|restart|logs|ps|port|cert|rebuild|update|admin|heal}"; exit 1 ;;
+    *) echo "usage: dotinschool-challenge {up|down|restart|logs|ps|port|cert|rebuild|update|admin|heal}"; exit 1 ;;
   esac
 }
 
 show_menu(){
   echo
   echo "+-------------------------------------------------+"
-  echo "|             dotinschool - management             |"
+  echo "|             dotinschool-challenge - management             |"
   echo "+-------------------------------------------------+"
   echo "|   0. Exit                                        |"
   echo "|   1. Start / bring everything up (IP + HTTPS)    |"
@@ -835,7 +835,7 @@ if [[ $# -eq 0 ]]; then show_menu; else run_action "$1"; fi
 WRAP
   chmod +x "$tmp"
   mv "$tmp" "$CLI_PATH"
-  ok "\"dotinschool\" command installed."
+  ok "\"dotinschool-challenge\" command installed."
 }
 
 # Poll the app's own port until it answers (or give up) - so the installer
@@ -843,7 +843,7 @@ WRAP
 # crash-loop instead of leaving the user to discover it.
 wait_healthy(){
   local port; port=$(grep -E '^APP_PORT=' "${INSTALL_DIR}/.env" | cut -d= -f2-)
-  [[ -n "$port" ]] || port=8080
+  [[ -n "$port" ]] || port=8081
   local i
   for i in $(seq 1 30); do
     if curl -fsS -m 3 "http://127.0.0.1:${port}/api/config" >/dev/null 2>&1; then
@@ -852,7 +852,7 @@ wait_healthy(){
     fi
     sleep 2
   done
-  warn "The panel didn't answer on port ${port} within 60s - check:  dotinschool logs"
+  warn "The panel didn't answer on port ${port} within 60s - check:  dotinschool-challenge logs"
   return 1
 }
 
@@ -874,7 +874,7 @@ main(){
 
   # Optional one-shot HTTPS: DOTINSCHOOL_DOMAIN=panel.example.com bash docker-install.sh
   # (the A record must already point here). Safe to skip - HTTP on the IP works
-  # regardless, and `dotinschool cert <domain>` can be run any time later.
+  # regardless, and `dotinschool-challenge cert <domain>` can be run any time later.
   if [[ -n "${DOTINSCHOOL_DOMAIN:-}" ]]; then
     echo
     # HTTPS-only (3x-ui style). CF_Token in the env -> Cloudflare-DNS (method 1,
@@ -882,18 +882,18 @@ main(){
     local m=2; [[ -n "${CF_Token:-}" ]] && m=1
     info "DOTINSCHOOL_DOMAIN set - setting up HTTPS-only for ${DOTINSCHOOL_DOMAIN} (method ${m})..."
     ( cd "$INSTALL_DIR" && CF_Token="${CF_Token:-}" "$CLI_PATH" cert "$DOTINSCHOOL_DOMAIN" "$m" ) || \
-      warn "HTTPS setup didn't complete - the panel is still up on the IP. Retry later with: dotinschool cert ${DOTINSCHOOL_DOMAIN}"
+      warn "HTTPS setup didn't complete - the panel is still up on the IP. Retry later with: dotinschool-challenge cert ${DOTINSCHOOL_DOMAIN}"
   fi
 
   echo
   ( cd "$INSTALL_DIR" && "$CLI_PATH" admin )
   echo
-  warn "For HTTPS later: point a domain's DNS A record at this server, then run:  dotinschool cert <domain>"
-  warn "If anything ever looks stuck:  dotinschool heal"
+  warn "For HTTPS later: point a domain's DNS A record at this server, then run:  dotinschool-challenge cert <domain>"
+  warn "If anything ever looks stuck:  dotinschool-challenge heal"
 }
 # Lets the installed CLI's own "update" action refresh /usr/local/bin/
-# dotinschool from whatever this file's install_cli() currently contains,
-# right after pulling the latest source - without this, "dotinschool
+# dotinschool-challenge from whatever this file's install_cli() currently contains,
+# right after pulling the latest source - without this, "dotinschool-challenge
 # update" updated the app but never itself, so a new CLI feature (a menu
 # item, a new subcommand) only ever showed up after re-running the whole
 # one-line installer again from scratch.

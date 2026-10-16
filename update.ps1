@@ -1,4 +1,4 @@
-# dotinschool - update a Docker install to the latest version and restart:
+# dotinschool-challenge - update a Docker install to the latest version and restart:
 #
 #   powershell -ExecutionPolicy Bypass -File .\update.ps1
 #   (or just:  .\update.ps1 )

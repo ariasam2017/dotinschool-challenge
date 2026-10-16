@@ -1,4 +1,4 @@
-# dotinschool — self-contained image: the frontend and the Go binary are both
+# dotinschool-challenge — self-contained image: the frontend and the Go binary are both
 # built inside this file, so a plain
 #
 #   docker compose up -d --build
@@ -45,13 +45,13 @@ COPY . .
 RUN rm -rf web/assets
 COPY --from=web /web/assets ./web/assets
 # -p 1 compiles one package at a time -> much lower peak memory.
-RUN go build -p 1 -ldflags="-s -w" -o /out/dotinschool ./cmd/server
+RUN go build -p 1 -ldflags="-s -w" -o /out/dotinschool-challenge ./cmd/server
 
 # ---- 3. minimal runtime ----
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata wget && adduser -D -u 10001 app
 WORKDIR /app
-COPY --from=build /out/dotinschool /app/dotinschool
+COPY --from=build /out/dotinschool-challenge /app/dotinschool-challenge
 # data dir must be app-owned before VOLUME so a fresh named volume inherits it
 # (else the non-root user cannot open arena.db -> SQLITE_CANTOPEN).
 RUN mkdir -p /app/data && chown -R app:app /app
@@ -62,4 +62,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=4s --start-period=5s --retries=3 \
   CMD wget -qO- "http://127.0.0.1:${PORT}/api/config" >/dev/null 2>&1 || exit 1
 USER app
-ENTRYPOINT ["/app/dotinschool"]
+ENTRYPOINT ["/app/dotinschool-challenge"]

@@ -6,7 +6,7 @@ import (
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 
-	"github.com/dotinschool/dotinschool/internal/model"
+	"github.com/dotinschool/dotinschool-challenge/internal/model"
 )
 
 func memDB(t *testing.T) *gorm.DB {

@@ -1,8 +1,10 @@
-# dotinschool
+# dotinschool-challenge
 
 <div dir="rtl" align="right">
 
 سامانهٔ آنلاین چالش برنامه‌نویسی، با معماری‌ای مشابه پنل‌های **x-ui / 3x-ui**: یک باینری استاتیک تک‌فایل به زبان **Go** که هم فرانت‌اند Vue بیلدشده را داخل خودش embed می‌کند و هم یک REST API کوچک روی SQLite دارد. دو پنل مجزا دارد: **پنل شرکت‌کننده** و **پنل مدیریت**.
+
+> این مخزن از پروژهٔ مشترک «dotinschool-Game&Challenge» جدا شده و **فقط سامانهٔ چالش برنامه‌نویسی** را دارد (پنل شرکت‌کننده حالا مستقیم روی `/` باز می‌شود؛ لینک قدیمی `/challenge` هم به همان‌جا می‌رود). بازی «لیگ قهرمانان برنامه‌نویسی» یک پروژهٔ کاملاً مستقل است: مخزن `dotinschool-game` (دیتابیس، image داکر، سرویس لینوکس و منوی مدیریتی جدا). پورت پیش‌فرض این پروژه **8081** است و بازی **8080**، پس هر دو روی یک سرور هم‌زمان بالا می‌آیند.
 
 روی **IP خام و HTTP ساده** بدون هیچ خطا کار می‌کند؛ اگر مسیر cert/key ست شده باشد مستقیم TLS می‌دهد.
 
@@ -11,7 +13,7 @@
 - بک‌اند: Go 1.22+‏ · Gin · GORM + SQLite (درایور pure-Go، بدون CGO) · robfig/cron · logrus · `go:embed`
 - فرانت‌اند: Vue 3 + Ant Design Vue 4 + Vite · RTL کامل · فارسی · ارقام فارسی · تقویم جلالی · فونت IRANYekanX + JetBrains Mono
 - ادیتور کد: CodeMirror 6 (های‌لایت جاوا، شماره خط، اتوکامپلیت، تطبیق پرانتز، Find/Replace، لینت سمت کلاینت)
-- استقرار: `scripts/install.sh` + systemd + دستور سراسری `dotinschool` · Docker (Dockerfile چندمرحله‌ای + compose + override پروداکشن با Caddy برای HTTPS خودکار)
+- استقرار: `scripts/install.sh` + systemd + دستور سراسری `dotinschool-challenge` · Docker (Dockerfile چندمرحله‌ای + compose + override پروداکشن با Caddy برای HTTPS خودکار)
 
 ---
 
@@ -22,7 +24,7 @@
 مخزن **Private** است، پس فقط برای همین اولین اجرا یک توکن گیت‌هاب لازم دارید:
 
 1. به [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new) بروید.
-2. Resource owner: `ariasam2017` · Repository access: Only select repositories → `dotinschool`.
+2. Resource owner: `ariasam2017` · Repository access: Only select repositories → `dotinschool-challenge`.
 3. Repository permissions → Contents: **Read-only**.
 4. Generate token و مقدارش را کپی کنید (فقط همان لحظه نشان داده می‌شود).
 
@@ -31,7 +33,7 @@
 </div>
 
 ```bash
-bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)'
+bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/scripts/install.sh)'
 ```
 
 <div dir="rtl" align="right">
@@ -41,7 +43,7 @@ bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(cu
 </div>
 
 ```bash
-bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)'
+bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/build/docker-install.sh)'
 ```
 
 <div dir="rtl" align="right">
@@ -51,24 +53,24 @@ bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(cu
 </div>
 
 ```powershell
-$s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s)); $env:DOTINSCHOOL_GH_TOKEN = $T; irm -Headers @{Authorization="token $T"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+$s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s)); $env:DOTINSCHOOL_GH_TOKEN = $T; irm -Headers @{Authorization="token $T"} https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/scripts/windows-install.ps1 | iex
 ```
 
 <div dir="rtl" align="right">
 
-اگر ترجیح می‌دهید توکن را مستقیم داخل خودِ دستور (بدون پرامپت تعاملی) بگذارید — مثلاً برای اسکریپت‌های خودکار — همان `git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git` هم جواب می‌دهد؛ جزئیات هر دو روش در ادامهٔ همین سند آمده است.
+اگر ترجیح می‌دهید توکن را مستقیم داخل خودِ دستور (بدون پرامپت تعاملی) بگذارید — مثلاً برای اسکریپت‌های خودکار — همان `git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git` هم جواب می‌دهد؛ جزئیات هر دو روش در ادامهٔ همین سند آمده است.
 
 ---
 
 ## اجرای محلی (توسعه)
 
-پیش‌نیاز: Go 1.24+‏ و Node 20+‏. مخزن Private است؛ اگر git شما از قبل به گیت‌هاب وصل نیست (مثلاً با `gh auth login`)، به‌جای آدرس ساده از `https://<TOKEN>@github.com/ariasam2017/dotinschool.git` با همان توکنِ بخش «نصب سریع» استفاده کنید.
+پیش‌نیاز: Go 1.24+‏ و Node 20+‏. مخزن Private است؛ اگر git شما از قبل به گیت‌هاب وصل نیست (مثلاً با `gh auth login`)، به‌جای آدرس ساده از `https://<TOKEN>@github.com/ariasam2017/dotinschool-challenge.git` با همان توکنِ بخش «نصب سریع» استفاده کنید.
 
 </div>
 
 ```bash
-git clone https://github.com/ariasam2017/dotinschool.git
-cd dotinschool
+git clone https://github.com/ariasam2017/dotinschool-challenge.git
+cd dotinschool-challenge
 
 # 1) build the frontend (output goes to web/assets/, embedded via go:embed)
 cd web && npm install && npm run build && cd ..
@@ -79,7 +81,7 @@ go run ./cmd/server
 
 <div dir="rtl" align="right">
 
-- پنل کاربر: <http://127.0.0.1:8080/>
+- پنل کاربر: <http://127.0.0.1:8080/> (با `go run`؛ روی Docker پیش‌فرض 8081 است)
 - پنل ادمین: <http://127.0.0.1:8080/admin/> (روی نصب لینوکسی، مسیر مخفی تصادفی)
 - رمز ادمین: اگر `ADMIN_PASSWORD` در `.env` نباشد، یک رمز تصادفی ساخته، در `.env` ذخیره و در لاگ چاپ می‌شود.
 
@@ -112,7 +114,7 @@ go run ./cmd/seed     # wipes and reseeds the DB with ~16 participants and a liv
 </div>
 
 ```bash
-bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)'
+bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/scripts/install.sh)'
 ```
 
 <div dir="rtl" align="right">
@@ -125,29 +127,29 @@ bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(cu
 
 | دستور | کاربرد |
 |---|---|
-| `dotinschool` | منوی مدیریت تعاملی (به سبک x-ui) |
-| `dotinschool admin` | نمایش/تغییر آدرس مخفی، نام‌کاربری، رمز، پورت، ساب‌دامین |
-| `dotinschool update` | دریافت آخرین نسخه از گیت‌هاب + کامپایل مجدد + ری‌استارت |
-| `dotinschool update-menu` | به‌روزرسانی فقط همین اسکریپت |
-| `dotinschool cert` | گرفتن/تمدید گواهی SSL از Let's Encrypt، روش HTTP-01 (نیاز به پورت ۸۰ باز) |
-| `dotinschool cert-cf` | گرفتن/تمدید گواهی SSL از راه Cloudflare DNS (بدون نیاز به پورت ۸۰) |
-| `dotinschool log` | لاگ زنده یا پاک‌کردن لاگ‌ها |
-| `dotinschool reset` | بازنشانی کامل به پیش‌فرض — پاک‌کردن دیتابیس، رمز و مسیر مخفیِ تازه (مخرب، تأیید می‌خواهد) |
-| `dotinschool fail2ban` | فعال‌سازی بن خودکار IP بعد از چند بار ورود اشتباه به پنل ادمین |
-| `dotinschool banlog` | وضعیت جیل fail2ban مخصوص dotinschool |
-| `dotinschool warp` | رفع مشکل اتصال به گیت‌هاب با Cloudflare WARP (برخی شبکه‌ها گیت‌هاب را کامل بلاک می‌کنند) |
-| `dotinschool start` / `stop` / `restart` / `status` | کنترل سرویس |
-| `dotinschool enable` / `disable` | اجرای خودکار در بوت |
-| `dotinschool uninstall` | حذف کامل |
+| `dotinschool-challenge` | منوی مدیریت تعاملی (به سبک x-ui) |
+| `dotinschool-challenge admin` | نمایش/تغییر آدرس مخفی، نام‌کاربری، رمز، پورت، ساب‌دامین |
+| `dotinschool-challenge update` | دریافت آخرین نسخه از گیت‌هاب + کامپایل مجدد + ری‌استارت |
+| `dotinschool-challenge update-menu` | به‌روزرسانی فقط همین اسکریپت |
+| `dotinschool-challenge cert` | گرفتن/تمدید گواهی SSL از Let's Encrypt، روش HTTP-01 (نیاز به پورت ۸۰ باز) |
+| `dotinschool-challenge cert-cf` | گرفتن/تمدید گواهی SSL از راه Cloudflare DNS (بدون نیاز به پورت ۸۰) |
+| `dotinschool-challenge log` | لاگ زنده یا پاک‌کردن لاگ‌ها |
+| `dotinschool-challenge reset` | بازنشانی کامل به پیش‌فرض — پاک‌کردن دیتابیس، رمز و مسیر مخفیِ تازه (مخرب، تأیید می‌خواهد) |
+| `dotinschool-challenge fail2ban` | فعال‌سازی بن خودکار IP بعد از چند بار ورود اشتباه به پنل ادمین |
+| `dotinschool-challenge banlog` | وضعیت جیل fail2ban مخصوص dotinschool-challenge |
+| `dotinschool-challenge warp` | رفع مشکل اتصال به گیت‌هاب با Cloudflare WARP (برخی شبکه‌ها گیت‌هاب را کامل بلاک می‌کنند) |
+| `dotinschool-challenge start` / `stop` / `restart` / `status` | کنترل سرویس |
+| `dotinschool-challenge enable` / `disable` | اجرای خودکار در بوت |
+| `dotinschool-challenge uninstall` | حذف کامل |
 
-موقع نصب، اگر دامنه‌ای داشته باشید که به IP این سرور اشاره می‌کند، خودِ اسکریپت در همان لحظه ازتان می‌پرسد و SSL کامل (HTTP-01 یا Cloudflare DNS) را همان‌جا برایتان فعال می‌کند — نیازی به اجرای دستیِ `dotinschool cert` بعد از نصب نیست، مگر بخواهید بعداً اضافه‌اش کنید.
+موقع نصب، اگر دامنه‌ای داشته باشید که به IP این سرور اشاره می‌کند، خودِ اسکریپت در همان لحظه ازتان می‌پرسد و SSL کامل (HTTP-01 یا Cloudflare DNS) را همان‌جا برایتان فعال می‌کند — نیازی به اجرای دستیِ `dotinschool-challenge cert` بعد از نصب نیست، مگر بخواهید بعداً اضافه‌اش کنید.
 
 ### اگر `git clone` روی سرور گیر کرد و چیزی دانلود نشد
 
 </div>
 
 ```bash
-git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
+git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git
 ```
 
 <div dir="rtl" align="right">
@@ -177,7 +179,7 @@ dnf install -y cloudflare-warp   # or: yum install -y cloudflare-warp
 
 <div dir="rtl" align="right">
 
-با `warp-cli status` مطمئن شوید وصل است، بعد دوباره `git clone` را امتحان کنید. بعد از این‌که یک‌بار `dotinschool` نصب شد، همین کار را با یک دستور هم می‌شود انجام داد: `dotinschool warp`.
+با `warp-cli status` مطمئن شوید وصل است، بعد دوباره `git clone` را امتحان کنید. بعد از این‌که یک‌بار `dotinschool-challenge` نصب شد، همین کار را با یک دستور هم می‌شود انجام داد: `dotinschool-challenge warp`.
 
 یونیت systemd یک `ExecStartPre` دارد که در هر ری‌استارت باینری را از سورس فعلی می‌سازد؛ به همین دلیل دکمهٔ «به‌روزرسانی» داخل پنل (که `git reset --hard origin/main` + ری‌استارت می‌کند) واقعاً اعمال می‌شود. اگر بیلد شکست بخورد، باینری قبلیِ سالم دست‌نخورده می‌ماند.
 
@@ -186,8 +188,8 @@ dnf install -y cloudflare-warp   # or: yum install -y cloudflare-warp
 </div>
 
 ```bash
-dotinschool cert       # HTTP-01, needs port 80 open
-dotinschool cert-cf    # Cloudflare DNS, no need for port 80
+dotinschool-challenge cert       # HTTP-01, needs port 80 open
+dotinschool-challenge cert-cf    # Cloudflare DNS, no need for port 80
 ```
 
 <div dir="rtl" align="right">
@@ -205,23 +207,23 @@ dotinschool cert-cf    # Cloudflare DNS, no need for port 80
 </div>
 
 ```powershell
-$s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s)); $env:DOTINSCHOOL_GH_TOKEN = $T; irm -Headers @{Authorization="token $T"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+$s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s)); $env:DOTINSCHOOL_GH_TOKEN = $T; irm -Headers @{Authorization="token $T"} https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/scripts/windows-install.ps1 | iex
 ```
 
 <div dir="rtl" align="right">
 
 اگر سورس از قبل روی سیستم کلون شده، همان مسیر را با اجرای مستقیم `.\docker-up.ps1` از داخل پوشهٔ پروژه هم می‌شود تکرار کرد (بدون گرفتن نسخهٔ تازه از گیت‌هاب). اگر PowerShell با خطای «running scripts is disabled on this system» جواب داد (پیش‌فرضِ رایج ویندوز)، به‌جایش این را بزنید: `powershell -ExecutionPolicy Bypass -File .\docker-up.ps1`
 
-اولین بار که `docker-up.ps1` (یا `windows-install.ps1`) کامل اجرا شود، دستور سراسری **`dotinschool`** هم نصب می‌شود — دقیقاً معادل نسخهٔ لینوکسی Docker (بدون نیاز به دسترسی ادمین، در هر پنجرهٔ PowerShell/cmd باز یا جدیدی کار می‌کند):
+اولین بار که `docker-up.ps1` (یا `windows-install.ps1`) کامل اجرا شود، دستور سراسری **`dotinschool-challenge`** هم نصب می‌شود — دقیقاً معادل نسخهٔ لینوکسی Docker (بدون نیاز به دسترسی ادمین، در هر پنجرهٔ PowerShell/cmd باز یا جدیدی کار می‌کند):
 
 | دستور | کاربرد |
 |---|---|
-| `dotinschool` | منوی مدیریت تعاملی (به سبک x-ui) |
-| `dotinschool up` / `down` / `restart` | شروع / توقف / ری‌استارت استک |
-| `dotinschool logs` / `ps` | لاگ زنده / وضعیت کانتینر |
-| `dotinschool rebuild` | کامپایل مجدد + ساخت ایمیج + بازسازی (بدون گرفتن نسخهٔ جدید از گیت‌هاب) |
-| `dotinschool update` | گرفتن آخرین نسخه از گیت‌هاب + کامپایل مجدد + ری‌استارت |
-| `dotinschool admin` | نمایش آدرس پنل + نام‌کاربری/رمز ادمین |
+| `dotinschool-challenge` | منوی مدیریت تعاملی (به سبک x-ui) |
+| `dotinschool-challenge up` / `down` / `restart` | شروع / توقف / ری‌استارت استک |
+| `dotinschool-challenge logs` / `ps` | لاگ زنده / وضعیت کانتینر |
+| `dotinschool-challenge rebuild` | کامپایل مجدد + ساخت ایمیج + بازسازی (بدون گرفتن نسخهٔ جدید از گیت‌هاب) |
+| `dotinschool-challenge update` | گرفتن آخرین نسخه از گیت‌هاب + کامپایل مجدد + ری‌استارت |
+| `dotinschool-challenge admin` | نمایش آدرس پنل + نام‌کاربری/رمز ادمین |
 
 ### روی لینوکس / مک، از داخل سورس کلون‌شده
 
@@ -255,16 +257,16 @@ $s = Read-Host "GitHub token" -AsSecureString; $T = [Runtime.InteropServices.Mar
 </div>
 
 ```bash
-bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/build/docker-install.sh)'
+bash -c 'read -rsp "GitHub token: " T; echo; DOTINSCHOOL_GH_TOKEN="$T" bash <(curl -Ls -H "Authorization: token $T" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/build/docker-install.sh)'
 ```
 
 <div dir="rtl" align="right">
 
-Docker و Go را نصب می‌کند، `.env` تصادفی می‌سازد، ایمیج را با کامپایل روی هاست می‌سازد، استک را بالا می‌آورد و دستور `dotinschool` را نصب می‌کند (`up | down | restart | logs | ps | rebuild | update | admin`).
+Docker و Go را نصب می‌کند، `.env` تصادفی می‌سازد، ایمیج را با کامپایل روی هاست می‌سازد، استک را بالا می‌آورد و دستور `dotinschool-challenge` را نصب می‌کند (`up | down | restart | logs | ps | rebuild | update | admin`).
 
 ### از ریشهٔ مخزن با compose خام
 
-اگر Docker از قبل روی سیستم هست، این مسیر هم جواب می‌دهد — یک ایمیج (فرانت + باینری Go داخل خودش) و یک کانتینر `dotinschool` می‌سازد، ابزار دیگری لازم نیست:
+اگر Docker از قبل روی سیستم هست، این مسیر هم جواب می‌دهد — یک ایمیج (فرانت + باینری Go داخل خودش) و یک کانتینر `dotinschool-challenge` می‌سازد، ابزار دیگری لازم نیست:
 
 </div>
 
@@ -274,7 +276,7 @@ docker compose up -d --build
 
 <div dir="rtl" align="right">
 
-- پنل کاربر: <http://localhost:8080/> · پنل ادمین: `http://localhost:8080/<ADMIN_PATH>/`
+- پنل کاربر: <http://localhost:8081/> · پنل ادمین: `http://localhost:8081/<ADMIN_PATH>/`
 - رمز ادمین: اگر `.env` نساخته باشید، یک رمز تصادفی ساخته و در لاگ چاپ می‌شود (`docker compose logs app`). برای رمز ثابت: `cp .env.example .env` و `ADMIN_PASSWORD` را پر کنید.
 - داده‌ها در ولوم `./data` — SQLite تک‌فایل.
 - لاگ: `docker compose logs -f app` · توقف: `docker compose down`
@@ -297,6 +299,8 @@ $env:APP_PORT = "8091"; docker compose up -d --build
 
 ### HTTPS خودکار با دامنه (Caddy)
 
+> **هر دو پروژه روی یک سرور؟** Caddy (و حالت‌های HTTPS روی :443) پورت‌های 80/443 را برای خودش می‌گیرد، پس فقط **یکی** از دو پروژه (بازی یا چالش) می‌تواند به این روش HTTPS بگیرد. برای دیگری یکی از این کارها را بکنید: روی سرور جدا نصبش کنید، یا با `HTTPS_PORT` پورت دیگری بدهید، یا بدون دامنه روی `http://IP:پورت` نگهش دارید.
+
 </div>
 
 ```bash
@@ -308,7 +312,7 @@ docker compose -f build/docker-compose.yml -f build/docker-compose.prod.yml up -
 
 Caddy گواهی Let's Encrypt را خودش می‌گیرد و تمدید می‌کند — بدون certbot، بدون downtime.
 
-داخل Docker، دکمهٔ «به‌روزرسانی» پنل پیام می‌دهد که از پوشهٔ ریشهٔ پروژه روی همان سرور `.\update.ps1` (ویندوز) یا `./update.sh` (لینوکس/مک) را اجرا کنید — یا اگر با `docker-install.sh` نصب کرده‌اید، دستور `dotinschool update` را. هر سه یک کار را انجام می‌دهند: `git reset --hard origin/main`، سپس کامپایل مجدد باینری روی هاست و `docker compose up -d`. داده‌ها در ولوم `data/` دست‌نخورده می‌مانند.
+داخل Docker، دکمهٔ «به‌روزرسانی» پنل پیام می‌دهد که از پوشهٔ ریشهٔ پروژه روی همان سرور `.\update.ps1` (ویندوز) یا `./update.sh` (لینوکس/مک) را اجرا کنید — یا اگر با `docker-install.sh` نصب کرده‌اید، دستور `dotinschool-challenge update` را. هر سه یک کار را انجام می‌دهند: `git reset --hard origin/main`، سپس کامپایل مجدد باینری روی هاست و `docker compose up -d`. داده‌ها در ولوم `data/` دست‌نخورده می‌مانند.
 
 ---
 
@@ -400,7 +404,7 @@ design-system/            ui-ux-pro-max skill output (MASTER.md + pages/admin.md
 - هدرهای امنیتی + CSP روی **همهٔ** پاسخ‌ها (script-src `'self'`؛ connect/img/default به `'self'` محدود).
 - مسیر مخفی و تصادفی پنل ادمین + امکان ساب‌دامین اختصاصی (روتینگ بر اساس Host).
 - نشست ادمین با توکن Bearer در حافظهٔ سرور نگه داشته می‌شود؛ مقایسهٔ رمز و کد OTP هم timing-safe است.
-- rate-limit حافظه‌ای روی مسیرهای حساس؛ هر ورود ناموفق به پنل ادمین با IP در لاگ ثبت می‌شود (`dotinschool fail2ban` برای بن خودکار بعد از چند بار خطا).
+- rate-limit حافظه‌ای روی مسیرهای حساس؛ هر ورود ناموفق به پنل ادمین با IP در لاگ ثبت می‌شود (`dotinschool-challenge fail2ban` برای بن خودکار بعد از چند بار خطا).
 - TTL نشست: ادمین ۱۲ ساعت، کاربر ۳۰ روز (sliding). OTP: ۲دقیقه TTL، ۶۰ث cooldown، ۵ تلاش.
 - هیچ جزئیات داخلی (مسیر فایل، stack trace) به کلاینت درز نمی‌کند.
 - مهاجرت سبک خودکار (AutoMigrate) برای دیتابیس‌های قدیمی‌تر.

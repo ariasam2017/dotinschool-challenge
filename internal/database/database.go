@@ -12,8 +12,8 @@ import (
 	"gorm.io/gorm"
 	glogger "gorm.io/gorm/logger"
 
-	"github.com/dotinschool/dotinschool/internal/config"
-	"github.com/dotinschool/dotinschool/internal/model"
+	"github.com/dotinschool/dotinschool-challenge/internal/config"
+	"github.com/dotinschool/dotinschool-challenge/internal/model"
 )
 
 // Open connects to arena.db (creating the data directory if needed), applies
@@ -107,12 +107,6 @@ func Validate(path string, log *logrus.Logger) error {
 	if err == nil {
 		err = db.Model(&model.ClientError{}).Count(&n).Error
 	}
-	if err == nil {
-		err = db.Model(&model.GameQuestion{}).Count(&n).Error
-	}
-	if err == nil {
-		err = db.Model(&model.GamePlayer{}).Count(&n).Error
-	}
 	Close(db)
 	CleanSidecars(path)
 	return err
@@ -126,8 +120,6 @@ func Migrate(db *gorm.DB) error {
 		&model.Participant{},
 		&model.Setting{},
 		&model.ClientError{},
-		&model.GameQuestion{},
-		&model.GamePlayer{},
 	)
 }
 

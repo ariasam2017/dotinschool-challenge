@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/dotinschool/dotinschool/internal/apperr"
-	"github.com/dotinschool/dotinschool/internal/model"
+	"github.com/dotinschool/dotinschool-challenge/internal/apperr"
+	"github.com/dotinschool/dotinschool-challenge/internal/model"
 )
 
 // The portable "move the entrants to another server" file. Unlike the whole-DB
@@ -49,7 +49,7 @@ func (s *server) handleExportParticipants(c *gin.Context) {
 		s.failWith(c, err)
 		return
 	}
-	filename := "dotinschool-participants-" + time.Now().Format("2006-01-02") + ".json"
+	filename := "dotinschool-challenge-participants-" + time.Now().Format("2006-01-02") + ".json"
 	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
 	c.Data(http.StatusOK, "application/json; charset=utf-8", body)
 }

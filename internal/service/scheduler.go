@@ -6,7 +6,7 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/sirupsen/logrus"
 
-	"github.com/dotinschool/dotinschool/internal/model"
+	"github.com/dotinschool/dotinschool-challenge/internal/model"
 )
 
 // Scheduler flips a scheduled event live the moment eventStartsAt arrives. It

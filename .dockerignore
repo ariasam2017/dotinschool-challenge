@@ -1,7 +1,7 @@
 # Keep the build context small and free of host-only / secret files.
 #
 # build/Dockerfile (the default, packaging image) only needs:
-#   dist/dotinschool_linux_<arch>   (produced by scripts/docker-build.sh)
+#   dist/dotinschool-challenge_linux_<arch>   (produced by scripts/docker-build.sh)
 # build/Dockerfile.hermetic needs the full Go + web source tree.
 
 .git
@@ -23,10 +23,10 @@ scripts/install.sh
 scripts/build.sh
 scripts/docker-build.sh
 build/docker-install.sh
-dotinschool
-dotinschool.exe
+dotinschool-challenge
+dotinschool-challenge.exe
 
 # dist/: keep only the linux binaries the packaging Dockerfile copies
 dist/*
-!dist/dotinschool_linux_amd64
-!dist/dotinschool_linux_arm64
+!dist/dotinschool-challenge_linux_amd64
+!dist/dotinschool-challenge_linux_arm64

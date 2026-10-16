@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dotinschool — update a Docker install to the latest version and restart:
+# dotinschool-challenge — update a Docker install to the latest version and restart:
 #
 #   ./update.sh
 #

@@ -1,4 +1,4 @@
-# dotinschool — Caddy in front, serving a certificate that acme.sh already
+# dotinschool-challenge — Caddy in front, serving a certificate that acme.sh already
 # issued (Cloudflare-DNS or standalone-HTTP). Caddy does NOT run its own ACME
 # here — it just terminates TLS with the files acme.sh dropped in /certs and
 # reverse-proxies to the app. This is the path that works when the domain is
@@ -6,7 +6,7 @@
 # TLS-ALPN challenge can't reach the origin.
 #
 # $DOMAIN comes from .env via compose. /certs is ../certs/$DOMAIN on the host,
-# refreshed by `dotinschool cert` and auto-renewed by acme.sh's cron.
+# refreshed by `dotinschool-challenge cert` and auto-renewed by acme.sh's cron.
 
 {$DOMAIN} {
 	encode zstd gzip

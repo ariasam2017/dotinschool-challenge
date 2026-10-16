@@ -13,10 +13,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
-	"github.com/dotinschool/dotinschool/internal/config"
-	"github.com/dotinschool/dotinschool/internal/database"
-	"github.com/dotinschool/dotinschool/internal/model"
-	"github.com/dotinschool/dotinschool/internal/service"
+	"github.com/dotinschool/dotinschool-challenge/internal/config"
+	"github.com/dotinschool/dotinschool-challenge/internal/database"
+	"github.com/dotinschool/dotinschool-challenge/internal/model"
+	"github.com/dotinschool/dotinschool-challenge/internal/service"
 )
 
 // Once a participant has submitted, resubmitting (or quietly patching the code

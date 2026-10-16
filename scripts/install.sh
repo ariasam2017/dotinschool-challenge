@@ -1,64 +1,64 @@
 #!/usr/bin/env bash
 # =============================================================================
-# dotinschool — Linux installer / management script (x-ui / Sanaei-panel style)
+# dotinschool-challenge — Linux installer / management script (x-ui / Sanaei-panel style)
 #
-# The dotinschool repo is private, so getting the source needs a GitHub
+# The dotinschool-challenge repo is private, so getting the source needs a GitHub
 # token: a fine-grained personal access token, scoped to just this repository
 # with "Contents: Read-only", is enough. Create one at
 # https://github.com/settings/personal-access-tokens/new, then install with:
 #
-#   git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool.git
-#   sudo bash dotinschool/scripts/install.sh
+#   git clone https://YOUR_TOKEN@github.com/ariasam2017/dotinschool-challenge.git
+#   sudo bash dotinschool-challenge/scripts/install.sh
 #
 # The token is only needed for that first "git clone": once cloned, this
-# script reuses the same remote for /opt/dotinschool, so later updates (this
+# script reuses the same remote for /opt/dotinschool-challenge, so later updates (this
 # script, the panel's "Update" button, systemd's rebuild-on-restart) keep
 # working without it.
 #
-# The clone above can be deleted afterwards - /opt/dotinschool is its own
+# The clone above can be deleted afterwards - /opt/dotinschool-challenge is its own
 # independent copy. If you'd rather skip the local clone entirely, this also
 # works in one line:
 #
-#   bash <(curl -Ls -H "Authorization: token YOUR_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/install.sh)
+#   bash <(curl -Ls -H "Authorization: token YOUR_TOKEN" https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/scripts/install.sh)
 #
-# After install the "dotinschool" command is available:
-#   dotinschool                 interactive management menu
-#   dotinschool install         install / reinstall
-#   dotinschool update          pull the latest version + rebuild + restart
-#   dotinschool update-menu     update just this CLI script
-#   dotinschool admin           show / change admin address, credentials, subdomain
-#   dotinschool cert            issue/renew an SSL certificate over HTTP-01
-#   dotinschool cert-cf         issue/renew an SSL certificate via Cloudflare DNS
-#   dotinschool log             live log / clear logs
-#   dotinschool reset           factory reset (wipe DB, new admin credentials)
-#   dotinschool fail2ban        enable IP banning after repeated failed logins
-#   dotinschool banlog          show fail2ban's dotinschool jail status
-#   dotinschool warp            fix GitHub connectivity via Cloudflare WARP
+# After install the "dotinschool-challenge" command is available:
+#   dotinschool-challenge                 interactive management menu
+#   dotinschool-challenge install         install / reinstall
+#   dotinschool-challenge update          pull the latest version + rebuild + restart
+#   dotinschool-challenge update-menu     update just this CLI script
+#   dotinschool-challenge admin           show / change admin address, credentials, subdomain
+#   dotinschool-challenge cert            issue/renew an SSL certificate over HTTP-01
+#   dotinschool-challenge cert-cf         issue/renew an SSL certificate via Cloudflare DNS
+#   dotinschool-challenge log             live log / clear logs
+#   dotinschool-challenge reset           factory reset (wipe DB, new admin credentials)
+#   dotinschool-challenge fail2ban        enable IP banning after repeated failed logins
+#   dotinschool-challenge banlog          show fail2ban's dotinschool-challenge jail status
+#   dotinschool-challenge warp            fix GitHub connectivity via Cloudflare WARP
 #                               (some hosting networks block GitHub outright —
 #                               if `git clone`/`update` just hangs, run this)
-#   dotinschool tunnel          access with a VPN on: Cloudflare Tunnel for
+#   dotinschool-challenge tunnel          access with a VPN on: Cloudflare Tunnel for
 #                               visitors from foreign IPs (Iranian data centres
 #                               often drop those) — token <TOKEN> | on | status | off
 #                               (token = your domain on Cloudflare; works from Iran.
 #                               "on" = free trycloudflare.com, filtered in Iran)
-#   dotinschool start|stop|restart|status
-#   dotinschool enable|disable  auto-start on boot
-#   dotinschool uninstall
+#   dotinschool-challenge start|stop|restart|status
+#   dotinschool-challenge enable|disable  auto-start on boot
+#   dotinschool-challenge uninstall
 # =============================================================================
 set -euo pipefail
 
 BRANCH="${DOTINSCHOOL_BRANCH:-main}"
 
-INSTALL_DIR="/opt/dotinschool"
-CONFIG_DIR="/etc/dotinschool"
-ENV_FILE="${CONFIG_DIR}/dotinschool.env"
+INSTALL_DIR="/opt/dotinschool-challenge"
+CONFIG_DIR="/etc/dotinschool-challenge"
+ENV_FILE="${CONFIG_DIR}/dotinschool-challenge.env"
 SSL_DIR="${CONFIG_DIR}/ssl"
-SERVICE_NAME="dotinschool"
+SERVICE_NAME="dotinschool-challenge"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-CLI_PATH="/usr/local/bin/dotinschool"
+CLI_PATH="/usr/local/bin/dotinschool-challenge"
 GO_VERSION="1.27.1"  # last-resort fallback only; see resolve_go_tarballs
 GO_ROOT="/usr/local/go"
-BIN_NAME="dotinschool"
+BIN_NAME="dotinschool-challenge"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 info(){ echo -e "${CYAN}[i]${NC} $*"; }
@@ -103,8 +103,8 @@ gh_token(){
 repo_url(){
   if [[ -n "${DOTINSCHOOL_REPO_URL:-}" ]]; then echo "$DOTINSCHOOL_REPO_URL"; return; fi
   local t; t=$(gh_token)
-  if [[ -n "$t" ]]; then echo "https://${t}@github.com/ariasam2017/dotinschool.git"
-  else echo "https://github.com/ariasam2017/dotinschool.git"; fi
+  if [[ -n "$t" ]]; then echo "https://${t}@github.com/ariasam2017/dotinschool-challenge.git"
+  else echo "https://github.com/ariasam2017/dotinschool-challenge.git"; fi
 }
 
 # Prompts once, in the real shell (not a $(...) subshell, so the export
@@ -223,8 +223,8 @@ fetch_app(){
   fi
 
   # Running from inside an already-cloned checkout of this same repo? (e.g.
-  # `git clone https://TOKEN@github.com/.../dotinschool.git && sudo bash
-  # dotinschool/scripts/install.sh`) Reuse it instead of asking for the
+  # `git clone https://TOKEN@github.com/.../dotinschool-challenge.git && sudo bash
+  # dotinschool-challenge/scripts/install.sh`) Reuse it instead of asking for the
   # token again: a fast local clone, then repoint the remote at the
   # original (token-bearing) URL so later updates go straight to GitHub.
   local self_dir=""
@@ -233,7 +233,7 @@ fetch_app(){
   fi
   if [[ -n "$self_dir" && -d "$self_dir/.git" ]]; then
     local origin; origin=$(git_nc -C "$self_dir" remote get-url origin 2>/dev/null)
-    if [[ "$origin" == *"github.com/ariasam2017/dotinschool"* ]]; then
+    if [[ "$origin" == *"github.com/ariasam2017/dotinschool-challenge"* ]]; then
       info "Reusing the local checkout at ${self_dir}..."
       git_nc clone --depth 1 --branch "$BRANCH" "$self_dir" "$INSTALL_DIR" >/dev/null
       git_nc -C "$INSTALL_DIR" remote set-url origin "$origin"
@@ -284,10 +284,10 @@ write_env_file(){
   mkdir -p "$CONFIG_DIR"
   if [[ ! -f "$ENV_FILE" ]]; then
     local pass adminpath port
-    pass=$(random_password); adminpath=$(random_admin_path); port=$(find_free_port 8080)
-    [[ "$port" == "8080" ]] || warn "Port 8080 is in use — using ${port} instead."
+    pass=$(random_password); adminpath=$(random_admin_path); port=$(find_free_port 8081)
+    [[ "$port" == "8081" ]] || warn "Port 8081 is in use — using ${port} instead."
     cat > "$ENV_FILE" <<EOF
-# dotinschool service configuration — edit via "dotinschool admin" / "dotinschool cert"
+# dotinschool-challenge service configuration — edit via "dotinschool-challenge admin" / "dotinschool-challenge cert"
 PORT=${port}
 DATA_DIR=${INSTALL_DIR}/data
 ADMIN_USERNAME=administrator
@@ -314,7 +314,7 @@ EOF
 write_systemd_unit(){
   cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=dotinschool — programming challenge platform
+Description=dotinschool-challenge — programming challenge platform (coding contest)
 After=network.target
 
 [Service]
@@ -346,7 +346,7 @@ open_firewall_port(){
   fi
 }
 
-install_cli(){ cp "${INSTALL_DIR}/scripts/install.sh" "$CLI_PATH"; chmod +x "$CLI_PATH"; ok "\"dotinschool\" command installed."; }
+install_cli(){ cp "${INSTALL_DIR}/scripts/install.sh" "$CLI_PATH"; chmod +x "$CLI_PATH"; ok "\"dotinschool-challenge\" command installed."; }
 
 get_env_val(){ grep -E "^${1}=" "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2- || true; }
 set_env_val(){
@@ -371,14 +371,14 @@ print_access_info(){
   ok "User panel (public address):          ${scheme}://${ip}:${port}/"
   ok "Admin panel (secret path — you only): ${scheme}://${ip}:${port}/${adminpath}/"
   [[ -n "$subdomain" ]] && ok "Admin panel (dedicated subdomain):    ${scheme}://${subdomain}/"
-  if systemctl is-active --quiet dotinschool-tunnel 2>/dev/null; then
-    local turl; turl=$(journalctl -u dotinschool-tunnel --no-pager -n 300 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -n1 || true)
+  if systemctl is-active --quiet dotinschool-challenge-tunnel 2>/dev/null; then
+    local turl; turl=$(journalctl -u dotinschool-challenge-tunnel --no-pager -n 300 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -n1 || true)
     [[ -n "$turl" ]] && ok "With a VPN on (Cloudflare Tunnel):    ${turl}/   admin: ${turl}/${adminpath}/"
   fi
   ok "Admin username:                       $(get_env_val ADMIN_USERNAME)"
   ok "Admin password:                       $(get_env_val ADMIN_PASSWORD)"
   echo
-  warn "Save this information somewhere safe — it can only be viewed again with \"dotinschool admin\"."
+  warn "Save this information somewhere safe — it can only be viewed again with \"dotinschool-challenge admin\"."
 }
 
 cmd_install(){
@@ -411,7 +411,7 @@ cmd_install(){
 
 cmd_update(){
   require_root
-  [[ -d "$INSTALL_DIR" ]] || die "Not installed yet — run \"dotinschool install\" first."
+  [[ -d "$INSTALL_DIR" ]] || die "Not installed yet — run \"dotinschool-challenge install\" first."
   ensure_gh_token
   local before after
   before=$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || echo "")
@@ -433,10 +433,10 @@ cmd_update_menu(){
     curl -fsSL "$DOTINSCHOOL_CLI_SOURCE_URL" -o "$tmp" || { rm -f "$tmp"; die "Download failed."; }
   elif [[ -n "$t" ]]; then
     curl -fsSL -H "Authorization: token ${t}" \
-      "https://raw.githubusercontent.com/ariasam2017/dotinschool/${BRANCH}/scripts/install.sh" -o "$tmp" \
+      "https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/${BRANCH}/scripts/install.sh" -o "$tmp" \
       || { rm -f "$tmp"; die "Download failed."; }
   else
-    curl -fsSL "https://raw.githubusercontent.com/ariasam2017/dotinschool/${BRANCH}/scripts/install.sh" -o "$tmp" \
+    curl -fsSL "https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/${BRANCH}/scripts/install.sh" -o "$tmp" \
       || { rm -f "$tmp"; die "Download failed (the repo is private — set DOTINSCHOOL_GH_TOKEN)."; }
   fi
   bash -n "$tmp" 2>/dev/null || { rm -f "$tmp"; die "Downloaded script failed the syntax check — nothing changed."; }
@@ -453,13 +453,13 @@ cmd_uninstall(){
   systemctl disable --now "$TUNNEL_SERVICE" 2>/dev/null || true
   rm -f "$SERVICE_FILE" "$TUNNEL_UNIT"; systemctl daemon-reload
   rm -rf "$INSTALL_DIR" "$CONFIG_DIR" "$CLI_PATH"
-  ok "dotinschool fully removed."
+  ok "dotinschool-challenge fully removed."
 }
 
 cmd_admin(){
   require_root
   [[ -f "$ENV_FILE" ]] || die "Not installed yet."
-  box_top; box_title "dotinschool — Admin Panel Settings"
+  box_top; box_title "dotinschool-challenge — Admin Panel Settings"
   box_item 0 "Back"; box_div
   box_item 1 "Show current access info"
   box_item 2 "Change username"
@@ -477,7 +477,7 @@ cmd_admin(){
     4) read -r -p "New port: " p; set_env_val PORT "$p"; open_firewall_port "$p"; systemctl restart "$SERVICE_NAME"; ok "Changed."; print_access_info ;;
     5) local np; np=$(random_admin_path); set_env_val ADMIN_PATH "$np"; systemctl restart "$SERVICE_NAME"; ok "Secret path changed — the old address no longer works."; print_access_info ;;
     6) read -r -p "Full subdomain (empty = disable): " sd; set_env_val ADMIN_SUBDOMAIN "$sd"; systemctl restart "$SERVICE_NAME";
-       [[ -n "$sd" ]] && warn "Add a DNS A record for \"${sd}\" pointing to this server's IP. Run \"dotinschool cert\" again for SSL."
+       [[ -n "$sd" ]] && warn "Add a DNS A record for \"${sd}\" pointing to this server's IP. Run \"dotinschool-challenge cert\" again for SSL."
        print_access_info ;;
     *) warn "Invalid option." ;;
   esac
@@ -563,13 +563,13 @@ prompt_domain_setup(){
   case "$m" in
     1) cmd_cert ;;
     2) cmd_cert_cf ;;
-    *) info "Skipped — run \"dotinschool cert\" or \"dotinschool cert-cf\" later." ;;
+    *) info "Skipped — run \"dotinschool-challenge cert\" or \"dotinschool-challenge cert-cf\" later." ;;
   esac
 }
 
 cmd_log(){
   require_root
-  box_top; box_title "dotinschool — Logs"
+  box_top; box_title "dotinschool-challenge — Logs"
   box_item 0 "Back"; box_div
   box_item 1 "Live log (Ctrl+C to stop)"
   box_item 2 "Clear all logs"
@@ -651,17 +651,17 @@ install_fail2ban(){
     esac
   fi
   mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d
-  cat > /etc/fail2ban/filter.d/dotinschool.conf <<'EOF'
+  cat > /etc/fail2ban/filter.d/dotinschool-challenge.conf <<'EOF'
 [Definition]
 failregex = ^.*msg="admin login failed" ip=<HOST>\s*$
 ignoreregex =
 EOF
-  cat > /etc/fail2ban/jail.d/dotinschool.conf <<EOF
-[dotinschool]
+  cat > /etc/fail2ban/jail.d/dotinschool-challenge.conf <<EOF
+[dotinschool-challenge]
 enabled = true
 backend = systemd
 journalmatch = _SYSTEMD_UNIT=${SERVICE_NAME}.service
-filter = dotinschool
+filter = dotinschool-challenge
 maxretry = 5
 findtime = 10m
 bantime = 1h
@@ -670,7 +670,7 @@ EOF
   systemctl enable --now fail2ban >/dev/null 2>&1
   systemctl restart fail2ban
   ok "fail2ban is watching admin login attempts — 5 failures in 10 minutes bans the IP for 1 hour."
-  warn "If you ever lock yourself out: fail2ban-client set dotinschool unbanip <your-ip>"
+  warn "If you ever lock yourself out: fail2ban-client set dotinschool-challenge unbanip <your-ip>"
 }
 
 # ---- access with a VPN on: Cloudflare Tunnel -----------------------------------
@@ -688,7 +688,7 @@ EOF
 # with TLS name h2.cftunnel.com, is reachable. The free *quick* tunnel is not:
 # trycloudflare.com is filtered in Iran (poisoned DNS, and connections to it are
 # cut by name), so quick mode only works on servers outside Iran.
-TUNNEL_SERVICE="dotinschool-tunnel"
+TUNNEL_SERVICE="dotinschool-challenge-tunnel"
 TUNNEL_UNIT="/etc/systemd/system/${TUNNEL_SERVICE}.service"
 CLOUDFLARED="/usr/local/bin/cloudflared"
 
@@ -718,13 +718,13 @@ install_cloudflared(){
         ;;
     esac
   fi
-  "$CLOUDFLARED" --version >/dev/null 2>&1 || die "Could not download cloudflared. If GitHub is blocked here, run \"dotinschool warp\" first and try again."
+  "$CLOUDFLARED" --version >/dev/null 2>&1 || die "Could not download cloudflared. If GitHub is blocked here, run \"dotinschool-challenge warp\" first and try again."
   ok "cloudflared installed: $("$CLOUDFLARED" --version 2>&1 | head -n1)"
 }
 
 # the local address cloudflared forwards to (https + no-verify when the panel terminates TLS itself)
 tunnel_origin_args(){
-  local port; port=$(get_env_val PORT); port=${port:-8080}
+  local port; port=$(get_env_val PORT); port=${port:-8081}
   if [[ -n "$(get_env_val SSL_CERT_PATH)" ]]; then
     echo "--url https://127.0.0.1:${port} --no-tls-verify"
   else
@@ -735,7 +735,7 @@ tunnel_origin_args(){
 write_tunnel_unit(){
   cat > "$TUNNEL_UNIT" <<EOF
 [Unit]
-Description=dotinschool - Cloudflare Tunnel (access with a VPN on)
+Description=dotinschool-challenge - Cloudflare Tunnel (access with a VPN on)
 After=network-online.target ${SERVICE_NAME}.service
 Wants=network-online.target
 
@@ -764,12 +764,12 @@ print_tunnel_info(){
   echo
   ok "Address for users WITH a VPN on:   ${url}/"
   ok "Admin panel through the tunnel:     ${url}/${adminpath}/"
-  info "Users without a VPN keep using the normal address (dotinschool admin -> 1)."
+  info "Users without a VPN keep using the normal address (dotinschool-challenge admin -> 1)."
 }
 
 tunnel_quick(){
   require_root
-  [[ -f "$ENV_FILE" ]] || die "Not installed yet — run \"dotinschool install\" first."
+  [[ -f "$ENV_FILE" ]] || die "Not installed yet — run \"dotinschool-challenge install\" first."
   install_cloudflared
   write_tunnel_unit "$(tunnel_origin_args)"
   set_env_val TUNNEL_MODE quick
@@ -782,18 +782,18 @@ tunnel_quick(){
   done
   if [[ -z "$url" ]]; then
     warn "No free address could be obtained: trycloudflare.com is filtered on Iranian networks."
-    warn "Use your own domain instead (works from Iran): dotinschool tunnel token"
+    warn "Use your own domain instead (works from Iran): dotinschool-challenge tunnel token"
     tunnel_off >/dev/null
     return
   fi
   print_tunnel_info "$url"
-  warn "This free address changes whenever the tunnel or the server restarts — check it again with: dotinschool tunnel status"
-  warn "For a permanent address, use your own domain on Cloudflare (dotinschool tunnel token <TOKEN>)."
+  warn "This free address changes whenever the tunnel or the server restarts — check it again with: dotinschool-challenge tunnel status"
+  warn "For a permanent address, use your own domain on Cloudflare (dotinschool-challenge tunnel token <TOKEN>)."
 }
 
 tunnel_token(){
   require_root
-  [[ -f "$ENV_FILE" ]] || die "Not installed yet — run \"dotinschool install\" first."
+  [[ -f "$ENV_FILE" ]] || die "Not installed yet — run \"dotinschool-challenge install\" first."
   local token="${1:-}"
   if [[ -z "$token" ]]; then
     echo "In the Cloudflare dashboard: Zero Trust -> Networks -> Tunnels -> Create a tunnel (Cloudflared),"
@@ -815,7 +815,7 @@ tunnel_token(){
 
 tunnel_status(){
   if ! systemctl is-active --quiet "$TUNNEL_SERVICE" 2>/dev/null; then
-    warn "The VPN-access tunnel is off. Turn it on with: dotinschool tunnel"
+    warn "The VPN-access tunnel is off. Turn it on with: dotinschool-challenge tunnel"
     return
   fi
   if [[ "$(get_env_val TUNNEL_MODE)" == "token" ]]; then
@@ -852,14 +852,14 @@ cmd_tunnel(){
       read -r -p "Choice [0-4]: " c
       case "$c" in 1) tunnel_token ;; 2) tunnel_quick ;; 3) tunnel_status ;; 4) tunnel_off ;; *) return ;; esac
       ;;
-    *) die "Usage: dotinschool tunnel [on|token <TOKEN>|status|off]" ;;
+    *) die "Usage: dotinschool-challenge tunnel [on|token <TOKEN>|status|off]" ;;
   esac
 }
 
 cmd_banlog(){
   require_root
-  command -v fail2ban-client >/dev/null 2>&1 || die "fail2ban is not installed — run \"dotinschool fail2ban\" first."
-  fail2ban-client status dotinschool 2>/dev/null || warn "The dotinschool jail isn't active yet."
+  command -v fail2ban-client >/dev/null 2>&1 || die "fail2ban is not installed — run \"dotinschool-challenge fail2ban\" first."
+  fail2ban-client status dotinschool-challenge 2>/dev/null || warn "The dotinschool-challenge jail isn't active yet."
 }
 
 cmd_service(){ require_root; systemctl "$1" "$SERVICE_NAME"; [[ "$1" == "status" ]] || ok "Command \"$1\" applied to the service."; }
@@ -871,7 +871,7 @@ show_status(){
 }
 
 show_menu(){
-  box_top; box_title "dotinschool — Management Script"
+  box_top; box_title "dotinschool-challenge — Management Script"
   box_item 0 "Exit"; box_div
   box_item 1 "Install"
   box_item 2 "Update to the latest version"

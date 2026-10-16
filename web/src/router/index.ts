@@ -1,17 +1,12 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { APP_MODE, ROUTER_BASE } from '@/lib/mode'
 
-const GAME_TITLE = 'لیگ قهرمانان برنامه‌نویسی'
+const APP_TITLE = 'چالش برنامه‌نویسی دوتین‌اسکول'
 
 const userRoutes: RouteRecordRaw[] = [
-  // The quiz game is the landing page; the coding challenge lives beside it.
-  { path: '/', name: 'game', component: () => import('@/views/game/GameApp.vue'), meta: { title: GAME_TITLE } },
-  {
-    path: '/challenge',
-    name: 'user',
-    component: () => import('@/views/user/UserApp.vue'),
-    meta: { title: 'dotinschool — چالش برنامه‌نویسی' },
-  },
+  { path: '/', name: 'user', component: () => import('@/views/user/UserApp.vue'), meta: { title: APP_TITLE } },
+  // old links from when the challenge lived beside the quiz game
+  { path: '/challenge', redirect: '/' },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
@@ -20,10 +15,7 @@ const adminRoutes: RouteRecordRaw[] = [
     path: '/',
     component: () => import('@/views/admin/AdminShell.vue'),
     children: [
-      { path: '', redirect: { name: 'admin-game' } },
-      { path: 'game', name: 'admin-game', component: () => import('@/views/admin/GameBoardSection.vue') },
-      { path: 'game-top', name: 'admin-game-top', component: () => import('@/views/admin/GameTopSection.vue') },
-      { path: 'game-questions', name: 'admin-game-questions', component: () => import('@/views/admin/GameQuestionsSection.vue') },
+      { path: '', redirect: { name: 'admin-overview' } },
       { path: 'overview', name: 'admin-overview', component: () => import('@/views/admin/OverviewSection.vue') },
       { path: 'schedule', name: 'admin-schedule', component: () => import('@/views/admin/ScheduleSection.vue') },
       { path: 'challenge', name: 'admin-challenge', component: () => import('@/views/admin/ChallengeSection.vue') },
@@ -45,5 +37,5 @@ export const router = createRouter({
 })
 
 router.afterEach((to) => {
-  document.title = (to.meta.title as string | undefined) || (APP_MODE === 'admin' ? 'پنل مدیریت — ' + GAME_TITLE : GAME_TITLE)
+  document.title = (to.meta.title as string | undefined) || (APP_MODE === 'admin' ? 'پنل مدیریت — ' + APP_TITLE : APP_TITLE)
 })

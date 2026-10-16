@@ -1,6 +1,6 @@
-# dotinschool - Windows installer.
+# dotinschool-challenge - Windows installer.
 #
-# The dotinschool repo is private, so fetching this file and the git clone it
+# The dotinschool-challenge repo is private, so fetching this file and the git clone it
 # runs both need a GitHub token: a fine-grained personal access token, scoped
 # to just this repository with "Contents: Read-only", is enough. Create one at
 # https://github.com/settings/personal-access-tokens/new, then run this - no
@@ -9,13 +9,13 @@
 #   $s = Read-Host "GitHub token" -AsSecureString
 #   $T = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))
 #   $env:DOTINSCHOOL_GH_TOKEN = $T
-#   irm -Headers @{Authorization="token $T"} https://raw.githubusercontent.com/ariasam2017/dotinschool/main/scripts/windows-install.ps1 | iex
+#   irm -Headers @{Authorization="token $T"} https://raw.githubusercontent.com/ariasam2017/dotinschool-challenge/main/scripts/windows-install.ps1 | iex
 #
 # The token is only needed for this first run: it gets embedded in the local
 # clone's git remote, so a later `.\docker-up.ps1` or re-run of this same
 # command line keeps working without it.
 #
-# Fetches the latest dotinschool source from GitHub into %USERPROFILE%\dotinschool
+# Fetches the latest dotinschool-challenge source from GitHub into %USERPROFILE%\dotinschool-challenge
 # (or updates it if already there), then hands off to docker-up.ps1, which
 # installs Go if missing and builds/starts the stack (Docker Desktop itself
 # is not auto-installed - docker-up.ps1 will tell you if it's missing).
@@ -59,7 +59,7 @@ function Die($m) {
 }
 
 $Branch     = 'main'
-$InstallDir = Join-Path $env:USERPROFILE 'dotinschool'
+$InstallDir = Join-Path $env:USERPROFILE 'dotinschool-challenge'
 
 # On some machines, plain `& git.exe ...` does NOT block the way it normally
 # does - git spins up in its own separate console window and this script
@@ -114,9 +114,9 @@ function Get-RepoUrl {
     if ($existing -match '^https://([^@]+)@github\.com/') { return $existing }
   }
   if ($env:DOTINSCHOOL_GH_TOKEN) {
-    return "https://$($env:DOTINSCHOOL_GH_TOKEN)@github.com/ariasam2017/dotinschool.git"
+    return "https://$($env:DOTINSCHOOL_GH_TOKEN)@github.com/ariasam2017/dotinschool-challenge.git"
   }
-  return 'https://github.com/ariasam2017/dotinschool.git'
+  return 'https://github.com/ariasam2017/dotinschool-challenge.git'
 }
 
 # ---- 1. git: locate it, or install it via winget ----
@@ -173,7 +173,7 @@ while (-not $fetched -and $attempt -lt $maxAttempts) {
     if (-not $env:DOTINSCHOOL_GH_TOKEN -and $repoUrl -notlike '*@github.com*') {
       Die "No GitHub token found (`$env:DOTINSCHOOL_GH_TOKEN) - this will fail, the repo is private. See the header of this script."
     }
-    Say "cloning dotinschool into $InstallDir (attempt $attempt of $maxAttempts)"
+    Say "cloning dotinschool-challenge into $InstallDir (attempt $attempt of $maxAttempts)"
     $fetchOk = ((Invoke-Git -GitArgs @('clone', '--depth', '1', '--branch', $Branch, $repoUrl, $InstallDir)) -eq 0)
   }
 

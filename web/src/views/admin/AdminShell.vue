@@ -25,14 +25,6 @@ interface NavGroup {
 }
 const NAV: NavGroup[] = [
   {
-    label: 'بازی',
-    items: [
-      { name: 'admin-game', label: 'نتایج زنده بازی', icon: 'trophy' },
-      { name: 'admin-game-top', label: '۳ نفر برتر', icon: 'crown' },
-      { name: 'admin-game-questions', label: 'بانک سوالات بازی', icon: 'help-circle' },
-    ],
-  },
-  {
     label: 'چالش برنامه‌نویسی',
     items: [
       { name: 'admin-overview', label: 'نمای کلی رویداد', icon: 'activity' },
@@ -66,7 +58,7 @@ const ALL_ITEMS = NAV.flatMap((g) => g.items)
 const currentLabel = computed(() => ALL_ITEMS.find((n) => n.name === route.name)?.label || '')
 
 /* Collapsible desktop rail — icon-only at 64px, remembered per browser. */
-const RAIL_KEY = 'dotinschool_admin_rail'
+const RAIL_KEY = 'dotinschool_challenge_admin_rail'
 const railed = ref(false)
 try {
   railed.value = localStorage.getItem(RAIL_KEY) === '1'
@@ -115,7 +107,7 @@ function confirmLogout() {
     <aside class="sidebar" :class="{ open: drawerOpen }">
       <div class="side-brand">
         <span class="brand-mark"><AppIcon name="shield" :size="18" /></span>
-        <span class="brand-name">dotinschool</span>
+        <span class="brand-name">dotinschool چالش</span>
         <button
           type="button"
           class="rail-toggle only-desktop"

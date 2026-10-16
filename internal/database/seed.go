@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/dotinschool/dotinschool/internal/model"
+	"github.com/dotinschool/dotinschool-challenge/internal/model"
 )
 
 // defaultAppearance ships the project's baseline Design Studio layer. It is
@@ -60,12 +60,6 @@ func EnsureDefaults(db *gorm.DB) error {
 	if err := set(model.KeyEventStartsAt, nil); err != nil {
 		return err
 	}
-	if err := set(model.KeyGameSettings, model.DefaultGameSettings()); err != nil {
-		return err
-	}
-	if err := seedGameBank(db); err != nil {
-		return err
-	}
 
 	// Ship a tuned Design Studio layer as the default for a fresh install
 	// (no-op while appearance.default.json is just "{}").
@@ -81,117 +75,6 @@ func EnsureDefaults(db *gorm.DB) error {
 		}
 	}
 	return nil
-}
-
-// keyGameBankSeeded is the legacy "bank loaded once" flag (= version 1);
-// keyGameBankVersion records which built-in bank version this DB has received.
-const (
-	keyGameBankSeeded  = "gameBankSeeded"
-	keyGameBankVersion = "gameBankVersion"
-)
-
-// seedGameBank adds the built-in technology/programming questions this database has not
-// received yet. It runs once per bank version (model.GameBankVersion), so an
-// admin who deletes questions does not get them back on every restart — only
-// when a newer built-in bank ships, and then only questions whose text is not
-// already present.
-func seedGameBank(db *gorm.DB) error {
-	have := 0
-	var row model.Setting
-	if db.Where("key = ?", keyGameBankVersion).First(&row).Error == nil {
-		_ = json.Unmarshal([]byte(row.Value), &have)
-	} else {
-		var legacy int64
-		if err := db.Model(&model.Setting{}).Where("key = ?", keyGameBankSeeded).Count(&legacy).Error; err != nil {
-			return err
-		}
-		if legacy > 0 {
-			have = 1
-		}
-	}
-	if have >= model.GameBankVersion {
-		return nil
-	}
-
-	if err := db.Where("text IN ?", model.RetiredBankTexts).Delete(&model.GameQuestion{}).Error; err != nil {
-		return err
-	}
-	if have < 7 {
-		if err := cleanFaQuestions(db); err != nil {
-			return err
-		}
-	}
-	var texts []string
-	if err := db.Model(&model.GameQuestion{}).Pluck("text", &texts).Error; err != nil {
-		return err
-	}
-	existing := make(map[string]bool, len(texts))
-	for _, t := range texts {
-		existing[t] = true
-	}
-	base := nowMs()
-	var rows []model.GameQuestion
-	for i, q := range model.DefaultGameQuestions() {
-		if existing[q.Text] {
-			continue
-		}
-		q.ID = uuid.NewString()
-		q.CreatedAt = base - int64(i)
-		rows = append(rows, q)
-	}
-	if len(rows) > 0 {
-		if err := db.CreateInBatches(rows, 200).Error; err != nil {
-			return err
-		}
-	}
-	// v4: built-in questions carry a difficulty; tag the ones already in an
-	// older database (matched by exact text — admin-written ones stay "easy")
-	var hardTexts []string
-	for _, q := range model.DefaultGameQuestions() {
-		if q.Difficulty == model.DifficultyHard {
-			hardTexts = append(hardTexts, q.Text)
-		}
-	}
-	if err := db.Model(&model.GameQuestion{}).Where("text IN ?", hardTexts).
-		Update("difficulty", model.DifficultyHard).Error; err != nil {
-		return err
-	}
-	raw, _ := json.Marshal(model.GameBankVersion)
-	return db.Save(&model.Setting{Key: keyGameBankVersion, Value: string(raw)}).Error
-}
-
-// cleanFaQuestions (v7) rewrites every stored question — built-in and
-// admin-written — with model.CleanFaText, in place, so ids and played results
-// stay valid. A question whose options would collide after cleaning is left
-// as is rather than made ambiguous.
-func cleanFaQuestions(db *gorm.DB) error {
-	var rows []model.GameQuestion
-	if err := db.Find(&rows).Error; err != nil {
-		return err
-	}
-	return db.Transaction(func(tx *gorm.DB) error {
-		for _, q := range rows {
-			if !model.CleanFaQuestion(&q) {
-				continue
-			}
-			opts := q.Options()
-			seen := map[string]bool{}
-			dup := false
-			for _, o := range opts {
-				dup = dup || seen[o]
-				seen[o] = true
-			}
-			if dup {
-				continue
-			}
-			if err := tx.Model(&model.GameQuestion{}).Where("id = ?", q.ID).Updates(map[string]any{
-				"text": q.Text, "option1": opts[0], "option2": opts[1], "option3": opts[2], "option4": opts[3],
-			}).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
 }
 
 var namesPool = [][2]string{

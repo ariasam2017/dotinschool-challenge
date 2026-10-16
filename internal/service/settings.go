@@ -9,8 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
-	"github.com/dotinschool/dotinschool/internal/config"
-	"github.com/dotinschool/dotinschool/internal/model"
+	"github.com/dotinschool/dotinschool-challenge/internal/config"
+	"github.com/dotinschool/dotinschool-challenge/internal/model"
 )
 
 // SettingService is the key/value config store: event timing, the published

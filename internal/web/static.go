@@ -12,7 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	frontend "github.com/dotinschool/dotinschool/web"
+	frontend "github.com/dotinschool/dotinschool-challenge/web"
 )
 
 // headToken is replaced in index.html at serve time with mode/base meta tags.
@@ -156,7 +156,7 @@ func htmlAttr(s string) string {
 // compressed once on first request and kept in memory. Without it every phone
 // joining at once pulls ~1 MB of raw JS/CSS (~0.3 MB gzipped) — on a modest
 // server uplink that is the difference between an instant page and a long
-// white screen when a whole class opens the game together. (Behind the Caddy
+// white screen when a whole class opens the challenge together. (Behind the Caddy
 // stack Caddy compresses too; on a raw-IP install this is the only one.)
 type gzipAssets struct {
 	fsys fs.FS

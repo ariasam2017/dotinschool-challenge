@@ -1,9 +1,9 @@
-# dotinschool — dev & release tasks.
+# dotinschool-challenge — dev & release tasks.
 # `make dev` runs the Go server and the Vite dev server together (Vite proxies
 # /api to :8080). `make build` produces the embedded single binary.
 
 SHELL := /bin/bash
-BIN   := dotinschool
+BIN   := dotinschool-challenge
 GO    ?= go
 
 .PHONY: help
@@ -43,7 +43,7 @@ image: ## reliable Docker image: host-compile the binary, then package it
 
 .PHONY: image-hermetic
 image-hermetic: ## fully in-container build (needs ~2GB free for `go build`)
-	docker build -f build/Dockerfile.hermetic -t dotinschool:local .
+	docker build -f build/Dockerfile.hermetic -t dotinschool-challenge:local .
 
 .PHONY: docker
 docker: image ## alias for `make image`

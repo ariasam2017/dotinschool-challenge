@@ -9,8 +9,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/dotinschool/dotinschool/internal/apperr"
-	"github.com/dotinschool/dotinschool/internal/config"
+	"github.com/dotinschool/dotinschool-challenge/internal/apperr"
+	"github.com/dotinschool/dotinschool-challenge/internal/config"
 )
 
 // OTP timing — 5-digit code, 2-minute lifetime, 60-second resend cooldown,

@@ -1,4 +1,4 @@
-# Automatic HTTPS for dotinschool. $DOMAIN comes from .env via compose.
+# Automatic HTTPS for dotinschool-challenge. $DOMAIN comes from .env via compose.
 # Caddy fetches + renews the Let's Encrypt certificate on its own.
 
 {$DOMAIN} {

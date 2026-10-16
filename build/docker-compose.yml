@@ -1,4 +1,4 @@
-# ── dotinschool ── base stack: works everywhere (Windows/macOS/Linux, IP-only).
+# ── dotinschool-challenge ── base stack: works everywhere (Windows/macOS/Linux, IP-only).
 #
 # The image is built by the packaging Dockerfile (build/Dockerfile), which just
 # copies a host-compiled Linux binary — so it never fails on memory / proxy /
@@ -9,23 +9,23 @@
 #   docker compose -f build/docker-compose.yml logs -f app
 #   docker compose -f build/docker-compose.yml down
 #
-# `up -d --build` also works, but only after `dist/dotinschool_linux_amd64`
+# `up -d --build` also works, but only after `dist/dotinschool-challenge_linux_amd64`
 # exists (make image / scripts/docker-build.sh create it).
 #
 # Public domain + automatic HTTPS on Linux: add the prod override —
 #   docker compose -f build/docker-compose.yml -f build/docker-compose.prod.yml up -d
 
-name: dotinschool
+name: dotinschool-challenge
 
 services:
   app:
     build:
       context: ..
       dockerfile: build/Dockerfile
-    image: dotinschool:local
-    container_name: dotinschool
+    image: dotinschool-challenge:local
+    container_name: dotinschool-challenge
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "${APP_PORT:-8081}:8080"
     environment:
       - PORT=8080
       - DATA_DIR=/app/data

@@ -1,4 +1,4 @@
-# dotinschool — one container, one command, from this folder:
+# dotinschool-challenge — one container, one command, from this folder:
 #
 #   docker compose up -d --build          # build + start
 #   docker compose logs -f app            # follow logs
@@ -13,17 +13,17 @@
 # For a public domain + automatic HTTPS, add the prod override:
 #   docker compose -f docker-compose.yml -f build/docker-compose.prod.yml up -d
 
-name: dotinschool
+name: dotinschool-challenge
 
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    image: dotinschool:local
-    container_name: dotinschool
+    image: dotinschool-challenge:local
+    container_name: dotinschool-challenge
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "${APP_PORT:-8081}:8080"
     environment:
       - PORT=8080
       - DATA_DIR=/app/data

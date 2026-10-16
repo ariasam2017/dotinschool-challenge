@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A programming-challenge platform shipped the way **x-ui / 3x-ui** panels are: one
+The **coding-challenge** platform (split out of the former combined
+`dotinschool-Game&Challenge` repo — the quiz game now lives in its own
+`dotinschool-game` repo, with its own DB, image, service and CLI), shipped the way **x-ui / 3x-ui** panels are: one
 static Go binary that **embeds the built Vue SPA** (`web/assets/`, via `go:embed`)
 and serves a small REST API over a **single SQLite file** (pure-Go driver,
 `CGO_ENABLED=0`). It runs on a raw IP over plain HTTP with no errors, and speaks
@@ -18,7 +20,7 @@ make dev                 # Go server :8080 + Vite dev server :5173 (proxies /api
 go run ./cmd/server      # server only (needs web/assets/ already built)
 go run ./cmd/seed        # wipe participants + reseed ~16 demo rows + a running 90-min event
                          #   (distinct from the boot-time database.Seed, which is 7 rows + a paused event)
-make build               # web-fast + CGO_ENABLED=0 go build -> ./dotinschool
+make build               # web-fast + CGO_ENABLED=0 go build -> ./dotinschool-challenge
 make test                # go test ./... + frontend typecheck (needs GOARCH=amd64 prefix below)
 make tidy                # gofmt -w . + go mod tidy
 make release             # cross-compiled artifacts into dist/ (scripts/build.sh)
@@ -29,7 +31,7 @@ cd web && npm run build:fast  # vite build, no typecheck
 cd web && npm run typecheck   # vue-tsc only
 ```
 
-Local run: user panel `http://127.0.0.1:8080/`, admin `http://127.0.0.1:8080/admin/`.
+Local run: user panel `http://127.0.0.1:8080/` (`go run`; Docker publishes **8081** by default so it can sit next to the game on 8080), admin `http://127.0.0.1:8080/admin/`.
 Admin password is read from `ADMIN_PASSWORD` in `.env`; if unset, a random one is
 generated, written to `.env`, and printed to the log on first boot.
 
@@ -53,7 +55,7 @@ Add `GOFLAGS=-p=2` if a build/test run OOMs (the 32-bit `go` process is
 address-space-limited; the `windows/amd64` link step is the usual casualty —
 `linux/amd64` always builds and is what Docker actually ships).
 
-Test files: `internal/service/{ai,game,participant,ratelimit}_test.go`,
+Test files: `internal/service/{ai,participant,ratelimit}_test.go`,
 `internal/web/handlers_ai_test.go`. There is **no in-repo HTTP integration
 harness** — endpoint behaviour is checked by building `./cmd/server`, running it
 against a throwaway `DATA_DIR`, and curling it.
@@ -124,43 +126,9 @@ the cross-file business logic that table doesn't spell out:
 - **OTP**: 5-digit code, 2-minute TTL, 60s resend cooldown, 5 verify attempts.
 - Sensitive routes (login, OTP request, AI review, client-error reporting)
   carry an in-memory rate limit (`internal/service/ratelimit.go`); failed
-  admin-login attempts are logged by IP, and `dotinschool fail2ban`
+  admin-login attempts are logged by IP, and `dotinschool-challenge fail2ban`
   (`scripts/install.sh`) auto-bans after repeated failures on bare-metal
   installs.
-
-### Quiz game ("لیگ قهرمانان برنامه‌نویسی")
-
-A Quiz-of-Kings style individual quiz that is the **user panel's landing page**
-(`/` → `views/game/GameApp.vue`); the coding challenge moved to `/challenge`.
-Admin pages: `admin/game` (live board, default admin route) and
-`admin/game-questions` (bank editor, CSV/JSON import). Backend:
-`service/game.go` + `handlers_game.go`, tables `game_questions` / `game_players`,
-settings key `game`. Registration is name + mobile, **no OTP**; the player token
-is persisted on the row (survives restarts, unlike `SessionService`). The server
-deals a random question subset with shuffled options, **never sends the answer
-key before the answer**, and times each answer from when it served the question
-(`answerGraceMs` latency allowance; an abandoned question times out lazily in
-`State`). Ranking: correct count desc, then total time asc; score =
-100 × correct + up to 99 speed bonus (`ComputeGameScore`); the player API never
-sends time/score back — only the correct count (the admin board has both).
-
-- **Concurrency** (sized for ~40 simultaneous players): per-player *striped*
-  locks (`lockPlayer`, keyed by player id) instead of one global mutex,
-  settings cached in an `atomic.Pointer` (refreshed by `SaveSettings`), and
-  questions dealt from a shuffled **deck** (`deal`) so consecutive players get
-  distinct questions until the bank is exhausted; any bank mutation bumps
-  `bankRev` and the deck is rebuilt. `TestGameFortyConcurrentPlayers` covers it.
-- **Built-in bank** (`model/game_bank.go`, correct answer written first, rotated
-  on seed) is versioned: bump `GameBankVersion` when adding questions and
-  `seedGameBank` adds the missing ones (by exact text) to existing DBs once;
-  list replaced questions in `RetiredBankTexts`. `TestBuiltInBankIsClean`
-  fails on a duplicate or invalid built-in question.
-- **Test mode** (`settings.testMode`) exposes `POST /api/game/replay` so a
-  player can replay from the result screen; refused (403) when off.
-- **Winner reveal** (`components/WinnerReveal.vue` + `lib/revealSound.ts`,
-  Web Audio — no audio files): rolls names per place (3rd→1st) for
-  `reveal{Third,Second,First}Sec`, then holds on "؟" until Enter/tap. The
-  admin board also has a demo mode with made-up players (no DB access).
 
 ### Data-movement paths (all in the admin overview "پشتیبان‌گیری دیتابیس" card)
 
@@ -212,7 +180,7 @@ sends time/score back — only the correct count (the admin board has both).
 
 - **Commit messages**: Conventional Commits, English (`feat/fix/docs/refactor/build/chore`).
 - **The in-app "update" flow destroys uncommitted work.** The admin "بررسی و اعمال
-  به‌روزرسانی" button, `dotinschool update`, and `update.ps1`/`update.sh` all run
+  به‌روزرسانی" button, `dotinschool-challenge update`, and `update.ps1`/`update.sh` all run
   `git reset --hard origin/main`. Commit changes to a branch before testing via
   any update path.
 - `scripts/windows-install.ps1` and `docker-up.ps1` must stay **pure ASCII** (no
@@ -228,5 +196,5 @@ sends time/score back — only the correct count (the admin board has both).
   `model:"administrator"` and the gateway answers "No available channel for model
   administrator". `AIService.ModelOrDefault` self-heals `model == AdminUsername`
   (and empty) to the default model everywhere it's read.
-- Deploy targets: bare-metal (`scripts/install.sh` + systemd + a `dotinschool` CLI
+- Deploy targets: bare-metal (`scripts/install.sh` + systemd + a `dotinschool-challenge` CLI
   menu) and Docker (`build/`, `docker-compose*.yml`, Caddy for auto-HTTPS in prod).

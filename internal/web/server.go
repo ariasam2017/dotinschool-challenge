@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 
-	"github.com/dotinschool/dotinschool/internal/config"
-	"github.com/dotinschool/dotinschool/internal/service"
+	"github.com/dotinschool/dotinschool-challenge/internal/config"
+	"github.com/dotinschool/dotinschool-challenge/internal/service"
 )
 
 // Options are the dependencies NewRouter needs.
@@ -27,8 +27,6 @@ type Options struct {
 const (
 	defaultBodyLimit = 2 << 20   // 2 MiB
 	restoreBodyLimit = 256 << 20 // 256 MiB
-	// a bulk question-bank import (up to 5000 questions)
-	questionImportLimit = 16 << 20 // 16 MiB
 )
 
 type server struct {
@@ -61,7 +59,7 @@ func NewRouter(opts Options) *gin.Engine {
 }
 
 // configureProxyTrust decides where c.ClientIP() comes from. Loopback is always
-// a trusted proxy (a local Caddy, or cloudflared for "dotinschool tunnel").
+// a trusted proxy (a local Caddy, or cloudflared for "dotinschool-challenge tunnel").
 // Behind the Cloudflare Tunnel every request arrives from cloudflared on
 // loopback and CF-Connecting-IP carries the real visitor — without it, all VPN
 // players would share one IP for rate limiting and fail2ban. extra (the
@@ -94,15 +92,6 @@ func (s *server) mountAPI(r *gin.Engine) {
 	api.GET("/config", s.handleGetConfig)
 	api.GET("/version", s.handleVersion)
 	api.POST("/client-errors", s.handleReportClientError)
-
-	// ---- quiz game player (token in body) ----
-	api.GET("/game/info", s.handleGameInfo)
-	api.POST("/game/register", s.handleGameRegister)
-	api.POST("/game/state", s.handleGameState)
-	api.POST("/game/start", s.handleGameStart)
-	api.POST("/game/answer", s.handleGameAnswer)
-	api.POST("/game/next", s.handleGameNext)
-	api.POST("/game/replay", s.handleGameReplay)
 
 	// ---- participant OR admin ----
 	api.PATCH("/participants/:id", s.handlePatchParticipant)
@@ -149,20 +138,6 @@ func (s *server) mountAPI(r *gin.Engine) {
 
 		admin.GET("/admin/sms-status", s.handleSMSStatus)
 		admin.POST("/admin/sms-test", s.handleSMSTest)
-		admin.GET("/admin/game/board", s.handleGameBoard)
-		admin.GET("/admin/game/report", s.handleGameReport)
-		admin.PUT("/admin/game/settings", s.handlePutGameSettings)
-		admin.GET("/admin/game/players/:id", s.handleGamePlayerReview)
-		admin.POST("/admin/game/players/:id/reset", s.handleGameResetPlayer)
-		admin.DELETE("/admin/game/players/:id", s.handleGameDeletePlayer)
-		admin.DELETE("/admin/game/players", s.handleGameDeleteAllPlayers)
-		admin.GET("/admin/game/questions", s.handleListGameQuestions)
-		admin.POST("/admin/game/questions", s.handleCreateGameQuestion)
-		admin.PUT("/admin/game/questions/:id", s.handleUpdateGameQuestion)
-		admin.DELETE("/admin/game/questions/:id", s.handleDeleteGameQuestion)
-		admin.POST("/admin/game/questions/delete", s.handleBulkDeleteGameQuestions)
-		admin.POST("/admin/game/questions/import", bodyLimit(questionImportLimit), s.handleImportGameQuestions)
-		admin.POST("/admin/game/questions/defaults", s.handleAddDefaultGameQuestions)
 
 		admin.GET("/admin/sms-settings", s.handleGetSMSSettings)
 		admin.PUT("/admin/sms-settings", s.handlePutSMSSettings)

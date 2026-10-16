@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dotinschool/dotinschool/internal/apperr"
-	"github.com/dotinschool/dotinschool/internal/model"
+	"github.com/dotinschool/dotinschool-challenge/internal/apperr"
+	"github.com/dotinschool/dotinschool-challenge/internal/model"
 )
 
 // ---- Design Studio: the panel-managed appearance layer --------------------

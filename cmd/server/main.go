@@ -1,4 +1,4 @@
-// Command server is the dotinschool platform: one static binary that serves the
+// Command server is the dotinschool-challenge platform: one static binary that serves the
 // embedded Vue frontend and a small REST API backed by a single SQLite file.
 package main
 
@@ -14,20 +14,20 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/dotinschool/dotinschool/internal/config"
-	"github.com/dotinschool/dotinschool/internal/database"
-	"github.com/dotinschool/dotinschool/internal/service"
-	"github.com/dotinschool/dotinschool/internal/web"
+	"github.com/dotinschool/dotinschool-challenge/internal/config"
+	"github.com/dotinschool/dotinschool-challenge/internal/database"
+	"github.com/dotinschool/dotinschool-challenge/internal/service"
+	"github.com/dotinschool/dotinschool-challenge/internal/web"
 )
 
 // version is stamped at build time via -ldflags "-X main.version=...".
 // scripts/docker-build.sh sets it from `git describe`. Logged once at start-up
-// so `dotinschool update` can prove which build the container is running.
+// so `dotinschool-challenge update` can prove which build the container is running.
 var version = "dev"
 
 func main() {
 	log := newLogger()
-	log.Infof("dotinschool version %s", version)
+	log.Infof("dotinschool-challenge version %s", version)
 
 	wd, err := os.Getwd()
 	if err != nil {
@@ -84,7 +84,7 @@ func main() {
 			scheme = "https"
 		}
 		base := cfg.PublicBaseURL()
-		log.Infof("dotinschool server running (%s):", scheme)
+		log.Infof("dotinschool-challenge server running (%s):", scheme)
 		log.Infof("  User panel:  %s/", base)
 		log.Infof("  Admin panel: %s%s/", base, cfg.AdminPath)
 		log.Infof("  (bound to 0.0.0.0:%s)", cfg.Port)

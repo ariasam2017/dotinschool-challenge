@@ -1,4 +1,4 @@
-# dotinschool - bring the whole stack up on Docker with ONE command.
+# dotinschool-challenge - bring the whole stack up on Docker with ONE command.
 #
 #   powershell -ExecutionPolicy Bypass -File .\docker-up.ps1
 #   (or just:  .\docker-up.ps1 )
@@ -52,7 +52,7 @@ function Die($m) { Write-Host "[x] $m" -ForegroundColor Red; Wait-BeforeClose; t
 # its windows-amd64.zip 404'd). Ask go.dev for its real release list instead
 # and try the few most recent stable ones in order, oldest fallback last.
 $GoVersionFallback = '1.27.1'
-$GoRoot = Join-Path $env:LOCALAPPDATA 'dotinschool\go'
+$GoRoot = Join-Path $env:LOCALAPPDATA 'dotinschool-challenge\go'
 
 function Find-Go {
   $cmd = Get-Command go -ErrorAction SilentlyContinue
@@ -195,29 +195,29 @@ Docker Desktop did not become ready in time.
 }
 Say "Docker is ready"
 
-# ---- 2b. install the global "dotinschool" command (Windows counterpart of the
+# ---- 2b. install the global "dotinschool-challenge" command (Windows counterpart of the
 # Linux Docker install's CLI wrapper) - a thin .cmd shim in
 # %LOCALAPPDATA%\Microsoft\WindowsApps (already on every user's PATH, no admin
 # rights, works in already-open shells too since only the PATH *variable* is
 # cached, not directory listings) that dispatches into this checkout's own
-# scripts\dotinschool-cli.ps1 - so it always runs the current version, no
-# separate re-install step after "dotinschool update".
+# scripts\dotinschool-challenge-cli.ps1 - so it always runs the current version, no
+# separate re-install step after "dotinschool-challenge update".
 function Install-DotinschoolCli {
   try {
     $aliasDir = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'
     if (-not (Test-Path $aliasDir)) { return }
-    $cliScript = Join-Path $InstallDir 'scripts\dotinschool-cli.ps1'
+    $cliScript = Join-Path $InstallDir 'scripts\dotinschool-challenge-cli.ps1'
     if (-not (Test-Path $cliScript)) { return }
-    $shimPath = Join-Path $aliasDir 'dotinschool.cmd'
+    $shimPath = Join-Path $aliasDir 'dotinschool-challenge.cmd'
     $shimContent = "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"$cliScript`" %*`r`n"
     $existing = if (Test-Path $shimPath) { Get-Content $shimPath -Raw } else { '' }
     if ($existing -ne $shimContent) {
       Set-Content -Path $shimPath -Value $shimContent -Encoding ascii -NoNewline
-      Say "installed the 'dotinschool' command (try: dotinschool)"
+      Say "installed the 'dotinschool-challenge' command (try: dotinschool-challenge)"
     }
   } catch {
     # Never fail the whole run over this - it's a convenience, not a requirement.
-    Warn "could not install the 'dotinschool' command ($($_.Exception.Message)) - use .\docker-up.ps1 / .\update.ps1 directly instead"
+    Warn "could not install the 'dotinschool-challenge' command ($($_.Exception.Message)) - use .\docker-up.ps1 / .\update.ps1 directly instead"
   }
 }
 $InstallDir = $PSScriptRoot
@@ -229,7 +229,7 @@ if (-not (Test-Path .env)) {
   $chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
   function Rand($n) { -join ((1..$n) | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] }) }
   @(
-    "APP_PORT=8080",
+    "APP_PORT=8081",
     "ADMIN_USERNAME=administrator",
     ("ADMIN_PASSWORD=" + (Rand 20)),
     ("ADMIN_PATH=panel-" + (Rand 8)),
@@ -254,8 +254,8 @@ function PortFree($p) {
   } catch { return $false }
 }
 $port = $null
-foreach ($p in 8080, 8090, 8091, 8092, 8093, 3000, 9000) { if (PortFree $p) { $port = $p; break } }
-if (-not $port) { $port = 8080 }
+foreach ($p in 8081, 8082, 8083, 8084, 8085, 3001, 9001) { if (PortFree $p) { $port = $p; break } }
+if (-not $port) { $port = 8081 }
 $env:APP_PORT = "$port"
 Say "host port: $port"
 
@@ -265,15 +265,15 @@ New-Item -ItemType Directory -Force -Path dist | Out-Null
 $ver = (& git describe --tags --always --dirty 2>$null); if (-not $ver) { $ver = 'dev' }
 # Remove the previous binary first: if this compile fails, the old file must
 # not be packaged silently (that shipped a stale build that "never updated").
-Remove-Item dist/dotinschool_linux_amd64 -Force -ErrorAction SilentlyContinue
+Remove-Item dist/dotinschool-challenge_linux_amd64 -Force -ErrorAction SilentlyContinue
 $env:GOOS = 'linux'; $env:GOARCH = 'amd64'; $env:CGO_ENABLED = '0'
 try {
-  & $go build -trimpath -ldflags="-s -w -X main.version=$ver" -o dist/dotinschool_linux_amd64 ./cmd/server
+  & $go build -trimpath -ldflags="-s -w -X main.version=$ver" -o dist/dotinschool-challenge_linux_amd64 ./cmd/server
   $goExit = $LASTEXITCODE
 } finally {
   Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
 }
-if ($goExit -ne 0 -or -not (Test-Path dist/dotinschool_linux_amd64)) {
+if ($goExit -ne 0 -or -not (Test-Path dist/dotinschool-challenge_linux_amd64)) {
   Die "go build failed (see the errors above) - nothing was deployed. Alternative that needs no Go on this PC: docker compose up -d --build"
 }
 
@@ -295,7 +295,7 @@ function Build-Image([bool]$legacyBuilder) {
   # otherwise get bundled into what this function "returns", and a non-empty
   # array is always truthy regardless of $ok, silently defeating the retry
   # check below on the very first (failing) attempt.
-  docker build -f build/Dockerfile -t dotinschool:local . | Out-Host
+  docker build -f build/Dockerfile -t dotinschool-challenge:local . | Out-Host
   $ok = ($LASTEXITCODE -eq 0)
   Remove-Item Env:DOCKER_BUILDKIT -ErrorAction SilentlyContinue
   return $ok
@@ -334,6 +334,6 @@ Write-Host (" password   :  {0}" -f $cfg['ADMIN_PASSWORD']) -ForegroundColor Gre
 Write-Host "----------------------------------------------" -ForegroundColor Green
 Write-Host " logs : docker compose -f build/docker-compose.yml logs -f app"
 Write-Host " stop : docker compose -f build/docker-compose.yml down"
-if (Get-Command dotinschool -ErrorAction SilentlyContinue) {
-  Write-Host " menu : dotinschool          (also: up / down / restart / logs / ps / rebuild / update / admin)"
+if (Get-Command dotinschool-challenge -ErrorAction SilentlyContinue) {
+  Write-Host " menu : dotinschool-challenge          (also: up / down / restart / logs / ps / rebuild / update / admin)"
 }

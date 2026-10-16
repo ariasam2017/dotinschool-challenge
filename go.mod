@@ -1,4 +1,4 @@
-module github.com/dotinschool/dotinschool
+module github.com/dotinschool/dotinschool-challenge
 
 go 1.25.0
 

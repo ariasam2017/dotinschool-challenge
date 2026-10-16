@@ -16,11 +16,11 @@ echo "==> building frontend (web/)"
 ( cd web && npm ci --no-audit --no-fund && npm run build )
 
 mkdir -p "$DIST"
-rm -f "$DIST"/dotinschool-*
+rm -f "$DIST"/dotinschool-challenge-*
 
 build_one() {
   local goos="$1" goarch="$2" ext="${3:-}"
-  local out="dotinschool-${goos}-${goarch}${ext}"
+  local out="dotinschool-challenge-${goos}-${goarch}${ext}"
   echo "==> $out"
   CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
     go build -trimpath -ldflags="$LDFLAGS" -o "${DIST}/${out}" ./cmd/server
@@ -29,8 +29,8 @@ build_one() {
 }
 
 if [[ "${1:-}" == "local" ]]; then
-  go build -trimpath -ldflags="$LDFLAGS" -o "${ROOT}/dotinschool" ./cmd/server
-  echo "==> ${ROOT}/dotinschool"
+  go build -trimpath -ldflags="$LDFLAGS" -o "${ROOT}/dotinschool-challenge" ./cmd/server
+  echo "==> ${ROOT}/dotinschool-challenge"
   exit 0
 fi
 

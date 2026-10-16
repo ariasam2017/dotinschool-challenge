@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/dotinschool/dotinschool/internal/apperr"
-	"github.com/dotinschool/dotinschool/internal/model"
+	"github.com/dotinschool/dotinschool-challenge/internal/apperr"
+	"github.com/dotinschool/dotinschool-challenge/internal/model"
 )
 
 // phoneRe matches a bare Iranian mobile number: "9XXXXXXXXX" (no leading zero,

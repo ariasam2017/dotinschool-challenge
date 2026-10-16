@@ -1,4 +1,4 @@
-# ── dotinschool ── production override: Caddy in front, automatic HTTPS.
+# ── dotinschool-challenge ── production override: Caddy in front, automatic HTTPS.
 #
 # This override ADDS a Caddy reverse proxy that terminates TLS for $DOMAIN and
 # fetches + auto-renews a Let's Encrypt certificate on its own (no certbot, no
@@ -30,7 +30,7 @@ services:
 
   caddy:
     image: caddy:2-alpine
-    container_name: dotinschool-caddy
+    container_name: dotinschool-challenge-caddy
     depends_on:
       - app
     ports:

@@ -1,9 +1,9 @@
 {
-  "name": "dotinschool-web",
+  "name": "dotinschool-challenge-web",
   "private": true,
   "type": "module",
   "version": "1.0.0",
-  "description": "فرانت‌اند پنل شرکت‌کننده و پنل مدیریت dotinschool (Vue 3 + Ant Design Vue 4)",
+  "description": "فرانت‌اند سامانه چالش برنامه‌نویسی dotinschool و پنل مدیریت آن (Vue 3 + Ant Design Vue 4)",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",

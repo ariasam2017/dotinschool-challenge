@@ -12,9 +12,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"github.com/dotinschool/dotinschool/internal/apperr"
-	"github.com/dotinschool/dotinschool/internal/model"
-	"github.com/dotinschool/dotinschool/internal/service"
+	"github.com/dotinschool/dotinschool-challenge/internal/apperr"
+	"github.com/dotinschool/dotinschool-challenge/internal/model"
+	"github.com/dotinschool/dotinschool-challenge/internal/service"
 )
 
 // GET /api/admin/ai-status — the effective (resolved) AI configuration.

@@ -7,7 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
-	"github.com/dotinschool/dotinschool/internal/config"
+	"github.com/dotinschool/dotinschool-challenge/internal/config"
 )
 
 // Services is the wired bundle handed to the web layer.
@@ -25,7 +25,6 @@ type Services struct {
 	AI           *AIService
 	ClientErrors *ClientErrorService
 	SysStats     *SysStatsService
-	Game         *GameService
 }
 
 // New constructs every service with its dependencies.
@@ -50,7 +49,6 @@ func New(cfg *config.Config, db *gorm.DB, log *logrus.Logger) *Services {
 		AI:           newAIService(cfg, settings, log),
 		ClientErrors: newClientErrorService(db),
 		SysStats:     newSysStatsService(),
-		Game:         newGameService(db, settings),
 	}
 }
 
