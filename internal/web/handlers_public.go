@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"math"
 	"net/http"
 	"strconv"
@@ -179,8 +180,32 @@ func (s *server) handleSession(c *gin.Context) {
 }
 
 // GET /api/config — public snapshot of event timing + published challenge.
+//
+// The challenge itself is withheld (null) from anyone but the admin until the
+// event is genuinely live: the user panel only shows it while running, but
+// without this an entrant could read the question with a plain curl before the
+// start, during a pause, or after the end.
 func (s *server) handleGetConfig(c *gin.Context) {
-	c.JSON(http.StatusOK, s.svc.Settings.CurrentConfig())
+	cfg := s.svc.Settings.CurrentConfig()
+	if _, isAdmin := s.svc.Sessions.ResolveAdmin(bearerToken(c)); !isAdmin && !s.eventLive() {
+		cfg.Challenge = json.RawMessage("null")
+	}
+	c.JSON(http.StatusOK, cfg)
+}
+
+// eventLive reports whether the event is running right now: past any scheduled
+// start, not paused, and before its end — the same rule the participant PATCH
+// lock enforces.
+func (s *server) eventLive() bool {
+	now := nowMs()
+	if startsAt := s.svc.Settings.EventStartsAt(); startsAt != nil && *startsAt > now {
+		return false
+	}
+	if s.svc.Settings.EventPaused() {
+		return false
+	}
+	endsAt := s.svc.Settings.EventEndsAt()
+	return endsAt != nil && *endsAt > now
 }
 
 // GET /api/version — the running build's version string. Stamped at build time

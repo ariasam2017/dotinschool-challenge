@@ -198,6 +198,15 @@ Restart=always
 RestartSec=3
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 NoNewPrivileges=true
+# Sandboxing that costs the app nothing: it needs no shared /tmp, never loads
+# kernel modules or tunes the kernel, and never runs setuid helpers.
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target

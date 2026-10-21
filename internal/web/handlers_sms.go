@@ -56,9 +56,20 @@ func (s *server) handlePutSMSSettings(c *gin.Context) {
 
 	cur := s.svc.Settings.SMSSettings()
 	typedKey := strings.TrimSpace(body.APIKey)
+	newKey := typedKey != "" && !service.LooksLikeMask(typedKey)
 	apiKey := cur.APIKey
-	if typedKey != "" && !service.LooksLikeMask(typedKey) {
+	if newKey {
 		apiKey = clip(typedKey, 400)
+	}
+
+	// The saved (or .env) key only ever goes to the endpoint it was set up
+	// for. Pointing the panel at a new custom endpoint without re-entering the
+	// key would let anyone holding an admin session receive it with the next
+	// SMS. Clearing back to the default endpoint needs no key.
+	if !newKey && baseURL != "" && !strings.EqualFold(baseURL, strings.TrimRight(cur.BaseURL, "/")) &&
+		s.svc.SMS.Info().Configured {
+		fail(c, apperr.New(400, "KEY_REQUIRED", "آدرس اندپوینت تغییر کرده — برای امنیت، کلید API را دوباره وارد کنید."))
+		return
 	}
 
 	v := model.SMSSettings{

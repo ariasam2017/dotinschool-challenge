@@ -129,6 +129,15 @@ func (s *server) handlePutAISettings(c *gin.Context) {
 		apiKey := typedKey
 		if apiKey == "" {
 			if pr, ok := prev[id]; ok {
+				// A kept (masked) key only ever goes back to the endpoint it was
+				// saved for. Otherwise anyone holding an admin session could point
+				// the provider at their own server and have the next test/review
+				// call hand them a key the panel never shows in clear text.
+				if pr.APIKey != "" && !sameAIBaseURL(pr.BaseURL, baseURL) {
+					fail(c, apperr.New(400, "KEY_REQUIRED",
+						"آدرس پایه «"+firstNonEmpty(label, "یک سرویس")+"» تغییر کرده — برای امنیت، کلید API را دوباره وارد کنید."))
+					return
+				}
 				apiKey = pr.APIKey
 			}
 		}
@@ -394,6 +403,15 @@ func firstNonEmpty(vs ...string) string {
 		}
 	}
 	return ""
+}
+
+// sameAIBaseURL compares two provider base URLs the way they are actually
+// called: blank means the default endpoint, trailing slashes don't matter.
+func sameAIBaseURL(a, b string) bool {
+	norm := func(u string) string {
+		return strings.ToLower(strings.TrimRight(firstNonEmpty(strings.TrimSpace(u), service.AIDefaultBaseURL), "/"))
+	}
+	return norm(a) == norm(b)
 }
 
 func containsProviderID(ps []model.AIProvider, id string) bool {

@@ -19,10 +19,18 @@ import (
 // Open connects to arena.db (creating the data directory if needed), applies
 // pragmatic pragmas, runs AutoMigrate, and returns the handle.
 func Open(cfg *config.Config, log *logrus.Logger) (*gorm.DB, error) {
-	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
+	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
 		return nil, err
 	}
-	return openFile(cfg.DBPath(), log)
+	db, err := openFile(cfg.DBPath(), log)
+	if err != nil {
+		return nil, err
+	}
+	// The file holds every entrant's phone number and the panel's API keys —
+	// owner-only, like the .env and sidecar files next to it. Best effort: a
+	// bind mount owned by someone else may refuse, which must not stop boot.
+	_ = os.Chmod(cfg.DBPath(), 0o600)
+	return db, nil
 }
 
 // buildDSN is the connection string for a SQLite file at path, with the exact
