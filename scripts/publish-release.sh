@@ -40,6 +40,10 @@ for a in $ARCHS; do
   else
     command -v docker >/dev/null 2>&1 || die "Neither Go nor Docker is available to compile with."
     src="$(pwd -W 2>/dev/null || pwd)"   # Git Bash needs the C:/... form for -v
+    # A cached image keeps whatever Go patch release it was pulled with, and the
+    # standard library ships inside the binary — refresh it so security fixes
+    # land. Falls back to the cache where Docker Hub is unreachable.
+    docker pull -q golang:1.27-alpine >/dev/null 2>&1 || echo "  (could not refresh golang:1.27-alpine - using the cached image)"
     MSYS_NO_PATHCONV=1 docker run --rm -v "${src}:/src" -w /src \
       -v dotin-gomod:/go/pkg/mod -v dotin-gocache:/root/.cache/go-build \
       -e CGO_ENABLED=0 -e GOOS=linux -e GOARCH="$a" -e GOFLAGS=-buildvcs=false \
