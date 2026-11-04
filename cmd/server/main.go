@@ -39,7 +39,7 @@ func main() {
 		log.WithError(err).Fatal("unsafe configuration — refusing to start (see docs/security/TLS-POLICY.md)")
 	}
 	if !cfg.Production {
-		log.Warn("APP_ENV is not production — development mode: plain HTTP is served for the user panel. Never expose this mode to users.")
+		log.Warn("APP_ENV is not production — setup/development stage: plain HTTP is served. Not for real use: get a certificate, then turn the HTTPS lock on (dotinschool-challenge lock on).")
 	}
 
 	db, err := database.Open(cfg, log)

@@ -4,23 +4,26 @@
 #
 # `dotinschool-challenge cert <domain>` picks this override automatically when you choose
 # the Cloudflare-DNS or standalone method (it writes CERT_MODE=acme to .env).
-# The app runs the production profile and is reachable only through Caddy.
+# Once the HTTPS lock is on, the app is reachable only through Caddy.
 #
 #   docker compose -f build/docker-compose.yml -f build/docker-compose.acme.yml up -d
 
 services:
   app:
-    # Production profile (docs/security/TLS-POLICY.md): the app refuses to
-    # start without TLS in front, refuses any non-TLS request, and answers the
-    # admin panel only from ADMIN_ALLOWED_CIDRS. Its own port is bound to the
-    # host's loopback only (healthchecks / an SSH tunnel) — the public reaches
-    # it solely through Caddy. `!override` needs Docker Compose >= 2.24.4.
+    # Stages (docs/security/TLS-POLICY.md). The installer's .env starts in
+    # APP_ENV=setup with APP_BIND=0.0.0.0, so plain http://<ip>:<APP_PORT>
+    # still works while HTTPS is checked. "dotinschool-challenge lock on" then
+    # sets APP_ENV=production + APP_BIND=127.0.0.1: the app refuses any non-TLS
+    # request and answers the admin panel only from ADMIN_ALLOWED_CIDRS, and
+    # its port is bound to the host's loopback — the public reaches it solely
+    # through Caddy. Both default to the locked values when unset.
+    # `!override` needs Docker Compose >= 2.24.4.
     ports: !override
-      - "127.0.0.1:${APP_PORT:-8081}:8080"
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8081}:8080"
     environment:
-      - APP_ENV=production
+      - APP_ENV=${APP_ENV:-production}
       - TLS_PROXY=1
-      - ADMIN_ALLOWED_CIDRS=${ADMIN_ALLOWED_CIDRS:?set ADMIN_ALLOWED_CIDRS in .env - the management network CIDRs, or any if the edge enforces it}
+      - ADMIN_ALLOWED_CIDRS=${ADMIN_ALLOWED_CIDRS:-}
       # Trust forwarding headers from Caddy's fixed address ONLY (not the whole
       # Docker range): the visitor IP behind it drives the login/OTP limits.
       - TRUSTED_PROXIES=${EDGE_CADDY_IP:-172.30.57.10}

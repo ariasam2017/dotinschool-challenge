@@ -16,8 +16,15 @@
 #   dotinschool-challenge update          download the latest release + restart
 #   dotinschool-challenge update-menu     update just this CLI script
 #   dotinschool-challenge admin           show / change admin address, credentials, subdomain
-#   dotinschool-challenge cert            issue/renew an SSL certificate over HTTP-01
-#   dotinschool-challenge cert-cf         issue/renew an SSL certificate via Cloudflare DNS
+#   dotinschool-challenge ssl             certificate & HTTPS-lock menu (all options below)
+#   dotinschool-challenge cert            free certificate: Let's Encrypt over HTTP-01
+#   dotinschool-challenge cert-cf         free certificate: Let's Encrypt via Cloudflare DNS
+#   dotinschool-challenge cert-zerossl    free certificate: ZeroSSL over HTTP-01
+#   dotinschool-challenge csr             own/paid certificate (Certum, company CA) step 1: key + CSR
+#   dotinschool-challenge cert-import     own/paid certificate step 2: install the files the CA sent
+#   dotinschool-challenge lock on|off|status
+#                               HTTPS lock: "on" = production mode, the panel then
+#                               ONLY works over HTTPS (docs/security/TLS-POLICY.md)
 #   dotinschool-challenge log             live log / clear logs
 #   dotinschool-challenge reset           factory reset (wipe DB, new admin credentials)
 #   dotinschool-challenge fail2ban        enable IP banning after repeated failed logins
@@ -47,6 +54,7 @@ SERVICE_NAME="dotinschool-challenge"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 CLI_PATH="/usr/local/bin/dotinschool-challenge"
 BIN_NAME="dotinschool-challenge"
+SSL_TOOLS="${INSTALL_DIR}/build/ssl-tools.sh"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 info(){ echo -e "${CYAN}[i]${NC} $*"; }
@@ -69,6 +77,13 @@ box_title(){ box_line "$1" "${BOLD}${1}${NC}"; }
 box_item(){ box_line "${1}.  ${2}" "${GREEN}${1}.${NC}  ${2}"; }
 
 require_root(){ [[ ${EUID:-$(id -u)} -eq 0 ]] || die "This script must be run as root (sudo bash install.sh)."; }
+
+# shared certificate helpers (shipped in the release bundle)
+load_ssl_tools(){
+  [[ -f "$SSL_TOOLS" ]] || die "Missing ${SSL_TOOLS} - run \"dotinschool-challenge update\" first."
+  # shellcheck source=../build/ssl-tools.sh
+  source "$SSL_TOOLS"
+}
 
 detect_pkg_manager(){
   if command -v apt-get >/dev/null 2>&1; then echo apt
@@ -167,15 +182,13 @@ ADMIN_PASSWORD=${pass}
 ADMIN_PATH=${adminpath}
 # SSL_CERT_PATH=
 # SSL_KEY_PATH=
-# ---- production profile (docs/security/TLS-POLICY.md) ----
-# Refuses to start without TLS (SSL_CERT_PATH/SSL_KEY_PATH, or TLS_PROXY=1
-# behind Caddy / the Cloudflare Tunnel) and serves nothing over plain HTTP.
-# APP_ENV=production
-# Management network(s) the admin panel answers; "any" only if the edge
-# (Cloudflare Access, VPN) enforces it. Required with APP_ENV=production.
-# ADMIN_ALLOWED_CIDRS=10.0.0.0/8
-# TLS_PROXY=1
-# CLIENT_IP_HEADER=X-Forwarded-For
+# ---- stage (docs/security/TLS-POLICY.md) ----
+# setup = first stage: plain HTTP works, admin login over HTTP allowed so the
+# install can be checked. "dotinschool-challenge lock on" switches to
+# APP_ENV=production once HTTPS works: then ONLY HTTPS, admin panel only from
+# ADMIN_ALLOWED_CIDRS, and the service refuses to start without a certificate.
+APP_ENV=setup
+ALLOW_INSECURE_ADMIN=1
 # ---- SMS (ippanel) ----
 # IPPANEL_API_KEY=
 # IPPANEL_PATTERN_CODE=
@@ -255,15 +268,20 @@ server_ip(){
 }
 
 print_access_info(){
-  local port scheme ip adminpath subdomain
-  port=$(get_env_val PORT); scheme="http"
-  [[ -n "$(get_env_val SSL_CERT_PATH)" ]] && scheme="https"
-  ip=$(server_ip)
+  local port scheme host adminpath subdomain
+  port=$(get_env_val PORT); scheme="http"; host="$(server_ip):${port}"
+  if [[ -n "$(get_env_val SSL_CERT_PATH)" ]]; then
+    # the certificate is for the domain, not the IP — show the address that works
+    scheme="https"; host=$(get_env_val CERT_DOMAIN); host=${host:-$(server_ip)}
+    [[ "$port" == "443" ]] || host="${host}:${port}"
+  fi
   adminpath=$(get_env_val ADMIN_PATH); adminpath=${adminpath:-admin}
   subdomain=$(get_env_val ADMIN_SUBDOMAIN)
   echo
-  ok "User panel:                           ${scheme}://${ip}:${port}/"
-  ok "Admin panel (secret path — you only): ${scheme}://${ip}:${port}/${adminpath}/"
+  if https_locked; then ok "Stage:                                PRODUCTION — HTTPS lock ON (plain HTTP refused)"
+  else warn "Stage:                                SETUP — plain HTTP allowed. Not for real use: get a certificate, then \"dotinschool-challenge lock on\""; fi
+  ok "User panel:                           ${scheme}://${host}/"
+  ok "Admin panel (secret path — you only): ${scheme}://${host}/${adminpath}/"
   [[ -n "$subdomain" ]] && ok "Admin panel (dedicated subdomain):    ${scheme}://${subdomain}/"
   if systemctl is-active --quiet dotinschool-challenge-tunnel 2>/dev/null; then
     local turl; turl=$(journalctl -u dotinschool-challenge-tunnel --no-pager -n 300 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -n1 || true)
@@ -313,6 +331,7 @@ cmd_update(){
   fetch_bundle
   after=$(cat "${INSTALL_DIR}/VERSION" 2>/dev/null || echo "")
   install_cli
+  migrate_stage_env
   # (re)written every time: installs from before the release repo rebuilt the
   # binary from source on every start, which would undo this update
   write_systemd_unit
@@ -322,6 +341,15 @@ cmd_update(){
   install_binary
   systemctl restart "$SERVICE_NAME"
   ok "Updated ${before:-?} -> ${after} and the service restarted."
+}
+
+# Installs from before the HTTPS lock existed have no APP_ENV: keep them working
+# exactly as before (setup stage) and point at the lock.
+migrate_stage_env(){
+  grep -qE '^APP_ENV=' "$ENV_FILE" 2>/dev/null && return 0
+  set_env_val APP_ENV setup
+  set_env_val ALLOW_INSECURE_ADMIN 1
+  warn "This server is in the SETUP stage (plain HTTP allowed). For real use: get a certificate, then run \"dotinschool-challenge lock on\"."
 }
 
 cmd_update_menu(){
@@ -380,14 +408,46 @@ install_acme(){ [[ -x "$HOME/.acme.sh/acme.sh" ]] || { info "Installing acme.sh.
 # app and point it at HTTPS. Assumes acme.sh already issued a cert for $1.
 activate_cert(){
   local domain="$1"
-  "$HOME/.acme.sh/acme.sh" --install-cert -d "$domain" \
+  mkdir -p "${SSL_DIR}/${domain}"
+  "$HOME/.acme.sh/acme.sh" --install-cert -d "$domain" --ecc \
     --fullchain-file "${SSL_DIR}/${domain}/fullchain.pem" \
     --key-file "${SSL_DIR}/${domain}/privkey.pem" \
-    --reloadcmd "systemctl restart ${SERVICE_NAME}" >/dev/null
+    --reloadcmd "chmod 600 ${SSL_DIR}/${domain}/privkey.pem; systemctl restart ${SERVICE_NAME}" >/dev/null
+  chmod 600 "${SSL_DIR}/${domain}/privkey.pem"
+  use_cert_files "$domain"
+}
+
+# point the app at ${SSL_DIR}/<domain>/{fullchain,privkey}.pem on :443
+use_cert_files(){
+  local domain="$1"
   set_env_val SSL_CERT_PATH "${SSL_DIR}/${domain}/fullchain.pem"
   set_env_val SSL_KEY_PATH "${SSL_DIR}/${domain}/privkey.pem"
+  set_env_val CERT_DOMAIN "$domain"
   set_env_val PORT 443
   open_firewall_port 443
+}
+
+# the panel answers on its own port (a loopback request is allowed in every stage)
+service_answers(){
+  local port scheme=http i; port=$(get_env_val PORT)
+  [[ -n "$(get_env_val SSL_CERT_PATH)" ]] && scheme=https
+  for i in $(seq 1 15); do
+    curl -fsk -o /dev/null --max-time 3 "${scheme}://127.0.0.1:${port}/api/version" 2>/dev/null && return 0
+    sleep 1
+  done
+  return 1
+}
+
+# after any certificate goes live: check it in a browser, then lock
+cert_done(){
+  ok "Certificate active — the panel is now on HTTPS."
+  print_access_info
+  https_locked && return 0
+  echo
+  info "Open the https:// address above in a browser and check that the padlock shows and the admin panel works."
+  local a; read -r -p "Everything OK? Turn the HTTPS lock on now (production mode, plain HTTP refused from then on)? [y/N] " a
+  if [[ "$a" == "y" || "$a" == "Y" ]]; then lock_on
+  else info "Lock stays off for now. Turn it on later with: dotinschool-challenge lock on"; fi
 }
 
 prompt_cert_domain(){
@@ -402,23 +462,36 @@ prompt_cert_domain(){
   return 0
 }
 
-cmd_cert(){
+cmd_cert(){ issue_http01 letsencrypt; }
+cmd_cert_zerossl(){ issue_http01 zerossl; }
+
+# free certificate over HTTP-01: acme.sh binds :80 for ~20s
+issue_http01(){
+  local ca="$1"
   require_root
-  echo "Issuing an SSL certificate requires a domain whose A record points to this server's IP."
-  warn "If you're only using a raw IP with no domain, skip this step — the panel works fine over plain HTTP with no certificate errors."
+  echo "A free certificate needs a domain whose DNS A record points to this server, and port 80"
+  echo "reachable from the internet for ~20 seconds."
   local domain="" domain_args=()
   prompt_cert_domain || { info "Cancelled."; return; }
   install_acme
-  mkdir -p "${SSL_DIR}/${domain}"
+  if [[ "$ca" == "zerossl" ]]; then
+    local email; read -r -p "Your email (ZeroSSL needs an account email): " email
+    [[ "$email" == *@*.* ]] || { err "A valid email is required for ZeroSSL."; return 1; }
+    "$HOME/.acme.sh/acme.sh" --register-account -m "$email" --server zerossl >/dev/null 2>&1 \
+      || { err "Could not register the ZeroSSL account."; return 1; }
+  fi
   info "Stopping the service temporarily to free port 80..."
   systemctl stop "$SERVICE_NAME" 2>/dev/null || true
-  if ! "$HOME/.acme.sh/acme.sh" --issue "${domain_args[@]}" --standalone --httpport 80; then
-    err "Certificate issuance failed — check the domain(s) and that port 80 is free."
+  local rc=0
+  "$HOME/.acme.sh/acme.sh" --issue --server "$ca" "${domain_args[@]}" --standalone --httpport 80 --keylength ec-256 || rc=$?
+  # rc 2 = a valid certificate already exists and isn't due for renewal
+  if [[ $rc -ne 0 && $rc -ne 2 ]]; then
+    err "Certificate issuance failed — check the domain(s) and that port 80 is free and reachable."
     systemctl start "$SERVICE_NAME" 2>/dev/null || true; return 1
   fi
   activate_cert "$domain"
-  systemctl start "$SERVICE_NAME"; sleep 1
-  if systemctl is-active --quiet "$SERVICE_NAME"; then ok "Certificate issued and active — the panel is now on HTTPS (auto-renewed via acme.sh)."; print_access_info
+  systemctl start "$SERVICE_NAME"
+  if service_answers; then cert_done
   else err "Service failed to start with HTTPS — journalctl -u ${SERVICE_NAME} -n 50"; fi
 }
 
@@ -434,28 +507,188 @@ cmd_cert_cf(){
   [[ -n "$cf_account" ]] || { info "Cancelled."; return; }
   install_acme
   mkdir -p "${SSL_DIR}/${domain}"
-  if ! CF_Token="$cf_token" CF_Account_ID="$cf_account" "$HOME/.acme.sh/acme.sh" --issue --dns dns_cf "${domain_args[@]}"; then
+  local rc=0
+  CF_Token="$cf_token" CF_Account_ID="$cf_account" "$HOME/.acme.sh/acme.sh" --issue --server letsencrypt --dns dns_cf "${domain_args[@]}" --keylength ec-256 || rc=$?
+  if [[ $rc -ne 0 && $rc -ne 2 ]]; then
     err "Certificate issuance failed — check the token's permissions and that this domain's zone is on that Cloudflare account."
     return 1
   fi
   activate_cert "$domain"
-  systemctl restart "$SERVICE_NAME"; sleep 1
-  if systemctl is-active --quiet "$SERVICE_NAME"; then ok "Certificate issued and active — the panel is now on HTTPS (auto-renewed via acme.sh)."; print_access_info
+  systemctl restart "$SERVICE_NAME"
+  if service_answers; then cert_done
   else err "Service failed to start with HTTPS — journalctl -u ${SERVICE_NAME} -n 50"; fi
+}
+
+# ---- own / paid certificate (Certum, a company CA, any CA) ----------------
+
+cmd_csr(){
+  require_root; load_ssl_tools
+  echo "Step 1 of 2 for a certificate you order yourself (Certum, your company CA, ...):"
+  echo "this creates the private key ON THIS SERVER and a request (CSR) to give the CA."
+  local domain extra org country dir a
+  read -r -p "Domain for the certificate (e.g. panel.company.ir, empty = cancel): " domain
+  [[ -n "$domain" ]] || { info "Cancelled."; return; }
+  read -r -p "Extra names on the same certificate, space-separated (Enter = none): " extra
+  read -r -p "Organisation name (Enter = skip): " org
+  read -r -p "Country code, 2 letters, e.g. IR (Enter = skip): " country
+  dir="${SSL_DIR}/.pending/${domain}"
+  if [[ -s "$dir/request.csr" ]]; then
+    read -r -p "A request for ${domain} already exists. Make a new one (the old one stops matching)? [y/N] " a
+    if [[ "$a" != "y" && "$a" != "Y" ]]; then echo; cat "$dir/request.csr"; return; fi
+  fi
+  ssl_make_csr "$domain" "$extra" "$dir" "$org" "$country" || die "Could not create the request."
+  ok "Private key kept on this server only: ${dir}/privkey.pem (never send it to anyone)."
+  ok "Request (CSR) saved to ${dir}/request.csr — paste everything below into the CA's order form:"
+  echo; cat "$dir/request.csr"; echo
+  info "When the CA sends the certificate, upload it here and run: dotinschool-challenge cert-import"
+}
+
+cmd_cert_import(){
+  require_root; load_ssl_tools
+  [[ -f "$ENV_FILE" ]] || die "Not installed yet."
+  echo "Install a certificate you got yourself (Certum, your company CA, any CA)."
+  local domain stage
+  read -r -p "Domain the certificate is for (e.g. panel.company.ir, empty = cancel): " domain
+  [[ -n "$domain" ]] || { info "Cancelled."; return; }
+  stage=$(mktemp -d); chmod 700 "$stage"
+  if ! ssl_import_interactive "$domain" "${SSL_DIR}/.pending/${domain}" "$stage"; then
+    rm -rf "$stage"; err "Nothing was changed."; return 1
+  fi
+  cp -p "$ENV_FILE" "${ENV_FILE}.pre-cert"
+  mkdir -p "${SSL_DIR}/${domain}"; chmod 700 "${SSL_DIR}/${domain}"
+  # acme.sh must not overwrite these files on its next renewal run
+  if [[ -x "$HOME/.acme.sh/acme.sh" ]]; then
+    "$HOME/.acme.sh/acme.sh" --remove -d "$domain" --ecc >/dev/null 2>&1 || true
+    "$HOME/.acme.sh/acme.sh" --remove -d "$domain" >/dev/null 2>&1 || true
+  fi
+  install -m 644 "$stage/fullchain.pem" "${SSL_DIR}/${domain}/fullchain.pem"
+  install -m 600 "$stage/privkey.pem" "${SSL_DIR}/${domain}/privkey.pem"
+  rm -rf "$stage"
+  use_cert_files "$domain"
+  systemctl restart "$SERVICE_NAME"
+  if ! service_answers; then
+    err "The service did not come up with this certificate — restoring the previous settings."
+    journalctl -u "$SERVICE_NAME" --no-pager -n 10 || true
+    mv -f "${ENV_FILE}.pre-cert" "$ENV_FILE"; systemctl restart "$SERVICE_NAME"; return 1
+  fi
+  rm -f "${ENV_FILE}.pre-cert"
+  rm -rf "${SSL_DIR}/.pending/${domain}"
+  warn "This certificate is NOT renewed automatically. Note its expiry date and repeat"
+  warn "\"dotinschool-challenge csr\" + \"cert-import\" before then (check: dotinschool-challenge lock status)."
+  cert_done
+}
+
+# ---- HTTPS lock (setup stage -> production) --------------------------------
+
+https_locked(){ [[ "$(get_env_val APP_ENV)" == "production" ]]; }
+del_env_val(){ sed -i "/^${1}=/d" "$ENV_FILE"; }
+# security-relevant changes go to syslog (journald), where the SIEM agent picks them up
+audit_log(){ logger -t dotinschool-challenge "$*" 2>/dev/null || true; }
+
+cmd_lock(){
+  require_root
+  [[ -f "$ENV_FILE" ]] || die "Not installed yet."
+  case "${1:-status}" in
+    on) lock_on ;;
+    off) lock_off ;;
+    status) lock_status ;;
+    *) die "Usage: dotinschool-challenge lock on|off|status" ;;
+  esac
+}
+
+lock_status(){
+  load_ssl_tools
+  echo
+  if https_locked; then echo -e "HTTPS lock: ${GREEN}ON${NC} — production: HTTPS only, plain HTTP refused"
+  else echo -e "HTTPS lock: ${YELLOW}OFF${NC} — setup stage: plain HTTP and admin login over HTTP allowed (not for real use)"; fi
+  local cert; cert=$(get_env_val SSL_CERT_PATH)
+  if [[ -n "$cert" ]]; then echo "Certificate ($(get_env_val CERT_DOMAIN)):"; ssl_show_info "$cert"
+  elif [[ "$(get_env_val TLS_PROXY)" == "1" ]]; then echo "TLS: terminated in front of the app (Cloudflare Tunnel / proxy)"
+  else echo "Certificate: none yet — get one from the SSL menu (dotinschool-challenge ssl)"; fi
+  if [[ -n "$(get_env_val ADMIN_ALLOWED_CIDRS)" ]]; then echo "Admin panel allowed from: $(get_env_val ADMIN_ALLOWED_CIDRS)"; fi
+  echo
+}
+
+lock_on(){
+  load_ssl_tools
+  local cert key cidrs
+  cert=$(get_env_val SSL_CERT_PATH); key=$(get_env_val SSL_KEY_PATH)
+  if [[ -n "$cert" ]]; then
+    [[ -s "$cert" && -s "$key" ]] || die "The certificate files are missing — install a certificate again first."
+    openssl x509 -in "$cert" -noout -checkend 0 >/dev/null 2>&1 || die "The certificate has expired — renew it first."
+  elif [[ "$(get_env_val TLS_PROXY)" != "1" ]]; then
+    die "No HTTPS yet. Get a certificate first (dotinschool-challenge ssl), check https:// in a browser, then lock."
+  fi
+  cidrs=$(ssl_prompt_admin_cidrs "$(get_env_val ADMIN_ALLOWED_CIDRS)") \
+    || die "Invalid list — nothing changed. Use IPs/CIDRs like 10.10.0.0/16,192.168.5.7 or the word any."
+  cp -p "$ENV_FILE" "${ENV_FILE}.pre-lock"
+  set_env_val APP_ENV production
+  set_env_val ADMIN_ALLOWED_CIDRS "$cidrs"
+  del_env_val ALLOW_INSECURE_ADMIN
+  systemctl restart "$SERVICE_NAME"
+  if ! service_answers; then
+    err "The service refused to start in production mode:"
+    journalctl -u "$SERVICE_NAME" --no-pager -n 30 2>/dev/null | grep -iE "fatal|refusing" | tail -n 3 || true
+    mv -f "${ENV_FILE}.pre-lock" "$ENV_FILE"; systemctl restart "$SERVICE_NAME"
+    die "Lock NOT applied — back in the setup stage, nothing else changed."
+  fi
+  rm -f "${ENV_FILE}.pre-lock"
+  audit_log "HTTPS lock turned ON by ${SUDO_USER:-root} (admin panel allowed from: ${cidrs})"
+  ok "HTTPS lock is ON. The panel now works only over HTTPS; plain HTTP is refused, and the"
+  ok "service will not start without a valid certificate. Admin panel only from: ${cidrs}"
+  print_access_info
+}
+
+lock_off(){
+  https_locked || { info "The HTTPS lock is already off (setup stage)."; return; }
+  warn "Turning the lock off puts the system back into the SETUP stage: plain HTTP and admin"
+  warn "login over HTTP become possible again. This is not allowed for production use."
+  local a; read -r -p "Type UNLOCK to confirm: " a
+  [[ "$a" == "UNLOCK" ]] || { info "Cancelled — the lock stays on."; return; }
+  set_env_val APP_ENV setup
+  set_env_val ALLOW_INSECURE_ADMIN 1
+  systemctl restart "$SERVICE_NAME"
+  audit_log "HTTPS lock turned OFF by ${SUDO_USER:-root}"
+  warn "Lock is OFF — setup stage. Turn it back on with: dotinschool-challenge lock on"
+}
+
+cmd_ssl_menu(){
+  require_root
+  [[ -f "$ENV_FILE" ]] || die "Not installed yet."
+  lock_status
+  box_top; box_title "SSL certificate & HTTPS lock"
+  box_item 0 "Back"; box_div
+  box_title "Free certificate:"
+  box_item 1 "Let's Encrypt (needs port 80)"
+  box_item 2 "Let's Encrypt via Cloudflare DNS"
+  box_item 3 "ZeroSSL (needs port 80 + email)"; box_div
+  box_title "Own / paid (Certum, company CA):"
+  box_item 4 "Step 1: create key + CSR"
+  box_item 5 "Step 2: install the issued files"; box_div
+  box_item 6 "HTTPS lock ON  (production)"
+  box_item 7 "HTTPS lock OFF (back to setup)"
+  box_bottom; echo
+  local c; read -r -p "Choice [0-7]: " c
+  case "$c" in
+    0) return ;;
+    1) cmd_cert ;;
+    2) cmd_cert_cf ;;
+    3) cmd_cert_zerossl ;;
+    4) cmd_csr ;;
+    5) cmd_cert_import ;;
+    6) lock_on ;;
+    7) lock_off ;;
+    *) warn "Invalid option." ;;
+  esac
 }
 
 prompt_domain_setup(){
   echo
-  read -r -p "Do you have a domain pointing at this server's IP? Set up SSL now? [y/N] " ans
-  [[ "$ans" == "y" || "$ans" == "Y" ]] || return 0
-  echo "1) Let's Encrypt over HTTP-01 (needs port 80 reachable from the internet)"
-  echo "2) Let's Encrypt via Cloudflare DNS (needs a Cloudflare API token, works without port 80)"
-  read -r -p "Choice [1/2, empty = skip]: " m
-  case "$m" in
-    1) cmd_cert ;;
-    2) cmd_cert_cf ;;
-    *) info "Skipped — run \"dotinschool-challenge cert\" or \"dotinschool-challenge cert-cf\" later." ;;
-  esac
+  warn "The panel is in the SETUP stage on plain HTTP — check it works using the addresses above."
+  info "Next: get an HTTPS certificate (free Let's Encrypt/ZeroSSL, or your own e.g. Certum), then turn the HTTPS lock on."
+  local ans; read -r -p "Open the certificate menu now? [y/N] " ans
+  if [[ "$ans" == "y" || "$ans" == "Y" ]]; then cmd_ssl_menu
+  else info "Later: dotinschool-challenge ssl"; fi
 }
 
 cmd_log(){
@@ -769,6 +1002,7 @@ show_status(){
   if ! [[ -f "$ENV_FILE" ]]; then echo -e "Panel status: ${RED}not installed${NC}"; return; fi
   systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null && echo -e "Panel status: ${GREEN}running${NC}" || echo -e "Panel status: ${YELLOW}stopped${NC}"
   systemctl is-enabled --quiet "$SERVICE_NAME" 2>/dev/null && echo -e "Start on boot: ${GREEN}yes${NC}" || echo -e "Start on boot: ${RED}no${NC}"
+  https_locked && echo -e "HTTPS lock:    ${GREEN}ON (production)${NC}" || echo -e "HTTPS lock:    ${YELLOW}OFF (setup stage)${NC}"
 }
 
 show_menu(){
@@ -779,8 +1013,8 @@ show_menu(){
   box_item 3 "Update this menu script"
   box_item 4 "Uninstall"; box_div
   box_item 5 "Admin panel settings"
-  box_item 6 "SSL certificate (HTTP-01)"
-  box_item 7 "SSL certificate (Cloudflare DNS)"
+  box_item 6 "SSL certificate & HTTPS lock"
+  box_item 7 "HTTPS lock status"
   box_item 8 "Logs"
   box_item 9 "Factory reset"
   box_item 10 "Brute-force protection (fail2ban)"
@@ -792,7 +1026,7 @@ show_menu(){
   read -r -p "Choice [0-18]: " choice
   case "$choice" in
     1) cmd_install ;; 2) cmd_update ;; 3) cmd_update_menu ;; 4) cmd_uninstall ;;
-    5) cmd_admin ;; 6) cmd_cert ;; 7) cmd_cert_cf ;; 8) cmd_log ;; 9) cmd_reset ;; 10) install_fail2ban ;; 11) install_warp ;;
+    5) cmd_admin ;; 6) cmd_ssl_menu ;; 7) cmd_lock status ;; 8) cmd_log ;; 9) cmd_reset ;; 10) install_fail2ban ;; 11) install_warp ;;
     12) cmd_service start ;; 13) cmd_service stop ;; 14) cmd_service restart ;; 15) cmd_service status ;;
     16) require_root; systemctl enable "$SERVICE_NAME" >/dev/null; ok "Autostart enabled." ;;
     17) require_root; systemctl disable "$SERVICE_NAME" >/dev/null; ok "Autostart disabled." ;;
@@ -809,8 +1043,13 @@ main(){
     update-menu) cmd_update_menu ;;
     uninstall) cmd_uninstall ;;
     admin) cmd_admin ;;
+    ssl) cmd_ssl_menu ;;
     cert) cmd_cert ;;
     cert-cf) cmd_cert_cf ;;
+    cert-zerossl) cmd_cert_zerossl ;;
+    csr) cmd_csr ;;
+    cert-import) cmd_cert_import ;;
+    lock) cmd_lock "${2:-status}" ;;
     log) cmd_log ;;
     reset) cmd_reset ;;
     fail2ban) install_fail2ban ;;

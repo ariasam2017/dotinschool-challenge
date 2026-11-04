@@ -31,11 +31,12 @@ services:
       - DOTINSCHOOL_DOCKER=1
       - SSL_CERT_PATH=/certs/fullchain.pem
       - SSL_KEY_PATH=/certs/privkey.pem
-      # Production profile: refuses to start if the certificate files are
-      # missing (no silent plain-HTTP fallback); admin panel only from
-      # ADMIN_ALLOWED_CIDRS. See docs/security/TLS-POLICY.md.
-      - APP_ENV=production
-      - ADMIN_ALLOWED_CIDRS=${ADMIN_ALLOWED_CIDRS:?set ADMIN_ALLOWED_CIDRS in .env - the management network CIDRs, or any if the edge enforces it}
+      # HTTPS lock ("dotinschool-challenge lock on" sets APP_ENV=production):
+      # refuses to start if the certificate files are missing (no silent
+      # plain-HTTP fallback); admin panel only from ADMIN_ALLOWED_CIDRS.
+      # Defaults to locked when unset. See docs/security/TLS-POLICY.md.
+      - APP_ENV=${APP_ENV:-production}
+      - ADMIN_ALLOWED_CIDRS=${ADMIN_ALLOWED_CIDRS:-}
     env_file:
       - path: ../.env
         required: false

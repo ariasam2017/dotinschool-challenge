@@ -13,19 +13,27 @@
 #   dotinschool-challenge                 interactive menu (free-port finder, HTTPS cert, ...)
 #   dotinschool-challenge up | down | restart | logs | update | admin | ps | rebuild | port
 #   dotinschool-challenge cert <domain>   set up HTTPS - pick a method interactively:
-#                                 1) HTTPS-only :443, cert via Cloudflare DNS  }  the
-#                                 2) HTTPS-only :443, cert via standalone HTTP  }  3x-ui
-#                                    (app terminates TLS itself, no HTTP)       }  shape
-#                                 3) Caddy in front + keep HTTP, auto Let's Encrypt
-#                                 4) Caddy in front + keep HTTP, Cloudflare DNS
-#   dotinschool-challenge cert <domain> 1  skip the prompt, use method 1 (or 2 / 3 / 4)
-#   dotinschool-challenge cert off        remove HTTPS again (plain HTTP on APP_PORT)
+#                                 1) HTTPS on :443, free Let's Encrypt via Cloudflare DNS
+#                                 2) HTTPS on :443, free Let's Encrypt via standalone HTTP
+#                                    (app terminates TLS itself - the 3x-ui shape)
+#                                 3) Caddy in front, automatic Let's Encrypt
+#                                 4) Caddy in front, Let's Encrypt via Cloudflare DNS
+#                                 5) HTTPS on :443, free ZeroSSL via standalone HTTP
+#                                 6) HTTPS on :443, your own certificate (Certum, company CA)
+#   dotinschool-challenge cert <domain> 1  skip the prompt, use method 1 (or 2 .. 6)
+#   dotinschool-challenge cert off        remove HTTPS again (only while the lock is off)
+#   dotinschool-challenge csr <domain>    own certificate step 1: key + CSR for the CA
+#   dotinschool-challenge lock on|off|status
+#                                 HTTPS lock: "on" = production, ONLY HTTPS from then on
 #   dotinschool-challenge heal            recover a stuck / half-brought-up stack
 #
+# Stages (docs/security/TLS-POLICY.md): a fresh install is in the SETUP stage -
+# plain http://<ip>:<APP_PORT> works (admin included) so it can be checked.
+# Get a certificate, check https:// in a browser, then "lock on": production
+# mode, plain HTTP refused, admin panel only from the management network.
+#
 # acme.sh (the same engine 3x-ui uses) is the certificate tool for methods
-# 1/2/4; it auto-renews via its own cron. Methods 1/2 are HTTPS-only on :443
-# (set HTTPS_PORT in .env to use another port). Methods 3/4 keep plain
-# http://<ip>:<APP_PORT> alongside HTTPS.
+# 1/2/4/5; it auto-renews via its own cron. Method 6 is renewed by hand.
 #
 # Optional one-shot HTTPS at install time:
 #   DOTINSCHOOL_DOMAIN=panel.example.com  bash build/docker-install.sh
@@ -175,6 +183,10 @@ DOMAIN=
 #   direct = HTTPS-only, app terminates TLS itself on HTTPS_PORT (3x-ui style)
 CERT_MODE=
 HTTPS_PORT=443
+# Stage - "dotinschool-challenge lock on" switches to production (HTTPS only):
+APP_ENV=setup
+ALLOW_INSECURE_ADMIN=1
+APP_BIND=0.0.0.0
 ADMIN_USERNAME=administrator
 ADMIN_PASSWORD=$(random_password)
 ADMIN_PATH=$(random_admin_path)
@@ -225,6 +237,15 @@ cd /opt/dotinschool-challenge
 # invocation, not just the first.
 mkdir -p data
 chown -R 10001:10001 data 2>/dev/null || true
+# An .env from before the HTTPS lock existed has no APP_ENV: keep it running
+# exactly as before (setup stage) - the compose files default to locked.
+if [[ -w .env ]] && ! grep -qE '^APP_ENV=' .env; then
+  printf '%s\n' "# Stage - 'dotinschool-challenge lock on' switches to production (HTTPS only):" \
+    "APP_ENV=setup" "ALLOW_INSECURE_ADMIN=1" "APP_BIND=0.0.0.0" >> .env
+fi
+# shared certificate helpers (own-certificate import, CSR, checks)
+# shellcheck source=ssl-tools.sh
+[[ -f build/ssl-tools.sh ]] && source build/ssl-tools.sh
 # --env-file .env (not relying on compose's own auto-discovery): compose
 # resolves ${APP_PORT:-8080} in build/docker-compose.yml relative to the
 # COMPOSE FILE's directory (build/), not this cd'd-to directory - so without
@@ -369,7 +390,7 @@ acme_install(){
 # acme.sh's cron handling renewal and reloading Caddy on its own thereafter.
 # method: cf (Cloudflare DNS API) | standalone (temporary :80 bind)
 acme_issue(){
-  local domain="$1" method="$2"
+  local domain="$1" method="$2" ca="${3:-letsencrypt}"
   acme_install || return 1
   mkdir -p "$CERT_DIR/$domain"
   # Force Let's Encrypt. acme.sh ships with ZeroSSL as the default CA, which
@@ -379,7 +400,14 @@ acme_issue(){
   # earlier attempt keeps whatever default it had.
   "$ACME_HOME/acme.sh" --set-default-ca --server letsencrypt >/dev/null 2>&1 || true
   local ok=0
-  local CA=(--server letsencrypt)
+  local CA=(--server "$ca")
+  if [[ "$ca" == "zerossl" ]]; then
+    local email=""
+    [[ -t 0 ]] && read -rp "Your email (ZeroSSL needs an account email): " email
+    [[ "$email" == *@*.* ]] || { echo "[!] A valid email is required for ZeroSSL."; return 1; }
+    "$ACME_HOME/acme.sh" --register-account -m "$email" --server zerossl --home "$ACME_HOME" >/dev/null 2>&1 \
+      || { echo "[!] Could not register the ZeroSSL account."; return 1; }
+  fi
   if [[ "$method" == "cf" ]]; then
     if [[ -z "${CF_Token:-}" && -t 0 ]]; then
       echo "Create a Cloudflare API token (Permissions: Zone > DNS > Edit,"
@@ -411,16 +439,67 @@ acme_issue(){
   # container app runs as uid 10001 and must be able to read them (a 600
   # root-owned key = "permission denied" inside the container = the TLS
   # listener never comes up). chown to 10001, then reload.
-  local fixperms="chown -R 10001:10001 '$CERT_DIR/$domain' 2>/dev/null; chmod 644 '$CERT_DIR/$domain'/*.pem 2>/dev/null"
+  local fixperms="chown -R 10001:10001 '$CERT_DIR/$domain' 2>/dev/null; chmod 644 '$CERT_DIR/$domain/fullchain.pem'; chmod 600 '$CERT_DIR/$domain/privkey.pem'"
   "$ACME_HOME/acme.sh" --install-cert -d "$domain" --home "$ACME_HOME" --ecc \
     --fullchain-file "$CERT_DIR/$domain/fullchain.pem" \
     --key-file "$CERT_DIR/$domain/privkey.pem" \
     --reloadcmd "${fixperms}; docker exec dotinschool-challenge-caddy caddy reload --config /etc/caddy/Caddyfile --force >/dev/null 2>&1; docker restart dotinschool-challenge >/dev/null 2>&1; true" \
     >/dev/null 2>&1
   [[ -s "$CERT_DIR/$domain/fullchain.pem" && -s "$CERT_DIR/$domain/privkey.pem" ]] || { echo "[!] Certificate files were not written."; return 1; }
-  chown -R 10001:10001 "$CERT_DIR/$domain" 2>/dev/null || true
-  chmod 644 "$CERT_DIR/$domain"/*.pem 2>/dev/null || true
+  fix_cert_perms "$domain"
   echo "[ok] Certificate saved to $CERT_DIR/$domain/ (acme.sh will auto-renew it)."
+}
+
+# the app runs as uid 10001 inside the container and must read the pems; the
+# key stays private to it (600), the chain is public anyway (644)
+fix_cert_perms(){
+  chown -R 10001:10001 "$CERT_DIR/$1" 2>/dev/null || true
+  chmod 700 "$CERT_DIR/$1" 2>/dev/null || true
+  chmod 644 "$CERT_DIR/$1/fullchain.pem" 2>/dev/null || true
+  chmod 600 "$CERT_DIR/$1/privkey.pem" 2>/dev/null || true
+}
+
+# Own certificate (Certum, a company CA, any CA): import + check the files the
+# CA sent into $CERT_DIR/<domain>/. Never auto-renewed.
+cert_import_files(){ # domain
+  local domain="$1" stage
+  declare -F ssl_import_interactive >/dev/null || { echo "[x] build/ssl-tools.sh is missing - run 'dotinschool-challenge update' first."; return 1; }
+  stage=$(mktemp -d); chmod 700 "$stage"
+  if ! ssl_import_interactive "$domain" "$CERT_DIR/.pending/$domain" "$stage"; then rm -rf "$stage"; return 1; fi
+  # acme.sh must not overwrite these files on its next renewal run
+  if [[ -x "$ACME_HOME/acme.sh" ]]; then
+    "$ACME_HOME/acme.sh" --remove -d "$domain" --ecc --home "$ACME_HOME" >/dev/null 2>&1 || true
+  fi
+  mkdir -p "$CERT_DIR/$domain"
+  install -m 644 "$stage/fullchain.pem" "$CERT_DIR/$domain/fullchain.pem"
+  install -m 600 "$stage/privkey.pem" "$CERT_DIR/$domain/privkey.pem"
+  rm -rf "$stage" "$CERT_DIR/.pending/$domain"
+  fix_cert_perms "$domain"
+  echo "[!] This certificate is NOT renewed automatically - note the expiry date and repeat"
+  echo "    'dotinschool-challenge csr' + 'cert <domain> 6' before then (check: dotinschool-challenge lock status)."
+}
+
+# Own certificate step 1: private key + CSR to give the CA.
+do_csr(){ # [domain]
+  declare -F ssl_make_csr >/dev/null || { echo "[x] build/ssl-tools.sh is missing - run 'dotinschool-challenge update' first."; return 1; }
+  local domain="${1:-}" extra org country dir a
+  echo "Step 1 of 2 for a certificate you order yourself (Certum, your company CA, ...):"
+  echo "this creates the private key ON THIS SERVER and a request (CSR) to give the CA."
+  [[ -n "$domain" ]] || read -rp "Domain for the certificate (e.g. panel.company.ir): " domain
+  [[ -n "$domain" ]] || { echo "No domain given."; return 1; }
+  read -rp "Extra names on the same certificate, space-separated (Enter = none): " extra
+  read -rp "Organisation name (Enter = skip): " org
+  read -rp "Country code, 2 letters, e.g. IR (Enter = skip): " country
+  dir="$CERT_DIR/.pending/$domain"
+  if [[ -s "$dir/request.csr" ]]; then
+    read -rp "A request for ${domain} already exists. Make a new one (the old one stops matching)? [y/N] " a
+    if [[ "$a" != "y" && "$a" != "Y" ]]; then echo; cat "$dir/request.csr"; return 0; fi
+  fi
+  ssl_make_csr "$domain" "$extra" "$dir" "$org" "$country" || { echo "[x] Could not create the request."; return 1; }
+  echo "[ok] Private key kept on this server only: $dir/privkey.pem (never send it to anyone)."
+  echo "[ok] Request (CSR) saved to $dir/request.csr - paste everything below into the CA's order form:"
+  echo; cat "$dir/request.csr"; echo
+  echo "When the CA sends the certificate, upload it here and run:  dotinschool-challenge cert ${domain} 6"
 }
 
 # `dotinschool-challenge cert <domain>` — set up HTTPS. acme.sh is the certificate
@@ -445,6 +524,11 @@ do_cert(){
   local appport; appport=$(grep -E '^APP_PORT=' .env | cut -d= -f2-)
 
   if [[ "$domain" == "off" ]]; then
+    if is_locked; then
+      echo "[x] The HTTPS lock is ON - HTTPS cannot be removed in production."
+      echo "    Turn the lock off first (dotinschool-challenge lock off) if you really need to."
+      return 1
+    fi
     echo "Disabling HTTPS - back to plain HTTP on APP_PORT ..."
     docker rm -f dotinschool-challenge-caddy >/dev/null 2>&1 || true
     $PROD down --remove-orphans 2>/dev/null || true
@@ -469,24 +553,36 @@ do_cert(){
   if [[ -z "$method" && -t 0 ]]; then
     echo
     echo "How do you want HTTPS set up for ${domain}?"
-    echo "  1) HTTPS-only on :443, cert via Cloudflare DNS   (like 3x-ui; needs a CF API token;"
-    echo "                                                    works even behind the Cloudflare proxy)"
-    echo "  2) HTTPS-only on :443, cert via standalone HTTP  (like 3x-ui; needs :80 free for ~20s)"
-    echo "  3) Caddy in front, keep plain HTTP too, automatic Let's Encrypt"
-    echo "  4) Caddy in front, keep plain HTTP too, cert via Cloudflare DNS"
-    read -rp "Choice [1-4]: " method
+    echo " Free certificate:"
+    echo "  1) HTTPS on :443, Let's Encrypt via Cloudflare DNS  (needs a CF API token;"
+    echo "                                                       works even behind the Cloudflare proxy)"
+    echo "  2) HTTPS on :443, Let's Encrypt via standalone HTTP (needs :80 free for ~20s)"
+    echo "  3) Caddy in front, automatic Let's Encrypt"
+    echo "  4) Caddy in front, Let's Encrypt via Cloudflare DNS"
+    echo "  5) HTTPS on :443, ZeroSSL via standalone HTTP       (needs :80 free + an email)"
+    echo " Own / paid certificate (Certum, your company CA, ...):"
+    echo "  6) HTTPS on :443 with the files your CA sent         (make the CSR first: dotinschool-challenge csr)"
+    echo " (plain http://<ip> keeps working until you turn the HTTPS lock on)"
+    read -rp "Choice [1-6]: " method
   fi
   [[ -n "$method" ]] || method=1
 
+  cp -p .env .env.pre-cert
   docker rm -f dotinschool-challenge-caddy >/dev/null 2>&1 || true
   set_env_kv DOMAIN "$domain"
 
+  local rc=0
   case "$method" in
-    1|cf|cloudflare|direct)          _cert_direct "$domain" cf         "$apath" "$ip" "$appport" ;;
-    2|standalone|http)               _cert_direct "$domain" standalone "$apath" "$ip" "$appport" ;;
-    4|caddy-cf)                      _cert_caddy  "$domain" cf         "$apath" "$ip" "$appport" ;;
-    *)                               _cert_caddy  "$domain" auto       "$apath" "$ip" "$appport" ;;
+    1|cf|cloudflare|direct)          _cert_direct "$domain" cf         "$apath" "$ip" "$appport" || rc=$? ;;
+    2|standalone|http)               _cert_direct "$domain" standalone "$apath" "$ip" "$appport" || rc=$? ;;
+    4|caddy-cf)                      _cert_caddy  "$domain" cf         "$apath" "$ip" "$appport" || rc=$? ;;
+    5|zerossl)                       _cert_direct "$domain" zerossl    "$apath" "$ip" "$appport" || rc=$? ;;
+    6|own|import)                    _cert_direct "$domain" own        "$apath" "$ip" "$appport" || rc=$? ;;
+    *)                               _cert_caddy  "$domain" auto       "$apath" "$ip" "$appport" || rc=$? ;;
   esac
+  rm -f .env.pre-cert
+  [[ $rc -eq 0 ]] || return $rc
+  offer_lock
 }
 
 # HTTPS-only, app-terminated TLS on :443 (the 3x-ui shape).
@@ -506,18 +602,25 @@ _cert_direct(){ # domain issuemethod apath ip appport
   docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
   docker compose --env-file .env -f build/docker-compose.yml -f build/docker-compose.acme.yml down --remove-orphans 2>/dev/null || true
 
-  if ! acme_issue "$domain" "$im"; then _cert_rollback "$domain" "$ip" "$appport" "$apath"; return 1; fi
+  local got=0
+  case "$im" in
+    own)     cert_import_files "$domain" && got=1 ;;
+    zerossl) acme_issue "$domain" standalone zerossl && got=1 ;;
+    *)       acme_issue "$domain" "$im" && got=1 ;;
+  esac
+  if [[ $got -ne 1 ]]; then _cert_rollback "$domain" "$ip" "$appport" "$apath"; return 1; fi
 
   set_env_kv CERT_MODE direct
   echo "Starting the panel in HTTPS-only mode on :${hp} ..."
-  if $TLS up -d --remove-orphans; then
+  # recreate: the app reads the certificate only at start
+  if $TLS up -d --force-recreate --remove-orphans; then
     local shown=":${hp}"; [[ "$hp" == "443" ]] && shown=""
     echo
     echo "Done - HTTPS only, no plain HTTP (exactly like the 3x-ui panel)."
     echo "  panel : https://${domain}${shown}/${apath}/"
     echo "  user  : https://${domain}${shown}/"
     echo "  logs  : dotinschool-challenge logs"
-    echo "  cert auto-renews (acme.sh cron); turn it off with:  dotinschool-challenge cert off"
+    [[ "$im" == "own" ]] || echo "  cert auto-renews (acme.sh cron)"
   else
     _cert_rollback "$domain" "$ip" "$appport" "$apath"; return 1
   fi
@@ -557,11 +660,21 @@ _cert_ok(){ # domain apath ip appport
   echo
   echo "Done."
   echo "  https : https://${1}/${2}/"
-  echo "  http  : http://${3}:${4}/${2}/        (always available)"
+  if is_locked; then echo "  (HTTPS lock ON - plain HTTP is refused)"
+  else echo "  http  : http://${3}:${4}/${2}/        (until you turn the HTTPS lock on)"; fi
   echo "  watch : dotinschool-challenge logs"
 }
 _cert_rollback(){ # domain ip appport apath
   echo
+  if is_locked && [[ -f .env.pre-cert ]]; then
+    # production: never fall back to plain HTTP - restore the previous HTTPS setup
+    echo "[!] HTTPS setup failed - restoring the previous certificate setup (the HTTPS lock is on)."
+    mv -f .env.pre-cert .env
+    docker rm -f dotinschool-challenge-caddy >/dev/null 2>&1 || true
+    compose_now up -d --remove-orphans || true
+    echo "    Fix the cause and retry:  dotinschool-challenge cert ${1}"
+    return
+  fi
   echo "[!] HTTPS setup failed - reverting to plain HTTP so the panel stays up."
   set_env_kv DOMAIN ""
   set_env_kv CERT_MODE ""
@@ -571,6 +684,116 @@ _cert_rollback(){ # domain ip appport apath
   echo "    Fix the cause and retry:  dotinschool-challenge cert ${1}"
 }
 
+# ---- HTTPS lock (setup stage -> production) ---------------------------------
+
+is_locked(){ grep -qE '^APP_ENV=production' .env 2>/dev/null; }
+del_env_kv(){ sed -i "/^$1=/d" .env; }
+# security-relevant changes go to syslog (journald), where the SIEM agent picks them up
+audit_log(){ logger -t dotinschool-challenge "$*" 2>/dev/null || true; }
+
+# docker compose with the files the CURRENT .env selects (C was fixed at start)
+compose_now(){
+  local f=(-f build/docker-compose.yml)
+  if grep -qE '^CERT_MODE=direct' .env 2>/dev/null; then f=(-f build/docker-compose.tls.yml)
+  elif has_domain; then
+    if grep -qE '^CERT_MODE=acme' .env 2>/dev/null; then f+=(-f build/docker-compose.acme.yml); else f+=(-f build/docker-compose.prod.yml); fi
+  fi
+  docker compose --env-file .env "${f[@]}" "$@"
+}
+
+# the app answers inside its container (loopback is allowed in every stage)
+app_answers(){
+  local i url="http://127.0.0.1:8080/api/version"
+  grep -qE '^CERT_MODE=direct' .env 2>/dev/null && url="https://127.0.0.1:8443/api/version"
+  for i in $(seq 1 20); do
+    docker exec dotinschool-challenge wget -qO- --no-check-certificate "$url" >/dev/null 2>&1 && return 0
+    sleep 2
+  done
+  return 1
+}
+
+https_configured(){
+  if grep -qE '^CERT_MODE=(direct|acme)' .env 2>/dev/null; then [[ -s "$CERT_DIR/$(get_domain)/fullchain.pem" ]]
+  else has_domain; fi
+}
+
+lock_status(){
+  echo
+  if is_locked; then echo "HTTPS lock: ON  - production: HTTPS only, plain HTTP refused"
+  else echo "HTTPS lock: OFF - setup stage: plain HTTP and admin login over HTTP allowed (not for real use)"; fi
+  if grep -qE '^CERT_MODE=(direct|acme)' .env 2>/dev/null; then
+    echo "Certificate ($(get_domain)):"
+    if declare -F ssl_show_info >/dev/null; then ssl_show_info "$CERT_DIR/$(get_domain)/fullchain.pem"; fi
+  elif has_domain; then echo "Certificate: Caddy's automatic Let's Encrypt for $(get_domain) (renewed by Caddy)"
+  else echo "Certificate: none yet - set up HTTPS first (menu 10 / dotinschool-challenge cert <domain>)"; fi
+  local a; a=$(grep -E '^ADMIN_ALLOWED_CIDRS=' .env 2>/dev/null | cut -d= -f2-)
+  if [[ -n "$a" ]]; then echo "Admin panel allowed from: $a"; fi
+  echo
+}
+
+lock_on(){
+  https_configured || { echo "[x] No HTTPS yet. Set it up first (menu 10 / dotinschool-challenge cert <domain>), check https:// in a browser, then lock."; return 1; }
+  if grep -qE '^CERT_MODE=(direct|acme)' .env 2>/dev/null; then
+    openssl x509 -in "$CERT_DIR/$(get_domain)/fullchain.pem" -noout -checkend 0 >/dev/null 2>&1       || { echo "[x] The certificate has expired - renew it first."; return 1; }
+  fi
+  declare -F ssl_prompt_admin_cidrs >/dev/null || { echo "[x] build/ssl-tools.sh is missing - run 'dotinschool-challenge update' first."; return 1; }
+  local cidrs
+  cidrs=$(ssl_prompt_admin_cidrs "$(grep -E '^ADMIN_ALLOWED_CIDRS=' .env 2>/dev/null | cut -d= -f2-)")     || { echo "[x] Invalid list - nothing changed. Use IPs/CIDRs like 10.10.0.0/16,192.168.5.7 or the word any."; return 1; }
+  cp -p .env .env.pre-lock
+  set_env_kv APP_ENV production
+  set_env_kv APP_BIND 127.0.0.1
+  set_env_kv ADMIN_ALLOWED_CIDRS "$cidrs"
+  del_env_kv ALLOW_INSECURE_ADMIN
+  compose_now up -d --force-recreate --remove-orphans
+  if ! app_answers; then
+    echo "[x] The panel refused to start in production mode:"
+    docker logs --tail 30 dotinschool-challenge 2>&1 | grep -iE "fatal|refusing" | tail -n 3 || true
+    mv -f .env.pre-lock .env
+    compose_now up -d --force-recreate --remove-orphans
+    echo "[x] Lock NOT applied - back in the setup stage, nothing else changed."
+    return 1
+  fi
+  rm -f .env.pre-lock
+  audit_log "HTTPS lock turned ON by ${SUDO_USER:-root} (admin panel allowed from: ${cidrs})"
+  echo "[ok] HTTPS lock is ON. The panel now works only over HTTPS; plain HTTP is refused, and it"
+  echo "     will not start without a valid certificate. Admin panel only from: ${cidrs}"
+  run_action admin
+}
+
+lock_off(){
+  is_locked || { echo "The HTTPS lock is already off (setup stage)."; return 0; }
+  echo "[!] Turning the lock off puts the system back into the SETUP stage: plain HTTP and admin"
+  echo "    login over HTTP become possible again. This is not allowed for production use."
+  local a; read -rp "Type UNLOCK to confirm: " a
+  [[ "$a" == "UNLOCK" ]] || { echo "Cancelled - the lock stays on."; return 0; }
+  set_env_kv APP_ENV setup
+  set_env_kv APP_BIND 0.0.0.0
+  set_env_kv ALLOW_INSECURE_ADMIN 1
+  compose_now up -d --force-recreate --remove-orphans
+  audit_log "HTTPS lock turned OFF by ${SUDO_USER:-root}"
+  echo "[!] Lock is OFF - setup stage. Turn it back on with: dotinschool-challenge lock on"
+}
+
+do_lock(){
+  case "${1:-status}" in
+    on) lock_on ;;
+    off) lock_off ;;
+    status) lock_status ;;
+    *) echo "usage: dotinschool-challenge lock on|off|status"; return 1 ;;
+  esac
+}
+
+# after a certificate goes live: check it in a browser, then lock
+offer_lock(){
+  is_locked && return 0
+  [[ -t 0 ]] || { echo "Check https:// in a browser, then turn the HTTPS lock on:  dotinschool-challenge lock on"; return 0; }
+  echo
+  echo "Open the https:// address above in a browser and check that the padlock shows and the admin panel works."
+  local a; read -rp "Everything OK? Turn the HTTPS lock on now (production mode, plain HTTP refused from then on)? [y/N] " a
+  if [[ "$a" == "y" || "$a" == "Y" ]]; then lock_on
+  else echo "Lock stays off for now. Turn it on later with:  dotinschool-challenge lock on"; fi
+}
+
 running_count(){ "${C[@]}" ps -q 2>/dev/null | grep -c . || true; }
 
 run_action(){
@@ -578,7 +801,7 @@ run_action(){
   # all root-owned. Without this a non-root run dies half-way (a failed step in
   # an && chain) and the panel looks "not updated". Re-exec via sudo instead.
   case "$1" in
-    update|rebuild|up|restart|cert|heal|fix|reset)
+    update|rebuild|up|restart|cert|csr|lock|heal|fix|reset)
       if [ "$(id -u)" -ne 0 ]; then
         if command -v sudo >/dev/null 2>&1; then exec sudo -- "$0" "$@"; fi
         echo "[x] '$1' needs root — re-run as:  sudo dotinschool-challenge $1"; exit 1
@@ -600,6 +823,8 @@ run_action(){
       [[ "$(running_count)" == "0" ]] && echo && echo "(no containers running - 'dotinschool-challenge up' / menu option 1 brings the stack up)" ;;
     port)    show_ports ;;
     cert)    do_cert "${2:-}" "${3:-}" ;;
+    csr)     do_csr "${2:-}" ;;
+    lock)    do_lock "${2:-status}" ;;
     heal|fix|reset)
       echo "Recovering the stack..."
       docker rm -f dotinschool-challenge dotinschool-challenge-caddy >/dev/null 2>&1 || true
@@ -608,7 +833,10 @@ run_action(){
       docker compose --env-file .env -f build/docker-compose.tls.yml down --remove-orphans 2>/dev/null || true
       # If .env says an HTTPS mode but the cert file is gone (a half-finished
       # issue), don't crash-loop - drop back to plain HTTP.
-      if grep -qE '^CERT_MODE=(acme|direct)' .env 2>/dev/null && [[ ! -s "${CERT_DIR}/$(get_domain)/fullchain.pem" ]]; then
+      if grep -qE '^CERT_MODE=(acme|direct)' .env 2>/dev/null && [[ ! -s "${CERT_DIR}/$(get_domain)/fullchain.pem" ]] && is_locked; then
+        echo "  [x] The certificate file is missing and the HTTPS lock is on - production never falls"
+        echo "      back to plain HTTP. Install the certificate again: dotinschool-challenge cert $(get_domain)"
+      elif grep -qE '^CERT_MODE=(acme|direct)' .env 2>/dev/null && [[ ! -s "${CERT_DIR}/$(get_domain)/fullchain.pem" ]]; then
         echo "  (cert file missing - falling back to plain HTTP; re-run 'dotinschool-challenge cert <domain>' to retry)"
         set_env_kv DOMAIN ""; set_env_kv CERT_MODE ""
         docker compose --env-file .env -f build/docker-compose.yml up -d --remove-orphans
@@ -673,7 +901,7 @@ run_action(){
       echo "Username:     $(grep -E '^ADMIN_USERNAME=' $e | cut -d= -f2-)"
       echo "Password:     $(grep -E '^ADMIN_PASSWORD=' $e | cut -d= -f2-)"
       ;;
-    *) echo "usage: dotinschool-challenge {up|down|restart|logs|ps|port|cert|rebuild|update|admin|heal}"; exit 1 ;;
+    *) echo "usage: dotinschool-challenge {up|down|restart|logs|ps|port|cert|csr|lock|rebuild|update|admin|heal}"; exit 1 ;;
   esac
 }
 
@@ -692,11 +920,16 @@ show_menu(){
   echo "|   7. Show container status                       |"
   echo "|   8. Find a free port                            |"
   echo "|   9. Show admin URL + credentials                |"
-  echo "|  10. Set up HTTPS  (3x-ui style :443, or Caddy)  |"
-  echo "|  11. Disable HTTPS (back to plain HTTP)          |"
+  echo "|  10. Set up HTTPS (free cert, or your own)       |"
+  echo "|  11. Disable HTTPS (only while the lock is off)  |"
   echo "|  12. Recover / fix a stuck stack                 |"
+  echo "|  13. Own cert (Certum, company CA): create CSR   |"
+  echo "|  14. HTTPS lock ON  (production)                 |"
+  echo "|  15. HTTPS lock OFF (back to setup stage)        |"
+  echo "|  16. HTTPS lock + certificate status             |"
   echo "+-------------------------------------------------+"
-  read -rp "Choice [0-12]: " choice
+  if is_locked; then echo "  HTTPS lock: ON (production)"; else echo "  HTTPS lock: OFF (setup stage - not for real use)"; fi
+  read -rp "Choice [0-16]: " choice
   case "$choice" in
     0) return ;;
     1) run_action up ;;
@@ -711,11 +944,15 @@ show_menu(){
     10) do_cert "" ;;
     11) do_cert off ;;
     12) run_action heal ;;
-    *) echo "Enter a number from 0 to 12." ;;
+    13) run_action csr ;;
+    14) run_action lock on ;;
+    15) run_action lock off ;;
+    16) run_action lock status ;;
+    *) echo "Enter a number from 0 to 16." ;;
   esac
 }
 
-if [[ $# -eq 0 ]]; then show_menu; else run_action "$1"; fi
+if [[ $# -eq 0 ]]; then show_menu; else run_action "$@"; fi
 WRAP
   chmod +x "$tmp"
   mv "$tmp" "$CLI_PATH"
@@ -770,7 +1007,9 @@ main(){
   echo
   ( cd "$INSTALL_DIR" && "$CLI_PATH" admin )
   echo
-  warn "For HTTPS later: point a domain's DNS A record at this server, then run:  dotinschool-challenge cert <domain>"
+  warn "SETUP stage: plain HTTP works so you can check the install - not for real use."
+  warn "Next: point a domain's DNS A record at this server, run  dotinschool-challenge cert <domain>,"
+  warn "check https:// in a browser, then  dotinschool-challenge lock on  (production: HTTPS only)."
   warn "If anything ever looks stuck:  dotinschool-challenge heal"
 }
 # Lets the installed CLI's own "update" action refresh /usr/local/bin/

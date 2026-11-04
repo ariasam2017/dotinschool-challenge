@@ -131,6 +131,12 @@ action).
   and only from loopback/`TRUSTED_PROXIES`.
 - `TestEveryNonPublicRouteRequiresAdmin` fails if a new `/api` route is neither
   in its `publicRoutes` list nor behind `requireAdmin`.
+- Install stages: both Linux CLIs write `APP_ENV=setup` + `ALLOW_INSECURE_ADMIN=1`
+  (Docker also `APP_BIND=0.0.0.0`) at install; `dotinschool-challenge lock on`
+  flips to `APP_ENV=production` (and rolls back if the app won't start). The TLS
+  compose files default to the locked values when the vars are unset.
+  Certificate import/CSR/validation lives in `build/ssl-tools.sh`, sourced by both
+  CLIs (it ships in the release bundle under `build/`).
 - Security compliance work is tracked phase by phase in
   `docs/security/COMPLIANCE-PLAN.md`.
 
