@@ -80,7 +80,7 @@ func (s *server) handlePatchParticipant(c *gin.Context) {
 		return
 	}
 
-	_, isAdmin := s.svc.Sessions.ResolveAdmin(bearerToken(c))
+	_, isAdmin := s.resolveAdmin(c)
 	if !isAdmin {
 		token := ""
 		if body.SessionToken != nil {

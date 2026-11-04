@@ -33,7 +33,9 @@ func TestPatchParticipant_OneTimeSubmission(t *testing.T) {
 
 	log := logrus.New()
 	log.SetOutput(io.Discard) // keep `go test -v` output readable
-	cfg := &config.Config{AdminUsername: "administrator"}
+	// The suite drives the admin API from a plain-HTTP test address; the
+	// transport rules have their own tests (transport_test.go).
+	cfg := &config.Config{AdminUsername: "administrator", AllowInsecureAdmin: true}
 	svc := service.New(cfg, db, log)
 
 	// make the event live, so the status transition itself is allowed

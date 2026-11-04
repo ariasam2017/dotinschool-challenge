@@ -83,8 +83,8 @@ route via `NoRoute`.
 ### Go layering (`cmd/server/main.go` wires it top-down)
 
 `config.Load` (reads `.env`, may append a generated admin password back to it) →
-`database.Open` (GORM + SQLite) + `EnsureDefaults` + `Seed` (**demo data is always
-seeded** at boot) → `service.New` → `web.NewRouter` (Gin) → `service.NewScheduler`
+`cfg.Validate` (fatal on an unsafe production config) → `database.Open` (GORM + SQLite) +
+`EnsureDefaults` + `Seed` (demo data seeded at boot **except with `APP_ENV=production`**) → `service.New` → `web.NewRouter` (Gin) → `service.NewScheduler`
 (cron; flips a scheduled event live the moment `eventStartsAt` passes, no admin
 action).
 
@@ -115,6 +115,24 @@ action).
 - **Self-update**: the panel's update button only works for a git checkout
   (`git fetch` + `git reset --hard origin/main`, then `os.Exit(0)`); on a release
   install (no `.git`) and on Docker it just tells the admin to run `dotinschool-challenge update`.
+
+### Transport & admin-channel rules (`internal/web/transport.go`, docs/security/TLS-POLICY.md)
+
+- `APP_ENV=production` refuses to start without TLS (cert files, or `TLS_PROXY=1`)
+  or without `ADMIN_ALLOWED_CIDRS`, and 403s every non-secure request. "Secure" =
+  TLS here, a trusted proxy saying `X-Forwarded-Proto: https`, or loopback with
+  no forwarding headers.
+- The admin surface (login, `requireAdmin`, the optional-admin `s.resolveAdmin`,
+  the admin index) needs a secure channel in **every** mode (dev escape hatch:
+  `ALLOW_INSECURE_ADMIN=1`, rejected in production) and 404s outside
+  `ADMIN_ALLOWED_CIDRS`. Use `s.resolveAdmin(c)`, never `Sessions.ResolveAdmin`
+  directly, in handlers.
+- Client IP comes from ONE header (`CLIENT_IP_HEADER`, default X-Forwarded-For)
+  and only from loopback/`TRUSTED_PROXIES`.
+- `TestEveryNonPublicRouteRequiresAdmin` fails if a new `/api` route is neither
+  in its `publicRoutes` list nor behind `requireAdmin`.
+- Security compliance work is tracked phase by phase in
+  `docs/security/COMPLIANCE-PLAN.md`.
 
 ### API surface & auth model
 

@@ -187,7 +187,7 @@ func (s *server) handleSession(c *gin.Context) {
 // start, during a pause, or after the end.
 func (s *server) handleGetConfig(c *gin.Context) {
 	cfg := s.svc.Settings.CurrentConfig()
-	if _, isAdmin := s.svc.Sessions.ResolveAdmin(bearerToken(c)); !isAdmin && !s.eventLive() {
+	if _, isAdmin := s.resolveAdmin(c); !isAdmin && !s.eventLive() {
 		cfg.Challenge = json.RawMessage("null")
 	}
 	c.JSON(http.StatusOK, cfg)

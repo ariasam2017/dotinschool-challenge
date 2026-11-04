@@ -35,6 +35,12 @@ func main() {
 	}
 
 	cfg := config.Load(wd, log)
+	if err := cfg.Validate(); err != nil {
+		log.WithError(err).Fatal("unsafe configuration — refusing to start (see docs/security/TLS-POLICY.md)")
+	}
+	if !cfg.Production {
+		log.Warn("APP_ENV is not production — development mode: plain HTTP is served for the user panel. Never expose this mode to users.")
+	}
 
 	db, err := database.Open(cfg, log)
 	if err != nil {
@@ -45,8 +51,11 @@ func main() {
 	if err := database.EnsureDefaults(db); err != nil {
 		log.WithError(err).Fatal("could not seed configuration defaults")
 	}
-	if err := database.Seed(db); err != nil {
-		log.WithError(err).Fatal("could not seed demo data")
+	// Demo participants are fake personal data — never in production.
+	if !cfg.Production {
+		if err := database.Seed(db); err != nil {
+			log.WithError(err).Fatal("could not seed demo data")
+		}
 	}
 
 	services := service.New(cfg, db, log)
@@ -71,11 +80,18 @@ func main() {
 		Version:  version,
 	})
 
+	// Every request is bounded. WriteTimeout covers the slowest normal route
+	// (an AI code review, up to 90s); the few big-transfer admin routes (DB
+	// restore/backup, participant import/export) widen their own deadlines —
+	// see longRequest in internal/web.
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           router,
-		ReadHeaderTimeout: 15 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      120 * time.Second,
 		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    64 << 10,
 	}
 
 	go func() {
@@ -91,7 +107,7 @@ func main() {
 
 		var listenErr error
 		if cfg.UseTLS {
-			srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+			srv.TLSConfig = tlsConfig()
 			listenErr = srv.ListenAndServeTLS(cfg.CertPath, cfg.KeyPath)
 		} else {
 			listenErr = srv.ListenAndServe()
@@ -115,6 +131,23 @@ func main() {
 		log.WithError(err).Warn("graceful shutdown timed out")
 	}
 	log.Info("bye")
+}
+
+// tlsConfig: TLS 1.2 minimum. TLS 1.3 suites are all AEAD and not
+// configurable in Go; for 1.2 only forward-secret ECDHE with AEAD ciphers are
+// offered — no CBC, RC4, 3DES or static-RSA key exchange.
+func tlsConfig() *tls.Config {
+	return &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
+	}
 }
 
 func newLogger() *logrus.Logger {

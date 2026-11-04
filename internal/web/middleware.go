@@ -13,7 +13,8 @@ import (
 // securityHeaders sets the same hardening headers on every response — static
 // assets included. connect-src/img-src/default-src pinned to 'self' keep an
 // injected script from exfiltrating data to an outside origin even if one ever
-// runs. HSTS is only sent when this process actually terminates TLS.
+// runs. HSTS is sent whenever the visitor's connection was TLS — terminated
+// here or by a trusted proxy — so it holds in every TLS deployment mode.
 func (s *server) securityHeaders() gin.HandlerFunc {
 	csp := "default-src 'self'; " +
 		"script-src 'self'; " +
@@ -36,8 +37,8 @@ func (s *server) securityHeaders() gin.HandlerFunc {
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
 		h.Set("Content-Security-Policy", csp)
-		if s.cfg.UseTLS {
-			h.Set("Strict-Transport-Security", "max-age=15552000; includeSubDomains")
+		if s.servedOverTLS(c) {
+			h.Set("Strict-Transport-Security", hstsValue)
 		}
 		c.Next()
 	}
@@ -94,10 +95,19 @@ func bodyLimit(max int64) gin.HandlerFunc {
 	}
 }
 
-// requireAdmin aborts unless a valid, unexpired admin bearer token is present.
-// On expiry the token is dropped so a stale browser tab surfaces a clean 401.
+// hstsValue: one year, sub-domains included (the Caddyfiles send the same).
+const hstsValue = "max-age=31536000; includeSubDomains"
+
+// requireAdmin aborts unless the request comes over the admin channel (TLS,
+// allowed network) with a valid, unexpired admin bearer token. On expiry the
+// token is dropped so a stale browser tab surfaces a clean 401.
 func (s *server) requireAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if e := s.adminChannelErr(c); e != nil {
+			fail(c, e)
+			c.Abort()
+			return
+		}
 		username, ok := s.svc.Sessions.ResolveAdmin(bearerToken(c))
 		if !ok {
 			fail(c, apperr.Unauthorized())

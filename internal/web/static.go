@@ -39,6 +39,12 @@ func (s *server) mountStatic(r *gin.Engine) {
 	gz := newGzipAssets(assetsFS)
 
 	serveIndex := func(c *gin.Context, admin bool, base string) {
+		// Outside the management network the admin panel does not exist.
+		if admin && !s.adminNetworkAllowed(c) {
+			s.log.WithField("ip", c.ClientIP()).WithField("path", c.Request.URL.Path).Warn("admin access denied: outside allowed network")
+			c.String(http.StatusNotFound, "یافت نشد")
+			return
+		}
 		var meta string
 		if admin {
 			meta = `<meta name="dotin-mode" content="admin"><meta name="dotin-base" content="` + htmlAttr(base) + `">`

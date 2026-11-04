@@ -167,6 +167,15 @@ ADMIN_PASSWORD=${pass}
 ADMIN_PATH=${adminpath}
 # SSL_CERT_PATH=
 # SSL_KEY_PATH=
+# ---- production profile (docs/security/TLS-POLICY.md) ----
+# Refuses to start without TLS (SSL_CERT_PATH/SSL_KEY_PATH, or TLS_PROXY=1
+# behind Caddy / the Cloudflare Tunnel) and serves nothing over plain HTTP.
+# APP_ENV=production
+# Management network(s) the admin panel answers; "any" only if the edge
+# (Cloudflare Access, VPN) enforces it. Required with APP_ENV=production.
+# ADMIN_ALLOWED_CIDRS=10.0.0.0/8
+# TLS_PROXY=1
+# CLIENT_IP_HEADER=X-Forwarded-For
 # ---- SMS (ippanel) ----
 # IPPANEL_API_KEY=
 # IPPANEL_PATTERN_CODE=
@@ -649,12 +658,21 @@ print_tunnel_info(){
   info "Users without a VPN keep using the normal address (dotinschool-challenge admin -> 1)."
 }
 
+# Behind the tunnel cloudflared terminates TLS and reports the visitor in
+# CF-Connecting-IP: tell the app so its TLS check and rate limits see the truth.
+tunnel_env(){
+  set_env_val CLIENT_IP_HEADER CF-Connecting-IP
+  set_env_val TLS_PROXY 1
+  systemctl restart "$SERVICE_NAME" || true
+}
+
 tunnel_quick(){
   require_root
   [[ -f "$ENV_FILE" ]] || die "Not installed yet — run \"dotinschool-challenge install\" first."
   install_cloudflared
   write_tunnel_unit "$(tunnel_origin_args)"
   set_env_val TUNNEL_MODE quick
+  tunnel_env
   info "Connecting to Cloudflare (up to 60 seconds)..."
   local url="" i
   for i in $(seq 1 60); do
@@ -687,6 +705,7 @@ tunnel_token(){
   install_cloudflared
   write_tunnel_unit "run --token ${token}"
   set_env_val TUNNEL_MODE token
+  tunnel_env
   sleep 5
   if systemctl is-active --quiet "$TUNNEL_SERVICE"; then
     ok "Tunnel is running with your Cloudflare token — users with a VPN on can use the Public Hostname you set."

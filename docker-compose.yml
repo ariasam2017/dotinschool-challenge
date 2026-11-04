@@ -1,5 +1,11 @@
 # dotinschool-challenge — one container, one command, from this folder:
 #
+# DEVELOPMENT / EVALUATION ONLY: plain HTTP, no TLS. Not an approved production
+# mode (docs/security/TLS-POLICY.md) — production adds a TLS override
+# (build/docker-compose.prod.yml, .acme.yml) or uses build/docker-compose.tls.yml.
+# The admin panel refuses plain HTTP from anywhere but loopback; set
+# ALLOW_INSECURE_ADMIN=1 in .env to evaluate it over plain HTTP (dev only).
+#
 #   docker compose up -d --build          # build + start
 #   docker compose logs -f app            # follow logs
 #   docker compose down                   # stop

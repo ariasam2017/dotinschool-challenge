@@ -2,11 +2,9 @@
 #
 # This override ADDS a Caddy reverse proxy that terminates TLS for $DOMAIN and
 # fetches + auto-renews a Let's Encrypt certificate on its own (no certbot, no
-# acme.sh, no downtime). It deliberately does NOT touch the app's own published
-# port: the app stays reachable directly on http://<server-ip>:<APP_PORT> too,
-# so the panel is up on the IP the whole time HTTPS is being set up — and stays
-# up even if DNS / the ACME challenge isn't ready yet. Caddy reaches the app
-# over the compose network (app:8080), which needs no published port at all.
+# acme.sh, no downtime), and switches the app to the production profile: it is
+# then reachable ONLY as https://$DOMAIN/ (plain http://<ip>:<APP_PORT> is
+# bound to the host's loopback and refused by the app anyway).
 #
 # Requirements for the HTTPS side to go green:
 #   1. A DNS A record for $DOMAIN pointing at this server's public IP.
@@ -20,13 +18,24 @@
 
 services:
   app:
+    # Production profile (docs/security/TLS-POLICY.md): the app refuses to
+    # start without TLS in front, refuses any non-TLS request, and answers the
+    # admin panel only from ADMIN_ALLOWED_CIDRS. Its own port is bound to the
+    # host's loopback only (healthchecks / an SSH tunnel) — the public reaches
+    # it solely through Caddy. `!override` needs Docker Compose >= 2.24.4.
+    ports: !override
+      - "127.0.0.1:${APP_PORT:-8081}:8080"
     environment:
-      # Caddy reaches the app from the compose network, so trust its forwarding
-      # headers from there — otherwise every visitor shares Caddy's IP and one
-      # attacker can use up the login/OTP rate limits for everyone. Published
-      # ports on Linux keep the real public source IP, which these private
-      # ranges never match, so a direct visitor still can't spoof theirs.
-      - TRUSTED_PROXIES=172.16.0.0/12,10.0.0.0/8
+      - APP_ENV=production
+      - TLS_PROXY=1
+      - ADMIN_ALLOWED_CIDRS=${ADMIN_ALLOWED_CIDRS:?set ADMIN_ALLOWED_CIDRS in .env - the management network CIDRs, or any if the edge enforces it}
+      # Trust forwarding headers from Caddy's fixed address ONLY (not the whole
+      # Docker range): the visitor IP behind it drives the login/OTP limits.
+      - TRUSTED_PROXIES=${EDGE_CADDY_IP:-172.30.57.10}
+      - CLIENT_IP_HEADER=X-Forwarded-For
+    networks:
+      edge:
+        ipv4_address: ${EDGE_APP_IP:-172.30.57.20}
 
   caddy:
     image: caddy:2-alpine
@@ -43,8 +52,20 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      edge:
+        ipv4_address: ${EDGE_CADDY_IP:-172.30.57.10}
     restart: unless-stopped
 
 volumes:
   caddy_data:
   caddy_config:
+
+# A dedicated network with a fixed subnet: exactly two members (Caddy, app),
+# fixed addresses, so TRUSTED_PROXIES can name Caddy alone. Change
+# EDGE_SUBNET / EDGE_*_IP in .env if the range collides with something else.
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: ${EDGE_SUBNET:-172.30.57.0/24}

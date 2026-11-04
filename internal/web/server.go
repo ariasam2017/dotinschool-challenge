@@ -5,6 +5,7 @@ package web
 
 import (
 	"net"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -29,25 +30,34 @@ const (
 	restoreBodyLimit = 256 << 20 // 256 MiB
 )
 
+// bigTransferTimeout is how long a restore/backup/import request may take —
+// the server-wide read/write timeouts are much shorter (cmd/server/main.go).
+const bigTransferTimeout = 10 * time.Minute
+
 type server struct {
-	cfg     *config.Config
-	svc     *service.Services
-	log     *logrus.Logger
-	version string
+	cfg         *config.Config
+	svc         *service.Services
+	log         *logrus.Logger
+	version     string
+	trustedNets []*net.IPNet // peers whose forwarding headers are believed
 }
 
 // NewRouter builds the fully configured gin.Engine.
 func NewRouter(opts Options) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
-	s := &server{cfg: opts.Config, svc: opts.Services, log: opts.Log, version: firstNonEmpty(opts.Version, "dev")}
+	s := &server{
+		cfg: opts.Config, svc: opts.Services, log: opts.Log, version: firstNonEmpty(opts.Version, "dev"),
+		trustedNets: parseTrustedNets(opts.Config.TrustedProxies),
+	}
 
 	r := gin.New()
-	configureProxyTrust(r, opts.Config.TrustedProxies)
+	configureProxyTrust(r, opts.Config.TrustedProxies, opts.Config.ClientIPHeader)
 
 	r.Use(s.recovery())
 	r.Use(s.requestLogger())
 	r.Use(s.securityHeaders())
+	r.Use(s.requireSecureTransport())  // production: nothing is served without TLS
 	r.Use(bodyLimit(defaultBodyLimit)) // 2 MiB ceiling on every request body
 
 	r.MaxMultipartMemory = 4 << 20
@@ -58,17 +68,15 @@ func NewRouter(opts Options) *gin.Engine {
 	return r
 }
 
-// configureProxyTrust decides where c.ClientIP() comes from. Loopback is always
-// a trusted proxy (a local Caddy, or cloudflared for "dotinschool-challenge tunnel").
-// Behind the Cloudflare Tunnel every request arrives from cloudflared on
-// loopback and CF-Connecting-IP carries the real visitor — without it, all VPN
-// players would share one IP for rate limiting and fail2ban. extra (the
-// TRUSTED_PROXIES env) adds the Docker network a Caddy container reaches the
-// app from; without it every visitor behind that Caddy shares Caddy's address,
-// so one attacker could exhaust the admin-login / OTP limits for everyone.
-// Forwarding headers are ignored from anyone else, so a direct visitor cannot
-// spoof their IP with them.
-func configureProxyTrust(r *gin.Engine, extra []string) {
+// configureProxyTrust decides where c.ClientIP() comes from — the one value the
+// rate limits, fail2ban and the access log all use. Loopback is always a
+// trusted proxy (a local Caddy, or cloudflared for "dotinschool-challenge
+// tunnel"); extra (TRUSTED_PROXIES) adds the Caddy container's fixed address.
+// Exactly one header is believed (CLIENT_IP_HEADER: X-Forwarded-For by
+// default, CF-Connecting-IP behind the Cloudflare Tunnel), and only from those
+// peers — anyone else's forwarding headers are ignored, so a direct visitor
+// cannot spoof their IP, and a second header can't be played against the first.
+func configureProxyTrust(r *gin.Engine, extra []string, header string) {
 	trusted := []string{"127.0.0.1", "::1"}
 	for _, p := range extra {
 		if _, _, err := net.ParseCIDR(p); err == nil || net.ParseIP(p) != nil {
@@ -76,7 +84,10 @@ func configureProxyTrust(r *gin.Engine, extra []string) {
 		}
 	}
 	_ = r.SetTrustedProxies(trusted)
-	r.RemoteIPHeaders = []string{"CF-Connecting-IP", "X-Forwarded-For", "X-Real-IP"}
+	if header == "" {
+		header = "X-Forwarded-For"
+	}
+	r.RemoteIPHeaders = []string{header}
 }
 
 // mountAPI registers every /api/* route with the exact method, path, auth, and
@@ -99,21 +110,23 @@ func (s *server) mountAPI(r *gin.Engine) {
 	// ---- admin only ----
 	admin := api.Group("")
 	{
-		api.POST("/admin/login", s.handleAdminLogin) // login itself is unauthenticated
+		// login itself is unauthenticated, but still only over TLS from the
+		// management network
+		api.POST("/admin/login", s.adminChannel(), s.handleAdminLogin)
 	}
 	admin.Use(s.requireAdmin())
 	{
 		admin.GET("/participants", s.handleListParticipants)
 		admin.DELETE("/participants/:id", s.handleDeleteParticipant)
-		admin.GET("/admin/participants/export", s.handleExportParticipants)
-		admin.POST("/admin/participants/import", bodyLimit(restoreBodyLimit), s.handleImportParticipants)
+		admin.GET("/admin/participants/export", longRequest(bigTransferTimeout), s.handleExportParticipants)
+		admin.POST("/admin/participants/import", longRequest(bigTransferTimeout), bodyLimit(restoreBodyLimit), s.handleImportParticipants)
 		admin.PUT("/config", s.handlePutConfig)
 
 		admin.POST("/admin/logout", s.handleAdminLogout)
-		admin.GET("/admin/backup", s.handleBackup)
+		admin.GET("/admin/backup", longRequest(bigTransferTimeout), s.handleBackup)
 		// restore uploads a whole base64-encoded SQLite file — needs a much
 		// higher ceiling than the 2 MiB default (still admin-only + magic-checked).
-		admin.POST("/admin/backup/restore", bodyLimit(restoreBodyLimit), s.handleRestore)
+		admin.POST("/admin/backup/restore", longRequest(bigTransferTimeout), bodyLimit(restoreBodyLimit), s.handleRestore)
 		admin.POST("/admin/update", s.handleUpdate)
 
 		admin.GET("/admin/appearance", s.handleGetAppearance)

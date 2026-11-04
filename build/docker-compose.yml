@@ -1,5 +1,11 @@
 # ── dotinschool-challenge ── base stack: works everywhere (Windows/macOS/Linux, IP-only).
 #
+# DEVELOPMENT / EVALUATION ONLY: plain HTTP, no TLS. Not an approved production
+# mode (docs/security/TLS-POLICY.md) — production adds a TLS override
+# (build/docker-compose.prod.yml, .acme.yml) or uses build/docker-compose.tls.yml.
+# The admin panel refuses plain HTTP from anywhere but loopback; set
+# ALLOW_INSECURE_ADMIN=1 in .env to evaluate it over plain HTTP (dev only).
+#
 # The image is built by the packaging Dockerfile (build/Dockerfile), which just
 # copies a host-compiled Linux binary — so it never fails on memory / proxy /
 # BuildKit. Build it first, then bring the stack up:

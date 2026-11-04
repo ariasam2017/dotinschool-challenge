@@ -37,6 +37,16 @@ export class ApiError extends Error {
 interface FetchOpts {
   method?: string
   body?: unknown
+  /** Abort after this long. Default 30 s — slow AI routes and big transfers pass more. */
+  timeoutMs?: number
+}
+
+const DEFAULT_TIMEOUT_MS = 30_000
+const AI_TIMEOUT_MS = 120_000 // the server allows an AI call up to 90 s
+const TRANSFER_TIMEOUT_MS = 10 * 60_000 // DB restore / participant import
+
+function timeoutError(): ApiError {
+  return new ApiError('پاسخ سرور بیش از حد طول کشید — دوباره تلاش کنید.', 'TIMEOUT', 0)
 }
 
 export async function apiFetch<T = unknown>(path: string, opts: FetchOpts = {}): Promise<T> {
@@ -50,8 +60,10 @@ export async function apiFetch<T = unknown>(path: string, opts: FetchOpts = {}):
       method: opts.method || 'GET',
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal: AbortSignal.timeout(opts.timeoutMs ?? DEFAULT_TIMEOUT_MS),
     })
-  } catch {
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'TimeoutError') throw timeoutError()
     throw new ApiError(
       'ارتباط با سرور برقرار نشد. بررسی کنید: آدرس و پورت درست باشد (همان که پنل روی آن باز شده)، فیلترشکن/پروکسی سیستم روی «دور زدن آدرس‌های محلی» تنظیم باشد، و افزونه‌های مسدودکننده (ad-blocker) روی این صفحه غیرفعال باشند. سپس صفحه را با Ctrl+Shift+R تازه کنید.',
       'NETWORK_ERROR',
@@ -173,10 +185,11 @@ export async function restoreBackup(file: File) {
   return apiFetch<{ ok: true; restarting: true }>('/api/admin/backup/restore', {
     method: 'POST',
     body: { data },
+    timeoutMs: TRANSFER_TIMEOUT_MS,
   })
 }
 export const checkForUpdate = () =>
-  apiFetch<UpdateResult>('/api/admin/update', { method: 'POST' })
+  apiFetch<UpdateResult>('/api/admin/update', { method: 'POST', timeoutMs: AI_TIMEOUT_MS })
 
 /* ---- portable participant transfer (server -> server) ---- */
 export async function exportParticipants(): Promise<Blob> {
@@ -208,6 +221,7 @@ export const importParticipants = (file: ParticipantExportFile) =>
   apiFetch<ParticipantImportResult>('/api/admin/participants/import', {
     method: 'POST',
     body: file,
+    timeoutMs: TRANSFER_TIMEOUT_MS,
   })
 
 /* ---- host resources (admin overview) ---- */
@@ -247,11 +261,16 @@ export const testAiProvider = (id?: string) =>
   apiFetch<{ ok: true; model: string; sample: string }>('/api/admin/ai-settings/test', {
     method: 'POST',
     body: id ? { id } : {},
+    timeoutMs: AI_TIMEOUT_MS,
   })
 export const detectAiProvider = (apiKey: string) =>
-  apiFetch<AiDetectResult>('/api/admin/ai-detect', { method: 'POST', body: { apiKey } })
+  apiFetch<AiDetectResult>('/api/admin/ai-detect', { method: 'POST', body: { apiKey }, timeoutMs: AI_TIMEOUT_MS })
 export const reviewCode = (filename: string, code: string) =>
-  apiFetch<ReviewResult>('/api/admin/review-code', { method: 'POST', body: { filename, code } })
+  apiFetch<ReviewResult>('/api/admin/review-code', {
+    method: 'POST',
+    body: { filename, code },
+    timeoutMs: AI_TIMEOUT_MS,
+  })
 
 /* ---- client error reports ---- */
 export function reportClientError(payload: Record<string, unknown>) {

@@ -5,6 +5,7 @@ package config
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -41,8 +42,33 @@ type Config struct {
 	AdminSubdomain string // lower-case host, no port; "" when disabled
 
 	// TrustedProxies are extra IPs/CIDRs (beyond loopback) whose forwarding
-	// headers are believed — the Docker network a Caddy container sits on.
+	// headers are believed — the Caddy container's fixed address.
 	TrustedProxies []string
+	// ClientIPHeader is the ONE forwarding header the visitor's address is read
+	// from, and only when the request comes from a trusted proxy. Rate limits,
+	// fail2ban and the access log all use that single value.
+	ClientIPHeader string
+
+	// Production (APP_ENV=production) turns the transport rules from advice
+	// into hard requirements: no plain-HTTP serving, no insecure admin, an
+	// explicit admin network allow-list — see Validate.
+	Production bool
+	// TLSProxy (TLS_PROXY=1): TLS is terminated by a trusted proxy in front
+	// (Caddy, Cloudflare Tunnel, a corporate load balancer) that reports the
+	// scheme in X-Forwarded-Proto.
+	TLSProxy bool
+	// AllowInsecureAdmin (ALLOW_INSECURE_ADMIN=1) lets the admin panel work
+	// over plain HTTP from a non-loopback address. Development only; refused
+	// in production.
+	AllowInsecureAdmin bool
+	// AdminAllowAll is ADMIN_ALLOWED_CIDRS=any — the admin network restriction
+	// is enforced somewhere else (Cloudflare Access, a VPN-only listener).
+	AdminAllowAll bool
+	// AdminAllowedNets is the parsed ADMIN_ALLOWED_CIDRS: the only source
+	// addresses the admin panel and admin API answer. Empty = unrestricted
+	// (development only).
+	AdminAllowedNets []*net.IPNet
+	badAdminCIDRs    []string
 
 	// SMS (ippanel) — every value optional; when APIKey is empty the OTP
 	// endpoints report SMS_SEND_FAILED just like the original.
@@ -133,6 +159,12 @@ func Load(root string, log *logrus.Logger) *Config {
 			c.TrustedProxies = append(c.TrustedProxies, p)
 		}
 	}
+	c.ClientIPHeader = firstNonEmpty(strings.TrimSpace(os.Getenv("CLIENT_IP_HEADER")), "X-Forwarded-For")
+
+	c.Production = strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
+	c.TLSProxy = envBool("TLS_PROXY")
+	c.AllowInsecureAdmin = envBool("ALLOW_INSECURE_ADMIN")
+	c.AdminAllowAll, c.AdminAllowedNets, c.badAdminCIDRs = parseAllowList(os.Getenv("ADMIN_ALLOWED_CIDRS"))
 
 	c.Domain = strings.TrimSpace(os.Getenv("DOMAIN"))
 	c.PublicHost = strings.TrimSpace(os.Getenv("PUBLIC_HOST"))
@@ -162,6 +194,75 @@ func Load(root string, log *logrus.Logger) *Config {
 	}
 
 	return c
+}
+
+// Validate reports configuration that must stop the server from starting. In
+// production that is every way the panel could end up served without TLS, or
+// the admin panel reachable from anywhere: the safe mode must be the only mode,
+// not a setting someone has to remember.
+func (c *Config) Validate() error {
+	var problems []string
+	if len(c.badAdminCIDRs) > 0 {
+		problems = append(problems, "ADMIN_ALLOWED_CIDRS has invalid entries: "+strings.Join(c.badAdminCIDRs, ", "))
+	}
+	if c.Production {
+		if (c.CertPath != "" || c.KeyPath != "") && !c.UseTLS {
+			problems = append(problems, "SSL_CERT_PATH/SSL_KEY_PATH are set but the files are missing — refusing to fall back to plain HTTP")
+		}
+		if !c.UseTLS && !c.TLSProxy {
+			problems = append(problems, "APP_ENV=production needs TLS: set SSL_CERT_PATH and SSL_KEY_PATH, or TLS_PROXY=1 behind a TLS-terminating proxy")
+		}
+		if c.AllowInsecureAdmin {
+			problems = append(problems, "ALLOW_INSECURE_ADMIN is a development switch and is not allowed with APP_ENV=production")
+		}
+		if !c.AdminAllowAll && len(c.AdminAllowedNets) == 0 {
+			problems = append(problems, "APP_ENV=production needs ADMIN_ALLOWED_CIDRS (the management network), or ADMIN_ALLOWED_CIDRS=any when the edge enforces it")
+		}
+	}
+	if len(problems) == 0 {
+		return nil
+	}
+	return errors.New(strings.Join(problems, "; "))
+}
+
+// parseAllowList reads a comma-separated list of IPs/CIDRs. "any" means the
+// restriction is deliberately delegated elsewhere. A bare IP becomes a /32
+// (or /128). Invalid entries are returned so Validate can refuse to start —
+// silently dropping a typo would quietly widen access.
+func parseAllowList(raw string) (allowAll bool, nets []*net.IPNet, bad []string) {
+	for _, p := range strings.Split(raw, ",") {
+		p = strings.TrimSpace(p)
+		switch {
+		case p == "":
+			continue
+		case strings.EqualFold(p, "any"):
+			allowAll = true
+			continue
+		}
+		if !strings.Contains(p, "/") {
+			if ip := net.ParseIP(p); ip != nil {
+				if ip.To4() != nil {
+					p += "/32"
+				} else {
+					p += "/128"
+				}
+			}
+		}
+		if _, n, err := net.ParseCIDR(p); err == nil {
+			nets = append(nets, n)
+		} else {
+			bad = append(bad, p)
+		}
+	}
+	return allowAll, nets, bad
+}
+
+func envBool(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 // AIConfigPath is the self-healing sidecar copy of the panel AI settings.

@@ -38,7 +38,7 @@ func newHardeningRig(t *testing.T, dbName string) *hardeningRig {
 	}
 	log := logrus.New()
 	log.SetOutput(io.Discard)
-	cfg := &config.Config{AdminUsername: "administrator", DataDir: t.TempDir()}
+	cfg := &config.Config{AdminUsername: "administrator", DataDir: t.TempDir(), AllowInsecureAdmin: true}
 	svc := service.New(cfg, db, log)
 	return &hardeningRig{
 		svc:    svc,
